@@ -16,9 +16,15 @@ intent:
       Schemas and the crew's replay-feed schema) before it is accepted.
     - Python that shapes the snapshots into the pages, and JavaScript for the replay
       player.
-    - The look from mqucifer/design-system, pinned by version.
-    - Contract tests on the data, browser tests on the pages, and the design system's
-      contrast and token checks.
+    - The look from mqucifer/design-system, pinned by its release tag (v0.1.0 today).
+      It is a GitHub repository, not a package on PyPI or npm. Pages link its tagged
+      stylesheet from jsDelivr, https://cdn.jsdelivr.net/gh/mqucifer/design-system@v0.1.0/styles.css,
+      with the fonts and theme script its DESIGN_SYSTEM.md lists. (The boards in
+      docs/design/mock/ inline those styles only so each opens on its own.)
+    - Contract tests on the data, browser tests on the pages, and the site's own contrast
+      and token checks against the design system's rules. The design system's
+      checks/check_tokens.py checks the design system itself, not a site, so the
+      site writes its own.
     out_of_scope:
     - Computing metrics. sprint-metrics computes them; the site arranges and shows
       what it is sent.
@@ -35,7 +41,7 @@ intent:
   done:
     bar: A change is done when its acceptance criteria are met and every check the
       project's CI runs passes, including the data contracts, the browser tests and
-      the design system's checks.
+      the site's contrast and token checks.
     never_touch:
     - .github/workflows/board.yml
     - The committed data snapshots. Only the crew's snapshot pull requests write them;
