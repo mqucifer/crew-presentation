@@ -19,12 +19,11 @@ intent:
     - The look from mqucifer/design-system, pinned by its release tag (v0.1.0 today).
       It is a GitHub repository, not a package on PyPI or npm. Pages link its tagged
       stylesheet from jsDelivr, https://cdn.jsdelivr.net/gh/mqucifer/design-system@v0.1.0/styles.css,
-      with the fonts and theme script its DESIGN_SYSTEM.md lists. (The boards in
-      docs/design/mock/ inline those styles only so each opens on its own.)
+      with the fonts and theme script its DESIGN_SYSTEM.md lists. (The boards in docs/design/mock/
+      inline those styles only so each opens on its own.)
     - Contract tests on the data, browser tests on the pages, and the site's own contrast
-      and token checks against the design system's rules. The design system's
-      checks/check_tokens.py checks the design system itself, not a site, so the
-      site writes its own.
+      and token checks against the design system's rules. The design system's checks/check_tokens.py
+      checks the design system itself, not a site, so the site writes its own.
     out_of_scope:
     - Computing metrics. sprint-metrics computes them; the site arranges and shows
       what it is sent.
@@ -47,3 +46,59 @@ intent:
     - The committed data snapshots. Only the crew's snapshot pull requests write them;
       no story edits data by hand.
   priority: 2
+design:
+  language: Python (build, validation, template rendering) and JavaScript (the replay
+    player in the browser)
+  dependencies: 'Python: jsonschema (validate snapshots against published JSON schemas),
+    jinja2 (render page templates), playwright (drive browser tests), ruff (format
+    and lint, dev). No npm package for the JS: the replay player is vanilla JavaScript
+    loaded by the page, with no build step or framework. The design-system CSS is
+    linked externally from jsDelivr at its pinned tag, not vendored.'
+  sandbox: Python 3.12, a Chromium browser binary with its system libraries (for Playwright
+    browser tests), and the Python packages from the lockfile
+  checks:
+  - python -m pytest tests/test_contracts.py -v
+  - python build.py
+  - python -m pytest tests/test_browser.py -v
+  - python -m pytest tests/test_tokens.py -v
+  sandbox_image: mcr.microsoft.com/playwright/python:v1.52.0-noble@sha256:a1d2b48b65f41f34e5e1d7690f385f1376397b7208691cba359e4078edbf86cb
+  setup: pip install -r requirements.txt
+  autofix:
+  - ruff format --check .
+  parts:
+  - path: ''
+    language: python
+    tests:
+    - tests/test_contracts.py
+    - tests/test_browser.py
+    - tests/test_tokens.py
+  - path: site/js/
+    language: javascript
+    tests:
+    - tests/test_browser.py
+  release_how: A snapshot pull request (one that adds or updates files under data/)
+    that merges to main triggers .github/workflows/deploy.yml. The job checks out
+    the site's code at its latest release tag (the tag is applied when an epic completes),
+    runs the full build (validate all data/ snapshots against schemas/, render the
+    pages, assemble the output with site/js/), deploys the output to GitHub Pages
+    at https://mqucifer.github.io/crew-presentation/, then asserts the site root and
+    each page return HTTP 200. A rerun of the release completes whatever the version
+    is missing (its tag, its image, its tags) and changes nothing already published
+    (§19.9).
+  structure: 'build.py — the build entry point: discovers all JSON files in data/,
+    validates each against the matching schema in schemas/, loads site/templates/
+    via Jinja2, renders each page, copies site/js/ into the output directory, and
+    writes the assembled site to build/. site/templates/ — Jinja2 templates, one per
+    view: sprint_overview.html, replay.html, story_journey.html; each includes the
+    design-system stylesheet link and the site''s own CSS. site/js/replay.js — the
+    replay player: play/pause toggle, speed control (1×, 30×, 60×), skip-idle, timeline
+    scrubber, event ticker, and board-state rendering; vanilla JS, no framework. schemas/
+    — JSON schema files: the sprint-metrics schemas (imported from the sprint-metrics
+    project''s published schemas) and the crew''s replay-feed schema; the contract
+    tests (test_contracts.py) validate every data/ file against the matching schema.
+    data/ — committed snapshot files (one JSON per sprint or replay event); written
+    only by the crew''s snapshot pull requests, never by a story. tests/ — test_contracts.py
+    (schema validation), test_browser.py (Playwright browser tests), test_tokens.py
+    (design-system token and contrast checks).'
+  docs:
+  - README.md
