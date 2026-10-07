@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Model settings compared</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Public+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+:root{--color-bg:#F6EFE3;--color-surface:#FFFBF4;--color-surface-raised:#EFE2CF;--color-border:#E6D8C3;--color-text:#2E1F14;--color-text-dim:#6B5646;--color-link:#A84A16;--color-accent:#A84A16;--color-accent-hover:#7E3510;--color-on-accent:#FFFBF4;--color-feature-bg:#2E1F14;--color-feature-text:#F6EFE3;--color-feature-dim:#E6D8C3;--color-feature-accent:#D9A035;--tone-waiting-bg:#EFE2CF;--tone-waiting-text:#5C4838;--tone-active-bg:#D8E9E6;--tone-active-text:#1F5A5A;--tone-held-bg:#F5E3B5;--tone-held-text:#6E4A06;--tone-done-bg:#E6E7CC;--tone-done-text:#4A5A1E;--tone-blocked-bg:#F4D6CB;--tone-blocked-text:#8E2A12;--stage-1:#D9A035;--stage-1-text:#2E1F14;--stage-2:#D9772E;--stage-2-text:#2E1F14;--stage-3:#A84A16;--stage-3-text:#FFFBF4;--stage-4:#8A3A16;--stage-4-text:#FFFBF4;--stage-5:#5A3218;--stage-5-text:#FFFBF4;}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:"Public Sans",system-ui,sans-serif}
+a{color:var(--color-link)}a:hover{color:var(--color-accent-hover)}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1024px; box-sizing: border-box; padding: 40px 56px; display: flex; flex-direction: column; gap: 28px; background: var(--color-bg); color: var(--color-text)">
+
+<header style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding-bottom: 20px; background: linear-gradient(to right, var(--stage-1) 0 25%, var(--stage-2) 25% 50%, var(--stage-3) 50% 75%, var(--stage-5) 75% 100%) bottom / 100% 5px no-repeat">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 13px; color: var(--color-text-dim)">Developer role · Qwen3.8-27B on the Spark</div>
+<h1 style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 40px; line-height: 1.1">Does thinking help it write code?</h1>
+</div>
+<nav aria-label="Views" style="display: flex; gap: 4px; font-size: 14px; font-weight: 500">
+<a href="sprint-overview.html" style="padding: 10px 14px; border-radius: 8px; text-decoration: none; color: var(--color-text-dim)">Sprint</a>
+<a href="story-journey.html" style="padding: 10px 14px; border-radius: 8px; text-decoration: none; color: var(--color-text-dim)">A story's journey</a>
+<a href="model-settings.html" aria-current="page" style="padding: 10px 14px; border-radius: 8px; text-decoration: none; background: var(--color-surface-raised); color: var(--color-text)">Model settings</a>
+</nav>
+</header>
+
+<section aria-label="Settings side by side" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+
+<div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; display: flex; flex-direction: column">
+<div style="padding: 16px 24px; border-bottom: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 2px"><div style="font-size: 13px; color: var(--color-text-dim)">crew-code</div><h2 style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 24px; font-weight: 600">Thinking off</h2></div>
+<div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 13px; color: var(--color-text-dim)">First try, split stories</div><div style="font-family: 'Public Sans', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">0 of 3</div></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 13px; color: var(--color-text-dim)">Attempts per story</div><div style="font-family: 'Public Sans', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">5.3</div></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 13px; color: var(--color-text-dim)">Reasoning tokens per call</div><div style="font-family: 'Public Sans', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">0</div></div>
+<p style="margin: 0; font-size: 14px; color: var(--color-text-dim); line-height: 1.5">Fast calls, many repairs. Kept both copies after a move; deleted the same thing twice.</p>
+</div>
+</div>
+
+<div style="background: var(--color-surface); border: 2px solid var(--color-accent); border-radius: 8px; display: flex; flex-direction: column">
+<div style="padding: 16px 24px; border-bottom: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 2px"><div style="display: flex; justify-content: space-between; align-items: center"><div style="font-size: 13px; color: var(--color-link); font-weight: 600">crew-code-think · effort low</div><span style="padding: 2px 8px; border-radius: 6px; background: var(--tone-done-bg); color: var(--tone-done-text); font-size: 13px; font-weight: 600">In use</span></div><h2 style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 24px; font-weight: 600">Thinking, low effort</h2></div>
+<div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 13px; color: var(--color-text-dim)">First try, once the crew's bugs were fixed</div><div style="font-family: 'Public Sans', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--color-link)">2 of 3</div></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 13px; color: var(--color-text-dim)">Attempts per story</div><div style="font-family: 'Public Sans', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">[AVG]</div></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 13px; color: var(--color-text-dim)">Reasoning tokens per call</div><div style="font-family: 'Public Sans', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">1.5k–10k</div></div>
+<p style="margin: 0; font-size: 14px; color: var(--color-text-dim); line-height: 1.5">Slower calls, fewer of them. Planned multi-file moves in one go.</p>
+</div>
+</div>
+
+<div style="border: 1px dashed var(--color-text-dim); border-radius: 8px; display: flex; flex-direction: column">
+<div style="padding: 16px 24px; border-bottom: 1px dashed var(--color-border); display: flex; flex-direction: column; gap: 2px"><div style="font-size: 13px; color: var(--color-text-dim)">crew-code-medium</div><h2 style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 24px; font-weight: 600">Thinking, medium</h2></div>
+<div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 13px; color: var(--color-text-dim)">First try</div><div style="font-family: 'Public Sans', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--color-text-dim)">not yet run</div></div>
+<p style="margin: 0; font-size: 14px; color: var(--color-text-dim); line-height: 1.5">The community's sweet spot for this model. Next to measure, on its own alias so every call says which setting made it.</p>
+</div>
+</div>
+
+</section>
+
+<section aria-labelledby="probe-h" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; display: flex; flex-direction: column">
+<div style="padding: 16px 24px; border-bottom: 1px solid var(--color-border)"><h2 id="probe-h" style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 24px; font-weight: 600">Same prompt, three settings: reasoning tokens</h2></div>
+<div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 70px; gap: 12px 14px; align-items: center; font-size: 14px; font-variant-numeric: tabular-nums">
+<div>Thinking off</div><div style="height: 18px; border-radius: 4px; background: var(--color-surface-raised)"></div><div style="text-align: right">0</div>
+<div>Low effort</div><div style="height: 18px; display: flex"><div style="width: 6%; border-radius: 4px; background: var(--color-accent)"></div></div><div style="text-align: right">97</div>
+<div>xhigh (the server default)</div><div style="height: 18px; border-radius: 4px; background: var(--stage-2)"></div><div style="text-align: right">1,697</div>
+</div>
+<p style="margin: 0; font-size: 14px; color: var(--color-text-dim)">Sampling follows the model vendor's card since 2026-09-26: temperature 1.0 with thinking, 0.7 without.</p>
+</div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1024}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

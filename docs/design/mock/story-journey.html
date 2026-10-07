@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A story's journey: #127</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Public+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+:root{--color-bg:#F6EFE3;--color-surface:#FFFBF4;--color-surface-raised:#EFE2CF;--color-border:#E6D8C3;--color-text:#2E1F14;--color-text-dim:#6B5646;--color-link:#A84A16;--color-accent:#A84A16;--color-accent-hover:#7E3510;--color-on-accent:#FFFBF4;--color-feature-bg:#2E1F14;--color-feature-text:#F6EFE3;--color-feature-dim:#E6D8C3;--color-feature-accent:#D9A035;--tone-waiting-bg:#EFE2CF;--tone-waiting-text:#5C4838;--tone-active-bg:#D8E9E6;--tone-active-text:#1F5A5A;--tone-held-bg:#F5E3B5;--tone-held-text:#6E4A06;--tone-done-bg:#E6E7CC;--tone-done-text:#4A5A1E;--tone-blocked-bg:#F4D6CB;--tone-blocked-text:#8E2A12;--stage-1:#D9A035;--stage-1-text:#2E1F14;--stage-2:#D9772E;--stage-2-text:#2E1F14;--stage-3:#A84A16;--stage-3-text:#FFFBF4;--stage-4:#8A3A16;--stage-4-text:#FFFBF4;--stage-5:#5A3218;--stage-5-text:#FFFBF4;}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:"Public Sans",system-ui,sans-serif}
+a{color:var(--color-link)}a:hover{color:var(--color-accent-hover)}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1024px; box-sizing: border-box; padding: 40px 56px; display: flex; flex-direction: column; gap: 28px; background: var(--color-bg); color: var(--color-text)">
+
+<header style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding-bottom: 20px; background: linear-gradient(to right, var(--stage-1) 0 25%, var(--stage-2) 25% 50%, var(--stage-3) 50% 75%, var(--stage-5) 75% 100%) bottom / 100% 5px no-repeat">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 13px; color: var(--color-text-dim)">sprint-metrics #127 · Extract threshold logic into thresholds.py</div>
+<h1 style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 40px; line-height: 1.1">Blocked three times. None of it was the model.</h1>
+</div>
+<nav aria-label="Views" style="display: flex; gap: 4px; font-size: 14px; font-weight: 500">
+<a href="sprint-overview.html" style="padding: 10px 14px; border-radius: 8px; text-decoration: none; color: var(--color-text-dim)">Sprint</a>
+<a href="story-journey.html" aria-current="page" style="padding: 10px 14px; border-radius: 8px; text-decoration: none; background: var(--color-surface-raised); color: var(--color-text)">A story's journey</a>
+<a href="model-settings.html" style="padding: 10px 14px; border-radius: 8px; text-decoration: none; color: var(--color-text-dim)">Model settings</a>
+</nav>
+</header>
+
+<div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 24px; flex-grow: 1">
+
+<section aria-labelledby="tl-h" style="grid-column: span 8; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; display: flex; flex-direction: column">
+<div style="padding: 16px 24px; border-bottom: 1px solid var(--color-border)"><h2 id="tl-h" style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 24px; font-weight: 600">What happened, in order</h2></div>
+<div style="padding: 24px; display: grid; grid-template-columns: 52px 20px minmax(0, 1fr); gap: 0 14px">
+
+<div style="font-size: 14px; color: var(--color-text-dim); padding-top: 1px; font-variant-numeric: tabular-nums">01:04</div>
+<div style="display: flex; flex-direction: column; align-items: center"><div style="width: 12px; height: 12px; margin-top: 4px; border-radius: 50%; background: var(--color-text)"></div><div style="width: 2px; flex-grow: 1; background: var(--color-border)"></div></div>
+<div style="padding-bottom: 18px"><div style="font-weight: 600; font-size: 16px">Developer claims it · thinking at low effort</div><div style="font-size: 14px; color: var(--color-text-dim)">Move five names into a new module, import them back, delete the originals.</div></div>
+
+<div style="font-size: 14px; color: var(--color-text-dim); padding-top: 1px; font-variant-numeric: tabular-nums">01:10</div>
+<div style="display: flex; flex-direction: column; align-items: center"><div style="width: 12px; height: 12px; margin-top: 4px; border-radius: 3px; background: var(--tone-blocked-text)"></div><div style="width: 2px; flex-grow: 1; background: var(--color-border)"></div></div>
+<div style="padding-bottom: 18px; display: flex; flex-direction: column; gap: 6px"><div style="display: flex; align-items: center; gap: 10px"><span style="padding: 2px 8px; border-radius: 6px; background: var(--tone-blocked-bg); color: var(--tone-blocked-text); font-size: 13px; font-weight: 600">Blocked</span><span style="font-weight: 600; font-size: 16px">Refused ×3 by the regression guard, then blocked</span></div><pre style="margin: 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; color: var(--color-text); background: var(--color-bg); border: 1px solid var(--color-border); padding: 8px 10px; border-radius: 6px">calculate_flags: removed entirely</pre><div style="font-size: 14px; color: var(--color-text-dim)">The same message three times. It didn't say which of the three steps was missing.</div></div>
+
+<div style="font-size: 14px; color: var(--color-text-dim); padding-top: 1px; font-variant-numeric: tabular-nums">01:19</div>
+<div style="display: flex; flex-direction: column; align-items: center"><div style="width: 12px; height: 12px; margin-top: 4px; border-radius: 3px; border: 2px dashed var(--color-text); box-sizing: border-box"></div><div style="width: 2px; flex-grow: 1; background: var(--color-border)"></div></div>
+<div style="padding-bottom: 18px"><div style="font-weight: 600; font-size: 16px">Crew fix #208 · a refusal names the missing step</div></div>
+
+<div style="font-size: 14px; color: var(--color-text-dim); padding-top: 1px; font-variant-numeric: tabular-nums">01:25</div>
+<div style="display: flex; flex-direction: column; align-items: center"><div style="width: 12px; height: 12px; margin-top: 4px; border-radius: 3px; background: var(--stage-1)"></div><div style="width: 2px; flex-grow: 1; background: var(--color-border)"></div></div>
+<div style="padding-bottom: 18px; display: flex; flex-direction: column; gap: 6px"><div style="display: flex; align-items: center; gap: 10px"><span style="padding: 2px 8px; border-radius: 6px; background: var(--tone-held-bg); color: var(--tone-held-text); font-size: 13px; font-weight: 600">Returned</span><span style="font-weight: 600; font-size: 16px">Refused, and now we can see why</span></div><pre style="margin: 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; color: var(--color-text); background: var(--color-bg); border: 1px solid var(--color-border); padding: 8px 10px; border-radius: 6px">the change doesn't apply: no definition named 'DEFAULT_THRESHOLDS'</pre><div style="font-size: 14px; color: var(--color-text-dim)">A constant with a type annotation. The crew's edit tool couldn't address it by name.</div></div>
+
+<div style="font-size: 14px; color: var(--color-text-dim); padding-top: 1px; font-variant-numeric: tabular-nums">01:28</div>
+<div style="display: flex; flex-direction: column; align-items: center"><div style="width: 12px; height: 12px; margin-top: 4px; border-radius: 3px; border: 2px dashed var(--color-text); box-sizing: border-box"></div><div style="width: 2px; flex-grow: 1; background: var(--color-border)"></div></div>
+<div style="padding-bottom: 18px"><div style="font-weight: 600; font-size: 16px">Crew fix #209 · annotated constants are addressable</div></div>
+
+<div style="font-size: 14px; color: var(--color-text-dim); padding-top: 1px; font-variant-numeric: tabular-nums">01:31</div>
+<div style="display: flex; flex-direction: column; align-items: center"><div style="width: 12px; height: 12px; margin-top: 4px; border-radius: 50%; background: var(--tone-done-text)"></div><div style="width: 2px; flex-grow: 1; background: var(--color-border)"></div></div>
+<div style="padding-bottom: 18px; display: flex; align-items: center; gap: 10px"><span style="padding: 2px 8px; border-radius: 6px; background: var(--tone-active-bg); color: var(--tone-active-text); font-size: 13px; font-weight: 600">Delivered</span><span style="font-weight: 600; font-size: 16px">On the next attempt · PR #137</span></div>
+
+<div style="font-size: 14px; color: var(--color-text-dim); padding-top: 1px; font-variant-numeric: tabular-nums">01:33</div>
+<div style="display: flex; flex-direction: column; align-items: center"><div style="width: 12px; height: 12px; margin-top: 4px; border-radius: 50%; background: var(--tone-done-text)"></div></div>
+<div style="display: flex; align-items: center; gap: 10px"><span style="padding: 2px 8px; border-radius: 6px; background: var(--tone-done-bg); color: var(--tone-done-text); font-size: 13px; font-weight: 600">Approved</span><span style="font-weight: 600; font-size: 16px">Reviewed, every criterion proven by QA, merged</span></div>
+</div>
+<div style="margin: 0 24px 24px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px" role="img" aria-label="Path: refined, built, reviewed, QA, merged — all reached">
+<div style="padding: 8px 6px; text-align: center; font-size: 13px; font-weight: 600; border-radius: 8px 2px 2px 8px; background: var(--stage-1); color: var(--stage-1-text)">Refined</div>
+<div style="padding: 8px 6px; text-align: center; font-size: 13px; font-weight: 600; border-radius: 2px; background: var(--stage-2); color: var(--stage-2-text)">Built</div>
+<div style="padding: 8px 6px; text-align: center; font-size: 13px; font-weight: 600; border-radius: 2px; background: var(--stage-3); color: var(--stage-3-text)">Reviewed</div>
+<div style="padding: 8px 6px; text-align: center; font-size: 13px; font-weight: 600; border-radius: 2px; background: var(--stage-4); color: var(--stage-4-text)">QA</div>
+<div style="padding: 8px 6px; text-align: center; font-size: 13px; font-weight: 600; border-radius: 2px 8px 8px 2px; background: var(--stage-5); color: var(--stage-5-text)">Merged</div>
+</div>
+</section>
+
+<div style="grid-column: span 4; display: flex; flex-direction: column; gap: 24px">
+<section aria-labelledby="cost-h" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; display: flex; flex-direction: column">
+<div style="padding: 16px 24px; border-bottom: 1px solid var(--color-border)"><h2 id="cost-h" style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 24px; font-weight: 600">What it cost</h2></div>
+<div style="padding: 20px 24px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 16px">
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 13px; color: var(--color-text-dim)">Developer calls</div><div style="font-family: 'Public Sans', sans-serif; font-size: 34px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">6</div></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 13px; color: var(--color-text-dim)">Wall-clock</div><div style="font-family: 'Public Sans', sans-serif; font-size: 34px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">29 min</div></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 13px; color: var(--color-text-dim)">Tokens written</div><div style="font-family: 'Public Sans', sans-serif; font-size: 34px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">[TOTAL]</div></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><div style="font-size: 13px; color: var(--color-text-dim)">of which reasoning</div><div style="font-family: 'Public Sans', sans-serif; font-size: 34px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">~72%</div></div>
+</div>
+</section>
+<section aria-labelledby="lesson-h" style="padding: 24px; background: var(--color-feature-bg); color: var(--color-feature-text); border-radius: 8px; display: flex; flex-direction: column; gap: 12px; flex-grow: 1">
+<h2 id="lesson-h" style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 24px; font-weight: 600">The pattern</h2>
+<p style="margin: 0; font-size: 16px; line-height: 1.6">Every block traced to the crew's own tooling, not the model. A vague refusal hid a bug; a clear one found it on the next attempt.</p>
+<p style="margin: 0; font-size: 16px; line-height: 1.6">That is the loop worth showing: <span style="color: var(--color-feature-accent); font-weight: 600">the crew's work finds what's wrong with the crew.</span></p>
+</section>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1024}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
