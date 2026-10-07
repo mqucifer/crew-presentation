@@ -1,0 +1,43 @@
+# The project's onboarding record (#111). Intent is the Sponsor's, written
+# through `crew onboard`. Design is the project's Architect's, and learned
+# is the crew's; both are proposed by pull request.
+version: 2
+intent:
+  scope:
+    purpose: Show how the crew works as visuals anyone can read, on a public site
+      that someone who has never seen the crew understands. How each sprint went,
+      and a story's path from a Goal to merged, played back.
+    in_scope:
+    - A static site on GitHub Pages, built and deployed by GitHub Actions.
+    - 'Its views: a sprint overview, a replay of work from a Goal to merged, and a
+      story''s journey, built to the design reference in docs/design/mock/.'
+    - Data snapshots the crew sends by pull request, kept in the repository so history
+      accumulates, each checked against its published contract (sprint-metrics' JSON
+      Schemas and the crew's replay-feed schema) before it is accepted.
+    - Python that shapes the snapshots into the pages, and JavaScript for the replay
+      player.
+    - The look from mqucifer/design-system, pinned by version.
+    - Contract tests on the data, browser tests on the pages, and the design system's
+      contrast and token checks.
+    out_of_scope:
+    - Computing metrics. sprint-metrics computes them; the site arranges and shows
+      what it is sent.
+    - Reading the crew's raw events, or anything that carries what the crew was told
+      or thought. Only content-free data is published.
+    - A server, a backend, accounts or analytics. The site is static.
+    - Comparing model settings, until the performance project supplies the data.
+  release:
+    deploys: true
+    publishes: false
+    where: GitHub Pages at https://mqucifer.github.io/crew-presentation/. The site
+      deploys only when a snapshot pull request merges, built from the latest release
+      tag of the site's code, which is tagged when an epic completes.
+  done:
+    bar: A change is done when its acceptance criteria are met and every check the
+      project's CI runs passes, including the data contracts, the browser tests and
+      the design system's checks.
+    never_touch:
+    - .github/workflows/board.yml
+    - The committed data snapshots. Only the crew's snapshot pull requests write them;
+      no story edits data by hand.
+  priority: 2
