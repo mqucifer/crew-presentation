@@ -41,3 +41,73 @@ intent:
     - The committed data snapshots. Only the crew's snapshot pull requests write them;
       no story edits data by hand.
   priority: 2
+design:
+  language: 'Python (the build: shapes committed JSON snapshots into the site''s pages)
+    and JavaScript (the replay player in assets/, in the browser).'
+  dependencies: 'Python: jsonschema (contract validation), jinja2 (page templating),
+    mqucifer-design-system pinned by version (tokens, components, contrast and token
+    checks), pytest, playwright (browser tests). JavaScript: mqucifer-design-system
+    pinned by version (CSS tokens, component styles), eslint, prettier (dev). All
+    locked: uv.lock and package-lock.json.'
+  sandbox: Python 3.12, uv, Node.js 20+, npm, npx, Playwright with Chromium (and its
+    system libraries).
+  checks:
+  - uv run python -m site.build
+  - uv run pytest tests/ -v
+  - npm run lint
+  - uv run python -m site.checks design
+  sandbox_image: mcr.microsoft.com/playwright/python:v1.50.0-jammy@sha256:37cc4a8e8ad6af55ff28c7f7bd05181d91ba9ab95c765355e68efee50305d72b
+  setup: pip install --quiet uv && uv sync && npm ci
+  autofix:
+  - npm run format
+  parts:
+  - path: site/
+    language: python
+    tests:
+    - tests/**/*.py
+  - path: assets/
+    language: javascript
+    tests:
+    - assets/**/*.spec.js
+  ci_checks:
+  - 'The deploy job in .github/workflows/ci.yml: on a snapshot-branch pull request
+    merge, checks out the latest release tag of the site''s code, reads every committed
+    snapshot in data/, builds the site, deploys to GitHub Pages at https://mqucifer.github.io/crew-presentation/
+    using the pages permission, and asserts the deployed URL responds with HTTP 200.
+    This proves the full data-to-page pipeline end to end.'
+  release_how: 'When an epic completes, the site''s code is tagged with a semver release
+    (e.g. v1.0.0). On snapshot PR merge, the deploy job in CI checks out that tag,
+    reads all committed snapshots from data/, builds the site, and deploys to GitHub
+    Pages. A release can be run again (§19.9): a deploy that fails partway leaves
+    the version to be completed by the next run; the tag is not used up. Only the
+    site''s code is tagged; data snapshots accumulate in data/ and are never re-written
+    by a release.'
+  structure: 'site/ is the Python build package. build.py is the entry point: it orchestrates
+    the build (calls data.py to load and validate, then the page shapers, then writes
+    dist/). data.py loads every JSON snapshot in data/ and validates each against
+    its schema in schemas/, failing loudly (§19.6) on any that doesn''t match. render.py
+    provides the shared page chrome (header, nav, design-system token injection via
+    Jinja2) and the helpers every page shaper uses. sprint.py shapes a sprint-metrics
+    snapshot into the sprint overview page (totals, the story-by-story split with
+    attempts, why work didn''t land first time, what the crew decided). journey.py
+    shapes one story''s data into its journey page (the ordered timeline, cost, and
+    pattern). replay.py shapes the replay-feed snapshot into the replay page: an HTML
+    shell with the design system''s components plus embedded JSON that assets/replay.js
+    reads to drive playback. checks.py runs the design system''s contrast and token
+    checks on the built output. assets/ is the JavaScript: replay.js is the replay
+    player (play/pause, 1x/30x/60x speed, skip idle, the timeline with merge/block/crew-fix/design
+    markers, the six-column board that animates, who''s-working, the event ticker);
+    replay.css is the site''s own component styles (the scrubber, speed control, board
+    columns, attempt chart — the components the design-mock README says are ''the
+    site''s own''). data/ holds committed JSON snapshots, written only by the crew''s
+    snapshot pull requests. schemas/ holds the two contracts: sprint-metrics.schema.json
+    (sprint-metrics'' published JSON Schema for its answers) and replay-feed.schema.json
+    (the crew''s replay-feed schema). tests/ holds all Python tests: test_contract.py
+    validates every snapshot in data/ against its schema; test_build.py checks the
+    generated HTML for correctness (every snapshot produces a page, the right data
+    is in the right place); test_browser.py uses Playwright to load the rendered pages
+    and exercise the replay player (play, pause, speed change, skip idle, timeline
+    markers, board state, ticker).'
+  docs:
+  - README.md
+  - docs/design/mock/README.md
