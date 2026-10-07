@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crew performance: Sprint 6</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Public+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+:root{--color-bg:#F6EFE3;--color-surface:#FFFBF4;--color-surface-raised:#EFE2CF;--color-border:#E6D8C3;--color-text:#2E1F14;--color-text-dim:#6B5646;--color-link:#A84A16;--color-accent:#A84A16;--color-accent-hover:#7E3510;--color-on-accent:#FFFBF4;--color-feature-bg:#2E1F14;--color-feature-text:#F6EFE3;--color-feature-dim:#E6D8C3;--color-feature-accent:#D9A035;--tone-waiting-bg:#EFE2CF;--tone-waiting-text:#5C4838;--tone-active-bg:#D8E9E6;--tone-active-text:#1F5A5A;--tone-held-bg:#F5E3B5;--tone-held-text:#6E4A06;--tone-done-bg:#E6E7CC;--tone-done-text:#4A5A1E;--tone-blocked-bg:#F4D6CB;--tone-blocked-text:#8E2A12;--stage-1:#D9A035;--stage-1-text:#2E1F14;--stage-2:#D9772E;--stage-2-text:#2E1F14;--stage-3:#A84A16;--stage-3-text:#FFFBF4;--stage-4:#8A3A16;--stage-4-text:#FFFBF4;--stage-5:#5A3218;--stage-5-text:#FFFBF4;}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:"Public Sans",system-ui,sans-serif}
+a{color:var(--color-link)}a:hover{color:var(--color-accent-hover)}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1024px; box-sizing: border-box; padding: 40px 56px; display: flex; flex-direction: column; gap: 28px; background: var(--color-bg); color: var(--color-text)">
+
+<header style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding-bottom: 20px; background: linear-gradient(to right, var(--stage-1) 0 25%, var(--stage-2) 25% 50%, var(--stage-3) 50% 75%, var(--stage-5) 75% 100%) bottom / 100% 5px no-repeat">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 13px; color: var(--color-text-dim)">mqucifer / crew · sprint-metrics</div>
+<h1 style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 40px; line-height: 1.1">Sprint 6, as the crew ran it</h1>
+</div>
+<nav aria-label="Views" style="display: flex; gap: 4px; font-size: 14px; font-weight: 500">
+<a href="sprint-overview.html" aria-current="page" style="padding: 10px 14px; border-radius: 8px; text-decoration: none; background: var(--color-surface-raised); color: var(--color-text)">Sprint</a>
+<a href="story-journey.html" style="padding: 10px 14px; border-radius: 8px; text-decoration: none; color: var(--color-text-dim)">A story's journey</a>
+<a href="model-settings.html" style="padding: 10px 14px; border-radius: 8px; text-decoration: none; color: var(--color-text-dim)">Model settings</a>
+</nav>
+</header>
+
+<section aria-label="Sprint totals" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; padding: 20px 24px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px"><div style="font-size: 13px; color: var(--color-text-dim)">Stories delivered</div><div style="font-family: 'Public Sans', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">22</div><div style="font-size: 13px; color: var(--color-text-dim)">63 points · all Done</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding-left: 16px; border-left: 1px solid var(--color-border)"><div style="font-size: 13px; color: var(--color-text-dim)">Landed first try</div><div style="font-family: 'Public Sans', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">12 of 22</div><div style="height: 8px; margin-top: 6px; border-radius: 4px; background: var(--color-surface-raised); display: flex"><div style="width: 55%; background: var(--color-accent); border-radius: 4px"></div></div></div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding-left: 16px; border-left: 1px solid var(--color-border)"><div style="font-size: 13px; color: var(--color-text-dim)">Escalations used</div><div style="font-family: 'Public Sans', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">1 / 1</div><div style="font-size: 13px; color: var(--color-text-dim)">budget per one-day sprint</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding-left: 16px; border-left: 1px solid var(--color-border)"><div style="font-size: 13px; color: var(--color-text-dim)">Crew issues fixed</div><div style="font-family: 'Public Sans', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">17</div><div style="font-size: 13px; color: var(--color-text-dim)">during the sprint, by hand</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding-left: 16px; border-left: 1px solid var(--color-border)"><div style="font-size: 13px; color: var(--color-text-dim)">Waiting on the Sponsor</div><div style="font-family: 'Public Sans', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; font-variant-numeric: tabular-nums">4</div><div style="font-size: 13px; color: var(--color-text-dim)">epics at the gate · Goal #48</div></div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 24px; flex-grow: 1">
+
+<section aria-labelledby="split-h" style="grid-column: span 7; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; display: flex; flex-direction: column">
+<div style="padding: 16px 24px; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: baseline">
+<h2 id="split-h" style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 24px; font-weight: 600">The Architect's split, story by story</h2>
+<div style="font-size: 13px; color: var(--color-text-dim); font-variant-numeric: tabular-nums">00:28 – 02:10 UTC</div>
+</div>
+<div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; gap: 18px; font-size: 13px; color: var(--color-text-dim)">
+<div style="display: flex; align-items: center; gap: 6px"><div style="width: 12px; height: 12px; border-radius: 3px; background: var(--tone-done-text)"></div>attempt that landed</div>
+<div style="display: flex; align-items: center; gap: 6px"><div style="width: 12px; height: 12px; border-radius: 3px; background: var(--stage-1)"></div>refused, repaired</div>
+<div style="display: flex; align-items: center; gap: 6px"><div style="width: 12px; height: 12px; border-radius: 3px; background: repeating-linear-gradient(45deg, var(--tone-blocked-text) 0 3px, var(--tone-blocked-bg) 3px 5px)"></div>blocked</div>
+<div style="display: flex; align-items: center; gap: 6px"><div style="width: 12px; height: 12px; border-radius: 3px; border: 2px dashed var(--color-text-dim); box-sizing: border-box"></div>crew fix merged</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr) 90px; gap: 12px; align-items: center"><div style="font-size: 14px"><span style="font-variant-numeric: tabular-nums; color: var(--color-text-dim)">#125</span> card.py</div><div style="display: flex; gap: 3px; align-items: center"><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--tone-done-text)"></div></div><div style="font-size: 13px; color: var(--tone-done-text); font-weight: 600">merged</div></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr) 90px; gap: 12px; align-items: center"><div style="font-size: 14px"><span style="font-variant-numeric: tabular-nums; color: var(--color-text-dim)">#133</span> entry point</div><div style="display: flex; gap: 3px; align-items: center"><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--tone-done-text)"></div></div><div style="font-size: 13px; color: var(--tone-done-text); font-weight: 600">merged</div></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr) 90px; gap: 12px; align-items: center"><div style="font-size: 14px"><span style="font-variant-numeric: tabular-nums; color: var(--color-text-dim)">#126</span> metrics.py</div><div style="display: flex; gap: 3px; align-items: center"><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--tone-done-text)"></div></div><div style="font-size: 13px; color: var(--tone-done-text); font-weight: 600">merged</div></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr) 90px; gap: 12px; align-items: center"><div style="font-size: 14px"><span style="font-variant-numeric: tabular-nums; color: var(--color-text-dim)">#127</span> thresholds.py</div><div style="display: flex; gap: 3px; align-items: center"><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: repeating-linear-gradient(45deg, var(--tone-blocked-text) 0 4px, var(--tone-blocked-bg) 4px 7px)"></div><div style="width: 22px; height: 22px; border-radius: 4px; border: 2px dashed var(--color-text-dim); box-sizing: border-box"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 22px; height: 22px; border-radius: 4px; border: 2px dashed var(--color-text-dim); box-sizing: border-box"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--tone-done-text)"></div></div><div style="font-size: 13px; color: var(--tone-done-text); font-weight: 600">merged</div></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr) 90px; gap: 12px; align-items: center"><div style="font-size: 14px"><span style="font-variant-numeric: tabular-nums; color: var(--color-text-dim)">#128</span> report.py</div><div style="display: flex; gap: 3px; align-items: center"><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--tone-done-text)"></div></div><div style="font-size: 13px; color: var(--tone-done-text); font-weight: 600">first try</div></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr) 90px; gap: 12px; align-items: center"><div style="font-size: 14px"><span style="font-variant-numeric: tabular-nums; color: var(--color-text-dim)">#129</span> sprint_range.py</div><div style="display: flex; gap: 3px; align-items: center"><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: repeating-linear-gradient(45deg, var(--tone-blocked-text) 0 4px, var(--tone-blocked-bg) 4px 7px)"></div><div style="width: 22px; height: 22px; border-radius: 4px; border: 2px dashed var(--color-text-dim); box-sizing: border-box"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div><div style="width: 40px; height: 22px; border-radius: 4px; background: var(--stage-1)"></div></div><div style="font-size: 13px; color: var(--color-text-dim); font-weight: 600">in progress</div></div>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr) 90px; gap: 12px; align-items: center; color: var(--color-text-dim)"><div style="font-size: 14px"><span style="font-variant-numeric: tabular-nums">#130–#132</span> serve, cli, cleanup</div><div style="height: 22px; border-radius: 4px; border: 1px dashed var(--color-text-dim)"></div><div style="font-size: 13px">waiting in order</div></div>
+</div>
+<p style="margin: 0; font-size: 13px; color: var(--color-text-dim); line-height: 1.5">Thinking off for #125, #126 and #133; thinking at low effort from #127 on. The dashed marks are fixes to the crew itself, found by these attempts.</p>
+</div>
+</section>
+
+<div style="grid-column: span 5; display: flex; flex-direction: column; gap: 24px">
+<section aria-labelledby="why-h" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; display: flex; flex-direction: column">
+<div style="padding: 16px 24px; border-bottom: 1px solid var(--color-border)"><h2 id="why-h" style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 24px; font-weight: 600">Why work didn't land first time</h2></div>
+<div style="padding: 20px 24px; display: grid; grid-template-columns: 210px minmax(0, 1fr) 28px; gap: 10px 12px; align-items: center; font-size: 14px; font-variant-numeric: tabular-nums">
+<div>A test's assertion failed</div><div style="height: 14px; border-radius: 3px; background: var(--stage-2); width: 100%"></div><div style="text-align: right">10</div>
+<div>"already exists"</div><div style="height: 14px; border-radius: 3px; background: var(--stage-2); width: 60%"></div><div style="text-align: right">6</div>
+<div>Must create or edit a file</div><div style="height: 14px; border-radius: 3px; background: var(--stage-2); width: 30%"></div><div style="text-align: right">3</div>
+<div>Undefined name (lint)</div><div style="height: 14px; border-radius: 3px; background: var(--stage-2); width: 20%"></div><div style="text-align: right">2</div>
+<div>No test written</div><div style="height: 14px; border-radius: 3px; background: var(--stage-2); width: 20%"></div><div style="text-align: right">2</div>
+<div style="color: var(--color-text-dim)">Cause not recorded</div><div style="height: 14px; border-radius: 3px; background: var(--color-surface-raised); width: 20%"></div><div style="text-align: right; color: var(--color-text-dim)">2</div>
+</div>
+</section>
+<section aria-labelledby="decided-h" style="padding: 24px; background: var(--color-feature-bg); color: var(--color-feature-text); border-radius: 8px; display: flex; flex-direction: column; gap: 12px; flex-grow: 1">
+<h2 id="decided-h" style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 24px; font-weight: 600">Decided by the crew</h2>
+<div style="font-size: 15px; line-height: 1.55">Four stories were rebuilt over <code style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; color: var(--color-feature-accent)">crew_performance.py</code> in one sprint. The Architect revised the design into seven modules, the crew merged it, and filed two technical epics. No one was asked.</div>
+<div style="display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 6px 12px; font-size: 14px; color: var(--color-feature-dim)">
+<div style="font-variant-numeric: tabular-nums">23:37</div><div>Architect · design revision PR #122</div>
+<div style="font-variant-numeric: tabular-nums">23:38</div><div>merged by the crew · epics #123 #124</div>
+<div style="font-variant-numeric: tabular-nums">23:44</div><div>Business Analyst · 8 stories from #123</div>
+</div>
+</section>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1024}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
