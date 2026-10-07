@@ -25,6 +25,7 @@ Nothing it publishes carries what the crew was told or thought.
 
 - [`docs/design/mock/`](docs/design/mock/): the design reference. Build to it.
 - The look comes from [mqucifer/design-system](https://github.com/mqucifer/design-system),
-  pinned by version.
+  pinned by its release tag. Pages link its tagged stylesheet from jsDelivr; it isn't
+  a package on PyPI or npm.
 
 The site's code is written by the crew, from the Goals filed on this repository.
