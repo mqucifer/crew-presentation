@@ -28,7 +28,7 @@ intent:
     - Computing metrics. sprint-metrics computes them; the site arranges and shows
       what it is sent.
     - Reading the crew's raw events, or anything that carries what the crew was told
-      or thought. Only content-free data is published.
+      or thought.
     - A server, a backend, accounts or analytics. The site is static.
     - Comparing model settings, until the performance project supplies the data.
   release:
