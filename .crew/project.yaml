@@ -53,20 +53,23 @@ intent:
 design:
   language: Python (build, validation, template rendering) and JavaScript (the replay
     player in the browser)
-  dependencies: 'Python: jsonschema (validate snapshots against published JSON schemas),
-    jinja2 (render page templates), playwright (drive browser tests), ruff (format
-    and lint, dev). No npm package for the JS: the replay player is vanilla JavaScript
-    loaded by the page, with no build step or framework. The design-system CSS is
-    linked externally from jsDelivr at its pinned tag, not vendored.'
+  dependencies: 'Python: jsonschema (validate the package''s data against the schema
+    it carries), jinja2 (render page templates), playwright (drive browser tests),
+    ruff (format and lint, dev). No npm package for the JS: the replay player is vanilla
+    JavaScript loaded by the page, with no build step or framework. The design-system
+    CSS is linked externally from jsDelivr at its pinned tag, not vendored; the pinned
+    version is a constant in the site''s code, bumped by pull request.'
   sandbox: Python 3.12, a Chromium browser binary with its system libraries (for Playwright
-    browser tests), and the Python packages from the lockfile
+    browser tests), and the Python packages from the lockfile. The delivery-history
+    package and the design-system CSS are fetched by setup into ./.package/; all checks
+    read from there, never from the network.
   checks:
   - python -m pytest tests/test_contracts.py -v
   - python build.py
   - python -m pytest tests/test_browser.py -v
   - python -m pytest tests/test_tokens.py -v
   sandbox_image: mcr.microsoft.com/playwright/python:v1.52.0-noble@sha256:a1d2b48b65f41f34e5e1d7690f385f1376397b7208691cba359e4078edbf86cb
-  setup: pip install -r requirements.txt
+  setup: pip install -r requirements.txt && python tools/fetch_package.py
   autofix:
   - ruff format --check .
   parts:
@@ -80,29 +83,44 @@ design:
     language: javascript
     tests:
     - tests/test_browser.py
-  release_how: A snapshot pull request (one that adds or updates files under data/)
-    that merges to main triggers .github/workflows/deploy.yml. The job checks out
-    the site's code at its latest release tag (the tag is applied when an epic completes),
-    runs the full build (validate all data/ snapshots against schemas/, render the
-    pages, assemble the output with site/js/), deploys the output to GitHub Pages
-    at https://mqucifer.github.io/crew-presentation/, then asserts the site root and
-    each page return HTTP 200. A rerun of the release completes whatever the version
-    is missing (its tag, its image, its tags) and changes nothing already published
-    (§19.9).
-  structure: 'build.py — the build entry point: discovers all JSON files in data/,
-    validates each against the matching schema in schemas/, loads site/templates/
-    via Jinja2, renders each page, copies site/js/ into the output directory, and
-    writes the assembled site to build/. site/templates/ — Jinja2 templates, one per
-    view: sprint_overview.html, replay.html, story_journey.html; each includes the
-    design-system stylesheet link and the site''s own CSS. site/js/replay.js — the
-    replay player: play/pause toggle, speed control (1×, 30×, 60×), skip-idle, timeline
-    scrubber, event ticker, and board-state rendering; vanilla JS, no framework. schemas/
-    — JSON schema files: the sprint-metrics schemas (imported from the sprint-metrics
-    project''s published schemas) and the crew''s replay-feed schema; the contract
-    tests (test_contracts.py) validate every data/ file against the matching schema.
-    data/ — committed snapshot files (one JSON per sprint or replay event); written
-    only by the crew''s snapshot pull requests, never by a story. tests/ — test_contracts.py
-    (schema validation), test_browser.py (Playwright browser tests), test_tokens.py
-    (design-system token and contrast checks).'
+  release_how: A pull request changing delivery-history.tag that merges to main triggers
+    .github/workflows/deploy.yml. The job checks out the site's code at its latest
+    release tag (the tag is applied when an epic completes), runs the full build (fetches
+    the package named in delivery-history.tag from the crew's releases, validates
+    it against the schema the package carries, checks the schema's major version,
+    renders the pages, assembles the output with site/js/ and site/css/), deploys
+    the output to GitHub Pages at https://mqucifer.github.io/crew-presentation/, then
+    asserts the site root and each page return HTTP 200. A rerun of the release completes
+    whatever the version is missing (its tag, its Release, its image and the image's
+    tags) and changes nothing already published (§19.9).
+  structure: 'build.py — the build entry point: reads the package fetched by setup
+    into ./.package/, validates each data file against the schema the package carries,
+    checks the schema''s major version against SUPPORTED_MAJOR_VERSIONS (a constant
+    in this file), loads site/templates/ via Jinja2, renders each page, copies site/js/
+    and site/css/ into the output directory, and writes the assembled site to build/.
+    site/templates/ — Jinja2 templates, one per view: sprint_overview.html, replay.html,
+    story_journey.html, plus base.html (the shared layout that declares the design-system
+    stylesheet link at its pinned jsDelivr URL and the site''s own CSS). site/js/replay.js
+    — the replay player: play/pause toggle, speed control (1×, 30×, 60×), skip-idle,
+    timeline scrubber, event ticker, and board-state rendering; vanilla JS, no framework,
+    no build step. site/css/ — the site''s own CSS: layout, the scrubber, the speed
+    control, the board columns, the attempt chart (the components the design mock
+    marks as the site''s own, not the design system''s); design-system.version — a
+    one-line file holding the pinned design-system tag, read by tools/fetch_package.py
+    and referenced in base.html. tools/fetch_package.py — setup helper: reads delivery-history.tag
+    for the release name, downloads the delivery-history release asset from the crew''s
+    releases, downloads the design-system CSS at the version in site/css/design-system.version,
+    extracts both into ./.package/. Called by setup; the only code that touches the
+    network. tests/test_contracts.py — validates every data file in ./.package/ against
+    the schema the package carries; checks the schema''s major version is in the supported
+    set. tests/test_browser.py — Playwright browser tests: loads each page from build/,
+    exercises the replay player (play, pause, speed, skip-idle, scrub), verifies page
+    structure and accessibility; serves the design-system CSS from ./.package/ via
+    Playwright route interception (the sandbox has no network at test time). tests/test_tokens.py
+    — the site''s own contrast and token checks against the design system''s rules,
+    run against the CSS in ./.package/ and the rendered pages. delivery-history.tag
+    — one line: the release tag of the delivery-history package the site displays;
+    read by setup and the build; agents must not change it. requirements.txt — Python
+    dependencies, locked.'
   docs:
   - README.md
