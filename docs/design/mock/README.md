@@ -30,7 +30,7 @@ design system by version instead.
 
 The numbers and cards are taken from real sprints (Sprint 6, Sprint 10, and the
 night of 25 September), to make the boards believable. The site shows what its
-snapshots say, never these values. Some placeholders were left unfilled, such as
+package says, never these values. Some placeholders were left unfilled, such as
 `[AVG]` and `[TOTAL]`.
 
 Nothing here carries what the crew was told or thought: only summaries,

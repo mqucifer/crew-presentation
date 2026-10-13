@@ -8,24 +8,28 @@ This site shows its work to people who have never seen it.
 
 ## How it works
 
-1. **The data comes in by pull request.** At its cadence, the crew asks the
-   sprint-metrics service for its metrics, exports its own replay feed, and opens
-   a pull request here with both as a JSON snapshot.
-2. **Each snapshot is checked against its contract.** sprint-metrics publishes
-   JSON Schemas for its answers, and the crew publishes one for its replay feed.
-   A snapshot that doesn't match fails its pull request; the site never sees it.
-3. **Merging a snapshot publishes the site.** The site is built from its latest
-   released version, with every snapshot it has been sent, and deployed to Pages.
-   Snapshots stay in the repository, so a trend reaches back as far as the data.
+1. **The data comes as a package.** The crew releases `delivery-history`, a
+   dated package of its sprints, cards and events with sprint-metrics' answers
+   for each sprint, and opens a pull request here that changes one line:
+   [`delivery-history.tag`](delivery-history.tag), the release the site shows.
+   How to use the package is in the crew's README:
+   [Data packages: how projects use them](https://github.com/mqucifer/crew#data-packages-how-projects-use-them).
+2. **Each package is checked against the schema it carries.** CI fetches the
+   release the tag names and validates it. A package on a schema major version
+   the site can't display fails its pull request; the site never sees it.
+3. **Merging the tag publishes the site.** The site is built from its latest
+   released version, with the package the tag names, and deployed to Pages.
+   Each package carries everything up to its date, so a trend reaches back as
+   far as the crew's history. The repository keeps no copy of the data or its
+   schemas.
 
-The site shows what sprint-metrics computes; it doesn't compute metrics itself.
-Nothing it publishes carries what the crew was told or thought.
+The site shows what sprint-metrics and the crew computed; it doesn't compute
+metrics itself. Nothing it publishes carries what the crew was told or thought.
 
 ## What's here
 
 - [`docs/design/mock/`](docs/design/mock/): the design reference. Build to it.
 - The look comes from [mqucifer/design-system](https://github.com/mqucifer/design-system),
-  pinned by its release tag. Pages link its tagged stylesheet from jsDelivr; it isn't
-  a package on PyPI or npm.
+  used as its README says.
 
 The site's code is written by the crew, from the Goals filed on this repository.
