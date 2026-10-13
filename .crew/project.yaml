@@ -53,11 +53,11 @@ intent:
 design:
   language: Python (build, validation, template rendering) and JavaScript (the replay
     player in the browser)
-  dependencies: 'Python: jsonschema (validate snapshots against published JSON schemas),
-    jinja2 (render page templates), playwright (drive browser tests), ruff (format
-    and lint, dev). No npm package for the JS: the replay player is vanilla JavaScript
-    loaded by the page, with no build step or framework. The design-system CSS is
-    linked externally from jsDelivr at its pinned tag, not vendored.'
+  dependencies: 'Python: jsonschema (validate the delivery-history package against
+    the schema it carries), jinja2 (render page templates), playwright (drive browser
+    tests), ruff (format and lint, dev). No npm package for the JS: the replay player
+    is vanilla JavaScript loaded by the page, with no build step or framework. The
+    design-system CSS is linked externally from jsDelivr at its pinned tag, not vendored.'
   sandbox: Python 3.12, a Chromium browser binary with its system libraries (for Playwright
     browser tests), and the Python packages from the lockfile
   checks:
@@ -80,29 +80,32 @@ design:
     language: javascript
     tests:
     - tests/test_browser.py
-  release_how: A snapshot pull request (one that adds or updates files under data/)
-    that merges to main triggers .github/workflows/deploy.yml. The job checks out
-    the site's code at its latest release tag (the tag is applied when an epic completes),
-    runs the full build (validate all data/ snapshots against schemas/, render the
-    pages, assemble the output with site/js/), deploys the output to GitHub Pages
-    at https://mqucifer.github.io/crew-presentation/, then asserts the site root and
-    each page return HTTP 200. A rerun of the release completes whatever the version
-    is missing (its tag, its image, its tags) and changes nothing already published
-    (§19.9).
-  structure: 'build.py — the build entry point: discovers all JSON files in data/,
-    validates each against the matching schema in schemas/, loads site/templates/
-    via Jinja2, renders each page, copies site/js/ into the output directory, and
-    writes the assembled site to build/. site/templates/ — Jinja2 templates, one per
-    view: sprint_overview.html, replay.html, story_journey.html; each includes the
-    design-system stylesheet link and the site''s own CSS. site/js/replay.js — the
-    replay player: play/pause toggle, speed control (1×, 30×, 60×), skip-idle, timeline
-    scrubber, event ticker, and board-state rendering; vanilla JS, no framework. schemas/
-    — JSON schema files: the sprint-metrics schemas (imported from the sprint-metrics
-    project''s published schemas) and the crew''s replay-feed schema; the contract
-    tests (test_contracts.py) validate every data/ file against the matching schema.
-    data/ — committed snapshot files (one JSON per sprint or replay event); written
-    only by the crew''s snapshot pull requests, never by a story. tests/ — test_contracts.py
-    (schema validation), test_browser.py (Playwright browser tests), test_tokens.py
-    (design-system token and contrast checks).'
+  ci_checks:
+  - The deploy job (deploy.yml) fetches the delivery-history package named by delivery-history.tag,
+    runs the full sandbox (contract validation, build, browser tests, token checks),
+    deploys the build output to GitHub Pages at https://mqucifer.github.io/crew-presentation/,
+    and asserts the site root and each rendered page return HTTP 200
+  release_how: A pull request changing delivery-history.tag that merges to main triggers
+    .github/workflows/deploy.yml. The job checks out the site's code at its latest
+    release tag (the tag is applied when an epic completes), fetches the delivery-history
+    package the tag names, runs the full sandbox (validate the package against its
+    carried schema, check the schema major version, render the pages, assemble the
+    output with site/js/), deploys the build output to GitHub Pages at https://mqucifer.github.io/crew-presentation/,
+    then asserts the site root and each page return HTTP 200. A rerun of the release
+    completes whatever the version is missing (its tag, its image, its tags) and changes
+    nothing already published (§19.9).
+  structure: 'build.py — the build entry point: reads the delivery-history package
+    from the workspace (placed there by CI), validates it against the schema the package
+    carries, checks the schema major version is in the site''s supported set, loads
+    site/templates/ via Jinja2, renders each page from the package''s sprint and replay
+    data, copies site/js/ into the output directory, and writes the assembled site
+    to build/. site/templates/ — Jinja2 templates, one per view: sprint_overview.html,
+    replay.html, story_journey.html; each includes the design-system stylesheet link
+    and the site''s own CSS. site/js/replay.js — the replay player: play/pause toggle,
+    speed control (1×, 30×, 60×), skip-idle, timeline scrubber, event ticker, and
+    board-state rendering; vanilla JS, no framework. tests/ — test_contracts.py (validates
+    the delivery-history package against its carried schema and checks the schema
+    major version), test_browser.py (Playwright browser tests), test_tokens.py (design-system
+    token and contrast checks).'
   docs:
   - README.md
