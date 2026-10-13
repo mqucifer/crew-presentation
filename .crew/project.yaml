@@ -11,40 +11,44 @@ intent:
     - A static site on GitHub Pages, built and deployed by GitHub Actions.
     - 'Its views: a sprint overview, a replay of work from a Goal to merged, and a
       story''s journey, built to the design reference in docs/design/mock/.'
-    - Data snapshots the crew sends by pull request, kept in the repository so history
-      accumulates, each checked against its published contract (sprint-metrics' JSON
-      Schemas and the crew's replay-feed schema) before it is accepted.
-    - Python that shapes the snapshots into the pages, and JavaScript for the replay
+    - The crew's delivery-history package, used as the crew's README says. The one
+      line in delivery-history.tag at the repository's root names the release; CI
+      fetches that package and validates it against the schema the package carries.
+      The package already holds sprint-metrics' answers, so the site depends on the
+      crew alone.
+    - Python that shapes the package into the pages, and JavaScript for the replay
       player.
-    - The look from mqucifer/design-system, pinned by its release tag (v0.1.0 today).
-      It is a GitHub repository, not a package on PyPI or npm. Pages link its tagged
-      stylesheet from jsDelivr, https://cdn.jsdelivr.net/gh/mqucifer/design-system@v0.1.0/styles.css,
-      with the fonts and theme script its DESIGN_SYSTEM.md lists. (The boards in docs/design/mock/
-      inline those styles only so each opens on its own.)
-    - Contract tests on the data, browser tests on the pages, and the site's own contrast
-      and token checks against the design system's rules. The design system's checks/check_tokens.py
-      checks the design system itself, not a site, so the site writes its own.
+    - 'The look from mqucifer/design-system, used as its README''s "How projects use
+      it" says: pinned once, in the site''s code, and bumped by pull request. (The
+      boards in docs/design/mock/ inline those styles only so each opens on its own.)'
+    - 'A check of which major versions of the package''s schema the site can display:
+      a package on any other major version fails the pull request that brought it.
+      Browser tests on the pages, and the site''s own contrast and token checks against
+      the design system''s rules. The design system''s checks/check_tokens.py checks
+      the design system itself, not a site, so the site writes its own.'
     out_of_scope:
     - Computing metrics. sprint-metrics computes them; the site arranges and shows
       what it is sent.
-    - Reading the crew's raw events, or anything that carries what the crew was told
-      or thought.
+    - Reading the crew's events directly, or anything that carries what the crew was
+      told or thought. The site reads them only through the data packages the crew
+      delivers.
+    - A copy of the crew's data or of any schema in the repository. History lives
+      in the crew's releases, and each package carries its own schema.
     - A server, a backend, accounts or analytics. The site is static.
     - Comparing model settings, until the performance project supplies the data.
   release:
     deploys: true
     publishes: false
     where: GitHub Pages at https://mqucifer.github.io/crew-presentation/. The site
-      deploys only when a snapshot pull request merges, built from the latest release
-      tag of the site's code, which is tagged when an epic completes.
+      deploys when a pull request changing delivery-history.tag merges, built from
+      the latest release tag of the site's code, which is tagged when an epic completes.
   done:
     bar: A change is done when its acceptance criteria are met and every check the
-      project's CI runs passes, including the data contracts, the browser tests and
-      the site's contrast and token checks.
+      project's CI runs passes, including the package's validation, the major-version
+      check, the browser tests and the site's contrast and token checks.
     never_touch:
     - .github/workflows/board.yml
-    - The committed data snapshots. Only the crew's snapshot pull requests write them;
-      no story edits data by hand.
+    - delivery-history.tag
   priority: 2
 design:
   language: Python (build, validation, template rendering) and JavaScript (the replay
