@@ -76,29 +76,37 @@ design:
     language: javascript
     tests:
     - tests/test_browser.py
+  ci_checks:
+  - 'The schema-provenance job: fetch the delivery-history schemas from mqucifer/crew
+    at the tag named in delivery-history.tag and assert each file in schemas/ matches
+    byte-for-byte. A mismatch fails the pull request.'
   release_how: A snapshot pull request (one that adds or updates files under data/)
     that merges to main triggers .github/workflows/deploy.yml. The job checks out
     the site's code at its latest release tag (the tag is applied when an epic completes),
-    runs the full build (validate all data/ snapshots against schemas/, render the
-    pages, assemble the output with site/js/), deploys the output to GitHub Pages
-    at https://mqucifer.github.io/crew-presentation/, then asserts the site root and
-    each page return HTTP 200. A rerun of the release completes whatever the version
-    is missing (its tag, its image, its tags) and changes nothing already published
-    (§19.9).
-  structure: 'build.py — the build entry point: discovers all JSON files in data/,
-    validates each against the matching schema in schemas/, loads site/templates/
-    via Jinja2, renders each page, copies site/js/ into the output directory, and
-    writes the assembled site to build/. site/templates/ — Jinja2 templates, one per
-    view: sprint_overview.html, replay.html, story_journey.html; each includes the
-    design-system stylesheet link and the site''s own CSS. site/js/replay.js — the
-    replay player: play/pause toggle, speed control (1×, 30×, 60×), skip-idle, timeline
-    scrubber, event ticker, and board-state rendering; vanilla JS, no framework. schemas/
-    — JSON schema files: the sprint-metrics schemas (imported from the sprint-metrics
-    project''s published schemas) and the crew''s replay-feed schema; the contract
-    tests (test_contracts.py) validate every data/ file against the matching schema.
-    data/ — committed snapshot files (one JSON per sprint or replay event); written
-    only by the crew''s snapshot pull requests, never by a story. tests/ — test_contracts.py
-    (schema validation), test_browser.py (Playwright browser tests), test_tokens.py
-    (design-system token and contrast checks).'
+    runs the full build (validate all data/ snapshots against schemas/, read delivery-history.tag
+    for the data version, render the pages, assemble the output with site/js/), deploys
+    the output to GitHub Pages at https://mqucifer.github.io/crew-presentation/, then
+    asserts the site root and each page return HTTP 200. A rerun of the release completes
+    whatever the version is missing (its tag, its image, its tags) and changes nothing
+    already published (§19.9).
+  structure: 'delivery-history.tag — a single-line file pinning the delivery-history
+    release (a tag on mqucifer/crew, e.g. delivery-history-2026-10-13) whose schemas
+    the site validates against. Updated only by the crew''s snapshot pull requests,
+    alongside the data files they add. schemas/ — the JSON schemas from the delivery-history
+    release at the tag pinned in delivery-history.tag: the sprint-metrics answer schemas
+    and the crew''s replay-feed schema; the contract tests (test_contracts.py) validate
+    every data/ file against the matching schema. build.py — the build entry point:
+    reads delivery-history.tag to identify the data version, discovers all JSON files
+    in data/, validates each against the matching schema in schemas/, loads site/templates/
+    via Jinja2, renders each page (including the data version in the output metadata),
+    copies site/js/ into the output directory, and writes the assembled site to build/.
+    site/templates/ — Jinja2 templates, one per view: sprint_overview.html, replay.html,
+    story_journey.html; each includes the design-system stylesheet link and the site''s
+    own CSS. site/js/replay.js — the replay player: play/pause toggle, speed control
+    (1×, 30×, 60×), skip-idle, timeline scrubber, event ticker, and board-state rendering;
+    vanilla JS, no framework. data/ — committed snapshot files (one JSON per sprint
+    or replay event); written only by the crew''s snapshot pull requests, never by
+    a story. tests/ — test_contracts.py (schema validation), test_browser.py (Playwright
+    browser tests), test_tokens.py (design-system token and contrast checks).'
   docs:
   - README.md
