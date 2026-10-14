@@ -1,11 +1,12 @@
-"""Contract check: validate the package structure fetched by setup.
+"""Contract check: validate every data file in the fetched package against the schema it carries.
 
-This is the seed for the full validator that #60 upgrades.
-It verifies that setup produced the expected layout.
+A non-conforming file or an unsupported schema major version fails the PR,
+with output naming the cause.
 """
 
 import importlib.util
 import json
+import jsonschema
 import re
 import subprocess
 import sys
@@ -33,23 +34,10 @@ def _load_setup():
 setup = _load_setup()
 
 
-def _read_delivery_history_tag() -> str:
-    """Read the release tag from delivery-history.tag."""
-    return DELIVERY_HISTORY_TAG.read_text().strip()
 
 
-def test_package_index_file_exists():
-    """AC1: the package's index file exists under ./.package/ after setup."""
-    tag = _read_delivery_history_tag()
-    index = PACKAGE_DIR / tag / "delivery-history.json"
-    assert index.is_file(), f"package index not found: {index}"
 
 
-def test_schema_file_exists():
-    """AC1: the schema the package carries exists under ./.package/."""
-    tag = _read_delivery_history_tag()
-    schema = PACKAGE_DIR / tag / "schema.json"
-    assert schema.is_file(), f"schema not found: {schema}"
 
 
 def test_design_system_stylesheet_exists():
@@ -58,13 +46,6 @@ def test_design_system_stylesheet_exists():
     assert css.is_file(), f"design-system CSS not found: {css}"
 
 
-def test_manifest_parses_as_json():
-    """AC1: the package's manifest.json parses as valid JSON."""
-    tag = _read_delivery_history_tag()
-    manifest_path = PACKAGE_DIR / tag / "manifest.json"
-    assert manifest_path.is_file(), f"manifest not found: {manifest_path}"
-    data = json.loads(manifest_path.read_text())
-    assert "schema_version" in data, "manifest.json missing schema_version field"
 
 
 def test_build_check_exits_zero():
@@ -133,3 +114,98 @@ def test_setup_fails_on_missing_release(monkeypatch, tmp_path):
     )
     index = list(tmp_path.rglob("delivery-history.json"))
     assert not index, f"index file present after failed setup: {index}"
+
+
+SUPPORTED_MAJOR_VERSIONS = (1,)
+
+
+def _package_dir() -> Path:
+    """Locate the package directory under ./.package/ named by delivery-history.tag."""
+    tag = DELIVERY_HISTORY_TAG.read_text().strip()
+    d = PACKAGE_DIR / tag
+    assert d.is_dir(), f"package directory not found: {d}"
+    return d
+
+
+def _load_json(path: Path):
+    """Load and parse a JSON file, asserting it exists."""
+    assert path.is_file(), f"file not found: {path}"
+    return json.loads(path.read_text())
+
+
+def _validate_against_schema(data, schema, file_label: str):
+    """Validate data against a JSON schema; raise ValueError naming the file on failure."""
+    validator = jsonschema.Draft202012Validator(schema)
+    errors = sorted(validator.iter_errors(data), key=lambda e: list(e.path))
+    if errors:
+        messages = "; ".join(
+            f"{'.'.join(map(str, e.path)) or '<root>'}: {e.message}" for e in errors[:5]
+        )
+        raise ValueError(f"{file_label} does not conform to its schema: {messages}")
+
+
+def _check_schema_version(manifest: dict):
+    """Assert the manifest's schema_version major is in SUPPORTED_MAJOR_VERSIONS."""
+    version = manifest["schema_version"]
+    match = re.fullmatch(r"(\d+)\.(\d+)(\.(\d+))?", version)
+    assert match, f"unrecognized schema_version format: {version}"
+    major = int(match.group(1))
+    if major not in SUPPORTED_MAJOR_VERSIONS:
+        raise ValueError(
+            f"schema major version {major} is one the site cannot display "
+            f"(supported: {SUPPORTED_MAJOR_VERSIONS})"
+        )
+
+
+def test_well_formed_package_passes():
+    """AC1: a well-formed package on a supported major version passes validation."""
+    pkg = _package_dir()
+
+    manifest = _load_json(pkg / "manifest.json")
+    _check_schema_version(manifest)
+
+    manifest_schema = _load_json(pkg / "manifest.schema.json")
+    index_schema = _load_json(pkg / "schema.json")
+    events_schema = _load_json(pkg / "events.schema.json")
+
+    _validate_against_schema(manifest, manifest_schema, "manifest.json")
+
+    index = _load_json(pkg / "delivery-history.json")
+    _validate_against_schema(index, index_schema, "delivery-history.json")
+
+    events_dir = pkg / "events"
+    if events_dir.is_dir():
+        for events_file in sorted(events_dir.glob("*.json")):
+            data = _load_json(events_file)
+            _validate_against_schema(data, events_schema, f"events/{events_file.name}")
+
+
+def test_non_conforming_file_fails_with_file_name():
+    """AC2: a non-conforming data file causes a failure that names the file."""
+    schema = {
+        "type": "object",
+        "required": ["sprint_id"],
+        "properties": {
+            "sprint_id": {"type": "string"},
+        },
+    }
+    bad_data = {"events": []}
+
+    with pytest.raises(ValueError) as exc_info:
+        _validate_against_schema(bad_data, schema, "events/sprint-7.json")
+
+    message = str(exc_info.value)
+    assert "events/sprint-7.json" in message
+    assert "does not conform" in message
+
+
+def test_unsupported_major_version_fails_with_version():
+    """AC3: a package on an unsupported major version fails, naming the version."""
+    manifest = {"schema_version": "2.0.0"}
+
+    with pytest.raises(ValueError) as exc_info:
+        _check_schema_version(manifest)
+
+    message = str(exc_info.value)
+    assert "2" in message
+    assert "cannot display" in message
