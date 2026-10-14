@@ -46,8 +46,22 @@ def _sync_dependencies() -> None:
     virtual environment. So uv exports the lockfile, with its hashes, and pip
     installs exactly those pins with --user: packages land under
     $HOME/.local/lib/python3.12/site-packages/, visible to every check.
+
+    It locks first: only setup runs uv, so a dependency changed in
+    pyproject.toml is locked here, and the lock it writes is committed with the
+    change. With nothing changed, `uv lock` keeps every pin as it is.
     """
     uv = _uv()
+    lock = subprocess.run(
+        [uv, "lock", "--quiet"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if lock.returncode != 0:
+        print(f"Failed to lock {LOCKFILE}:\n{lock.stderr}", file=sys.stderr)
+        sys.exit(1)
     with tempfile.TemporaryDirectory() as tmp:
         requirements = Path(tmp) / "requirements.txt"
         export = subprocess.run(
