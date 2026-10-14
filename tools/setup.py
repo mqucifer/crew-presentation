@@ -4,56 +4,89 @@ This is the only code that touches the network (§19.6: failure is loud).
 It runs in the sandbox's setup phase, before any check.
 """
 
-import json
 import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import urllib.request
 from pathlib import Path
-import tomllib
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_DIR = REPO_ROOT / ".package"
+LOCKFILE = REPO_ROOT / "uv.lock"
 DELIVERY_HISTORY_TAG = REPO_ROOT / "delivery-history.tag"
 DESIGN_SYSTEM_VERSION_FILE = REPO_ROOT / "site" / "css" / "design-system.version"
-DESIGN_SYSTEM_CSS = PACKAGE_DIR / "design-system.css"
 
 CREW_REPO = "mqucifer/crew"
 JSDELIVR_BASE = "https://cdn.jsdelivr.net/gh/mqucifer/design-system"
 
 
-def _install_uv() -> None:
-    """Install uv via pip if it is not already available."""
-    if shutil.which("uv") is not None:
-        return
+def _uv() -> str:
+    """The uv executable, installed via pip into the user site if the image lacks it."""
+    found = shutil.which("uv")
+    if found is not None:
+        return found
     result = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "uv"],
+        [sys.executable, "-m", "pip", "install", "--user", "--quiet", "uv"],
         capture_output=True,
         text=True,
+        check=False,
     )
     if result.returncode != 0:
         print(f"Failed to install uv:\n{result.stderr}", file=sys.stderr)
         sys.exit(1)
+    return shutil.which("uv") or str(Path.home() / ".local" / "bin" / "uv")
 
 
 def _sync_dependencies() -> None:
-    """Install Python dependencies into the user site so bare python can see them.
+    """Install the Python dependencies pinned in uv.lock into the user site.
 
     The checks run bare `python` (the image's own), which does not see a
-    virtual environment. Installing with --user puts packages under
+    virtual environment. So uv exports the lockfile, with its hashes, and pip
+    installs exactly those pins with --user: packages land under
     $HOME/.local/lib/python3.12/site-packages/, visible to every check.
     """
-    _install_uv()
-    pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())
-    deps = list(pyproject["project"]["dependencies"])
-    dev_deps = pyproject.get("project", {}).get("optional-dependencies", {}).get("dev", [])
-    all_deps = deps + dev_deps
-    result = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "--user", "--quiet"] + all_deps,
-        capture_output=True,
-        text=True,
-    )
+    uv = _uv()
+    with tempfile.TemporaryDirectory() as tmp:
+        requirements = Path(tmp) / "requirements.txt"
+        export = subprocess.run(
+            [
+                uv,
+                "export",
+                "--frozen",
+                "--extra",
+                "dev",
+                "--no-emit-project",
+                "--quiet",
+                "--output-file",
+                str(requirements),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if export.returncode != 0:
+            print(f"Failed to export {LOCKFILE}:\n{export.stderr}", file=sys.stderr)
+            sys.exit(1)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "--user",
+                "--quiet",
+                "--require-hashes",
+                "--no-deps",
+                "-r",
+                str(requirements),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
     if result.returncode != 0:
         print(f"Failed to install dependencies:\n{result.stderr}", file=sys.stderr)
         sys.exit(1)
@@ -99,7 +132,7 @@ def _download_delivery_history(tag: str) -> None:
     try:
         with urllib.request.urlopen(url) as response:
             archive_path.write_bytes(response.read())
-    except Exception as exc:
+    except OSError as exc:
         print(f"Failed to download {tag}: {exc}", file=sys.stderr)
         sys.exit(1)
 
@@ -116,8 +149,15 @@ def _download_delivery_history(tag: str) -> None:
     # Verify the expected layout
     index_file = dest_dir / "delivery-history.json"
     if not index_file.is_file():
-        print(f"Package index not found after extraction: {index_file}", file=sys.stderr)
+        print(
+            f"Package index not found after extraction: {index_file}", file=sys.stderr
+        )
         sys.exit(1)
+
+
+def design_system_css(version: str) -> Path:
+    """Where setup puts the design-system stylesheet for a pinned tag."""
+    return PACKAGE_DIR / f"design-system-{version}.css"
 
 
 def _download_design_system_css(version: str) -> None:
@@ -127,8 +167,8 @@ def _download_design_system_css(version: str) -> None:
     print(f"Downloading {url}")
     try:
         with urllib.request.urlopen(url) as response:
-            DESIGN_SYSTEM_CSS.write_bytes(response.read())
-    except Exception as exc:
+            design_system_css(version).write_bytes(response.read())
+    except OSError as exc:
         print(f"Failed to download design-system CSS {version}: {exc}", file=sys.stderr)
         sys.exit(1)
 

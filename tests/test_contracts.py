@@ -4,17 +4,33 @@ This is the seed for the full validator that #60 upgrades.
 It verifies that setup produced the expected layout.
 """
 
+import importlib.util
 import json
 import re
 import subprocess
 import sys
+import urllib.error
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_DIR = REPO_ROOT / ".package"
 DELIVERY_HISTORY_TAG = REPO_ROOT / "delivery-history.tag"
 DESIGN_SYSTEM_VERSION_FILE = REPO_ROOT / "site" / "css" / "design-system.version"
-DESIGN_SYSTEM_CSS = PACKAGE_DIR / "design-system.css"
+
+
+def _load_setup():
+    """Import tools/setup.py, which is a script rather than a package."""
+    spec = importlib.util.spec_from_file_location(
+        "setup", REPO_ROOT / "tools" / "setup.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+setup = _load_setup()
 
 
 def _read_delivery_history_tag() -> str:
@@ -38,7 +54,8 @@ def test_schema_file_exists():
 
 def test_design_system_stylesheet_exists():
     """AC1: the design-system stylesheet is present under ./.package/."""
-    assert DESIGN_SYSTEM_CSS.is_file(), f"design-system CSS not found: {DESIGN_SYSTEM_CSS}"
+    css = setup.design_system_css(DESIGN_SYSTEM_VERSION_FILE.read_text().strip())
+    assert css.is_file(), f"design-system CSS not found: {css}"
 
 
 def test_manifest_parses_as_json():
@@ -57,6 +74,7 @@ def test_build_check_exits_zero():
         capture_output=True,
         text=True,
         cwd=REPO_ROOT,
+        check=False,
     )
     assert result.returncode == 0, f"build.py failed:\n{result.stdout}\n{result.stderr}"
 
@@ -89,26 +107,29 @@ def test_site_structure_contains_marker():
 
 
 def test_design_system_version_is_real():
-    """AC5: design-system.version is not a placeholder, matches the tag form, and CSS was fetched for it."""
-    content = DESIGN_SYSTEM_VERSION_FILE.read_text().strip()
-    assert "crew:placeholder" not in content, "design-system.version is a placeholder"
-    assert re.fullmatch(r"v\d+\.\d+\.\d+", content), f"invalid tag format: {content}"
-    assert DESIGN_SYSTEM_CSS.is_file(), f"CSS for {content} not fetched: {DESIGN_SYSTEM_CSS}"
+    """AC5: the pinned version is real, a vX.Y.Z tag, and setup fetched the CSS for that tag."""
+    raw = DESIGN_SYSTEM_VERSION_FILE.read_text()
+    assert "crew:placeholder" not in raw, "design-system.version is a placeholder"
+    version = raw.strip()
+    assert re.fullmatch(r"v\d+\.\d+\.\d+", version), f"invalid tag format: {version}"
+    css = setup.design_system_css(version)
+    assert css.parent == PACKAGE_DIR, f"CSS for {version} is not under {PACKAGE_DIR}"
+    assert css.is_file(), f"CSS for {version} not fetched: {css}"
 
 
-def test_setup_fails_on_missing_release():
+def test_setup_fails_on_missing_release(monkeypatch, tmp_path):
     """AC6: setup exits non-zero and .package/ lacks the index when the release does not exist."""
-    original = DELIVERY_HISTORY_TAG.read_text().strip()
-    try:
-        DELIVERY_HISTORY_TAG.write_text("delivery-history-1999-01-01\n")
-        result = subprocess.run(
-            [sys.executable, "tools/setup.py"],
-            capture_output=True,
-            text=True,
-            cwd=REPO_ROOT,
-        )
-        assert result.returncode != 0, "setup should fail for a nonexistent release"
-        missing_index = PACKAGE_DIR / "delivery-history-1999-01-01" / "delivery-history.json"
-        assert not missing_index.is_file(), "index file should not exist after failed setup"
-    finally:
-        DELIVERY_HISTORY_TAG.write_text(original + "\n")
+    tag = "delivery-history-1999-01-01"
+
+    def not_found(url, *args, **kwargs):
+        raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
+
+    monkeypatch.setattr(setup, "PACKAGE_DIR", tmp_path)
+    monkeypatch.setattr(setup.urllib.request, "urlopen", not_found)
+    with pytest.raises(SystemExit) as exited:
+        setup._download_delivery_history(tag)
+    assert exited.value.code not in (0, None), (
+        "setup should fail for a nonexistent release"
+    )
+    index = list(tmp_path.rglob("delivery-history.json"))
+    assert not index, f"index file present after failed setup: {index}"

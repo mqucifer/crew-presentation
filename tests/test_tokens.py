@@ -5,7 +5,9 @@ crew:placeholder
 
 import pytest
 
-pytestmark = pytest.mark.skip(reason="crew:placeholder — real token checks come in a later epic")
+pytestmark = pytest.mark.skip(
+    reason="crew:placeholder — real token checks come in a later epic"
+)
 
 
 def test_placeholder_passes():
