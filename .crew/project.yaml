@@ -61,15 +61,17 @@ design:
   language: Python (build, validation, template rendering) and JavaScript (the replay
     player in the browser)
   dependencies: 'Python: jsonschema (validate the package''s data against the schema
-    it carries), jinja2 (render page templates), playwright (drive browser tests),
-    ruff (format and lint, dev). No npm package for the JS: the replay player is vanilla
-    JavaScript loaded by the page, with no build step or framework. The design-system
-    CSS is linked externally from jsDelivr at its pinned tag, not vendored; the pinned
-    version is a constant in the site''s code, bumped by pull request.'
-  sandbox: Python 3.12, a Chromium browser binary with its system libraries (for Playwright
-    browser tests), and the Python packages from the lockfile. The delivery-history
-    package and the design-system CSS are fetched by setup into ./.package/; all checks
-    read from there, never from the network.
+    it carries), jinja2 (render page templates), playwright (drive browser tests);
+    dev: ruff (format and lint). Declared in pyproject.toml, locked by uv.lock. No
+    npm package for the JS: the replay player is vanilla JavaScript loaded by the
+    page, with no build step or framework. The design-system CSS is linked externally
+    from jsDelivr at its pinned tag, not vendored; the pinned version is a constant
+    in the site''s code, bumped by pull request.'
+  sandbox: Python 3.12 (from the sandbox image), a Chromium browser binary with its
+    system libraries (from the sandbox image, for Playwright browser tests), uv (installed
+    by setup where the image lacks it), and the Python packages from uv.lock. The
+    delivery-history package and the design-system CSS are fetched by setup into ./.package/;
+    all checks read from there, never from the network.
   checks:
   - python -m pytest tests/test_contracts.py -v
   - python build.py
@@ -79,7 +81,7 @@ design:
   setup: python tools/setup.py
   autofix:
   - ruff format --check .
-  lockfile: requirements.txt
+  lockfile: uv.lock
   parts:
   - path: ''
     language: python
@@ -120,21 +122,24 @@ design:
     control, the board columns, the attempt chart (the components the design mock
     marks as the site''s own, not the design system''s); design-system.version — a
     one-line file holding the pinned design-system tag, read by tools/setup.py and
-    referenced in base.html. tools/setup.py — the setup entry point: installs Python
-    dependencies from requirements.txt, reads delivery-history.tag for the release
-    name, downloads the delivery-history release asset from the crew''s releases,
-    downloads the design-system CSS at the version in site/css/design-system.version,
-    extracts both into ./.package/. Called by setup; the only code that touches the
-    network. tests/test_contracts.py — validates every data file in ./.package/ against
-    the schema the package carries; checks the schema''s major version is in the supported
-    set. tests/test_browser.py — Playwright browser tests: loads each page from build/,
-    exercises the replay player (play, pause, speed, skip-idle, scrub), verifies page
-    structure and accessibility; serves the design-system CSS from ./.package/ via
-    Playwright route interception (the sandbox has no network at test time). tests/test_tokens.py
-    — the site''s own contrast and token checks against the design system''s rules,
-    run against the CSS in ./.package/ and the rendered pages. delivery-history.tag
-    — one line: the release tag of the delivery-history package the site displays;
-    read by setup and the build; agents must not change it. requirements.txt — Python
-    dependencies, locked with pinned versions and hashes.'
+    referenced in base.html. tools/setup.py — the setup entry point: installs uv (via
+    pip) if the image lacks it, runs uv sync to install Python dependencies from uv.lock,
+    reads delivery-history.tag for the release name, downloads the delivery-history
+    release asset from the crew''s releases, downloads the design-system CSS at the
+    version in site/css/design-system.version, extracts both into ./.package/. Called
+    by setup; the only code that touches the network. tests/test_contracts.py — validates
+    every data file in ./.package/ against the schema the package carries; checks
+    the schema''s major version is in the supported set. tests/test_browser.py — Playwright
+    browser tests: loads each page from build/, exercises the replay player (play,
+    pause, speed, skip-idle, scrub), verifies page structure and accessibility; serves
+    the design-system CSS from ./.package/ via Playwright route interception (the
+    sandbox has no network at test time). tests/test_tokens.py — the site''s own contrast
+    and token checks against the design system''s rules, run against the CSS in ./.package/
+    and the rendered pages. pyproject.toml — declares the project''s Python dependencies
+    (jsonschema, jinja2, playwright) and dev dependencies (ruff); read by uv. uv.lock
+    — the lockfile, written by uv; pins exact versions and hashes; never written by
+    hand (§19.3). delivery-history.tag — one line: the release tag of the delivery-history
+    package the site displays; read by setup and the build; agents must not change
+    it.'
   docs:
   - README.md
