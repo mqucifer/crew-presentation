@@ -60,13 +60,12 @@ intent:
 design:
   language: Python (build, validation, template rendering) and JavaScript (the replay
     player in the browser)
-  dependencies: 'Python: jsonschema (validate the package''s data against the schema
-    it carries), jinja2 (render page templates), playwright (drive browser tests);
-    dev: ruff (format and lint). Declared in pyproject.toml, locked by uv.lock. No
-    npm package for the JS: the replay player is vanilla JavaScript loaded by the
-    page, with no build step or framework. The design-system CSS is linked externally
-    from jsDelivr at its pinned tag, not vendored; the pinned version is a constant
-    in the site''s code, bumped by pull request.'
+  dependencies: 'Python: jsonschema, jinja2, playwright==1.52.0 (pinned to the sandbox
+    image''s browser version); dev: ruff, pytest. Declared in pyproject.toml, locked
+    by uv.lock. No npm package for the JS: the replay player is vanilla JavaScript
+    loaded by the page, with no build step or framework. The design-system CSS is
+    linked externally from jsDelivr at its pinned tag, not vendored; the pinned version
+    is a constant in the site''s code, bumped by pull request.'
   sandbox: Python 3.12 (from the sandbox image), a Chromium browser binary with its
     system libraries (from the sandbox image, for Playwright browser tests), uv (installed
     by setup where the image lacks it), and the Python packages from uv.lock. The
@@ -136,10 +135,10 @@ design:
     sandbox has no network at test time). tests/test_tokens.py — the site''s own contrast
     and token checks against the design system''s rules, run against the CSS in ./.package/
     and the rendered pages. pyproject.toml — declares the project''s Python dependencies
-    (jsonschema, jinja2, playwright) and dev dependencies (ruff); read by uv. uv.lock
-    — the lockfile, written by uv; pins exact versions and hashes; never written by
-    hand (§19.3). delivery-history.tag — one line: the release tag of the delivery-history
-    package the site displays; read by setup and the build; agents must not change
-    it.'
+    (jsonschema, jinja2, playwright==1.52.0) and dev dependencies (ruff, pytest);
+    read by uv. uv.lock — the lockfile, written by uv; pins exact versions and hashes;
+    never written by hand (§19.3). delivery-history.tag — one line: the release tag
+    of the delivery-history package the site displays; read by setup and the build;
+    agents must not change it.'
   docs:
   - README.md
