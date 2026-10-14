@@ -36,6 +36,13 @@ intent:
       in the crew's releases, and each package carries its own schema.
     - A server, a backend, accounts or analytics. The site is static.
     - Comparing model settings, until the performance project supplies the data.
+    uses:
+    - repo: mqucifer/crew
+      file: README.md
+      section: 'Data packages: how projects use them'
+    - repo: mqucifer/design-system
+      file: README.md
+      section: How projects use it
   release:
     deploys: true
     publishes: false
