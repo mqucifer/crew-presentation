@@ -69,9 +69,10 @@ design:
   - python -m pytest tests/test_browser.py -v
   - python -m pytest tests/test_tokens.py -v
   sandbox_image: mcr.microsoft.com/playwright/python:v1.52.0-noble@sha256:a1d2b48b65f41f34e5e1d7690f385f1376397b7208691cba359e4078edbf86cb
-  setup: pip install -r requirements.txt && python tools/fetch_package.py
+  setup: python tools/setup.py
   autofix:
   - ruff format --check .
+  lockfile: requirements.txt
   parts:
   - path: ''
     language: python
@@ -83,6 +84,11 @@ design:
     language: javascript
     tests:
     - tests/test_browser.py
+  ci_checks:
+  - The deploy job in .github/workflows/deploy.yml builds the site from its latest
+    release tag with the package named in delivery-history.tag, deploys the output
+    to GitHub Pages at mqucifer.github.io/crew-presentation/, and asserts the site
+    root and each page return HTTP 200.
   release_how: A pull request changing delivery-history.tag that merges to main triggers
     .github/workflows/deploy.yml. The job checks out the site's code at its latest
     release tag (the tag is applied when an epic completes), runs the full build (fetches
@@ -106,10 +112,11 @@ design:
     no build step. site/css/ — the site''s own CSS: layout, the scrubber, the speed
     control, the board columns, the attempt chart (the components the design mock
     marks as the site''s own, not the design system''s); design-system.version — a
-    one-line file holding the pinned design-system tag, read by tools/fetch_package.py
-    and referenced in base.html. tools/fetch_package.py — setup helper: reads delivery-history.tag
-    for the release name, downloads the delivery-history release asset from the crew''s
-    releases, downloads the design-system CSS at the version in site/css/design-system.version,
+    one-line file holding the pinned design-system tag, read by tools/setup.py and
+    referenced in base.html. tools/setup.py — the setup entry point: installs Python
+    dependencies from requirements.txt, reads delivery-history.tag for the release
+    name, downloads the delivery-history release asset from the crew''s releases,
+    downloads the design-system CSS at the version in site/css/design-system.version,
     extracts both into ./.package/. Called by setup; the only code that touches the
     network. tests/test_contracts.py — validates every data file in ./.package/ against
     the schema the package carries; checks the schema''s major version is in the supported
@@ -121,6 +128,6 @@ design:
     run against the CSS in ./.package/ and the rendered pages. delivery-history.tag
     — one line: the release tag of the delivery-history package the site displays;
     read by setup and the build; agents must not change it. requirements.txt — Python
-    dependencies, locked.'
+    dependencies, locked with pinned versions and hashes.'
   docs:
   - README.md
