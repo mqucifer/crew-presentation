@@ -57,7 +57,7 @@ intent:
     publishes: false
     where: GitHub Pages at https://mqucifer.github.io/crew-presentation/. The site
       deploys when a pull request changing delivery-history.tag merges, built from
-      the latest release tag of the site's code, which is tagged when an epic completes.
+      main as it stands at that merge.
   done:
     bar: A change is done when its acceptance criteria are met and every check the
       project's CI runs passes, including the package's validation, the major-version
@@ -102,20 +102,18 @@ design:
     tests:
     - tests/test_browser.py
   ci_checks:
-  - The deploy job in .github/workflows/deploy.yml builds the site from its latest
-    release tag with the package named in delivery-history.tag, deploys the output
-    to GitHub Pages at mqucifer.github.io/crew-presentation/, and asserts the site
-    root and each page return HTTP 200.
+  - The deploy job in .github/workflows/deploy.yml builds the site from main at the
+    merge, with the package named in delivery-history.tag, deploys the output to GitHub
+    Pages at mqucifer.github.io/crew-presentation/, and asserts the site root and
+    each page return HTTP 200.
   release_how: A pull request changing delivery-history.tag that merges to main triggers
-    .github/workflows/deploy.yml. The job checks out the site's code at its latest
-    release tag (the tag is applied when an epic completes), runs the full build (fetches
-    the package named in delivery-history.tag from the crew's releases, validates
-    it against the schema the package carries, checks the schema's major version,
-    renders the pages, assembles the output with site/js/ and site/css/), deploys
-    the output to GitHub Pages at https://mqucifer.github.io/crew-presentation/, then
-    asserts the site root and each page return HTTP 200. A rerun of the release completes
-    whatever the version is missing (its tag, its Release, its image and the image's
-    tags) and changes nothing already published (§19.9).
+    .github/workflows/deploy.yml. The job checks out main at that merge, runs the
+    full build (fetches the package named in delivery-history.tag from the crew's
+    releases, validates it against the schema the package carries, checks the schema's
+    major version, renders the pages, assembles the output with site/js/ and site/css/),
+    deploys the output to GitHub Pages at https://mqucifer.github.io/crew-presentation/,
+    then asserts the site root and each page return HTTP 200. A rerun builds and deploys
+    the same output again and changes nothing else (§19.9).
   structure: 'build.py — the build entry point: reads the package fetched by setup
     into ./.package/, validates each data file against the schema the package carries,
     checks the schema''s major version against SUPPORTED_MAJOR_VERSIONS (a constant
