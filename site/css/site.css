@@ -8,3 +8,132 @@
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
+
+/* Sprint grid: 12-column layout for the two-column body */
+.sprint-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.sprint-chart {
+  grid-column: span 7;
+}
+
+.sprint-chart .card__head h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Attempt chart */
+.attempt-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.attempt-row {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) 90px;
+  gap: 12px;
+  align-items: center;
+}
+
+.attempt-row .blocks {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.attempt-block {
+  width: 40px;
+  height: 22px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.attempt-block--refused {
+  background: var(--stage-1);
+}
+
+.attempt-block--landed {
+  background: var(--tone-done-text);
+}
+
+.attempt-block--blocked {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--tone-blocked-text) 0 4px,
+    var(--tone-blocked-bg) 4px 7px
+  );
+}
+
+.attempt-block--crew-fix {
+  border: 2px dashed var(--color-text-dim);
+  background: transparent;
+  box-sizing: border-box;
+}
+
+/* Legend */
+.attempt-legend {
+  display: flex;
+  gap: 18px;
+  font-size: 13px;
+  color: var(--color-text-dim);
+  flex-wrap: wrap;
+}
+
+.attempt-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.attempt-legend .swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.swatch--landed {
+  background: var(--tone-done-text);
+}
+
+.swatch--refused {
+  background: var(--stage-1);
+}
+
+.swatch--blocked {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--tone-blocked-text) 0 4px,
+    var(--tone-blocked-bg) 4px 7px
+  );
+}
+
+.swatch--crew-fix {
+  border: 2px dashed var(--color-text-dim);
+  background: transparent;
+  box-sizing: border-box;
+}
+
+/* Status labels */
+.attempt-status {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.attempt-status--merged {
+  color: var(--tone-done-text);
+}
+
+.attempt-status--first-try {
+  color: var(--tone-done-text);
+}
+
+.attempt-status--progress {
+  color: var(--color-text-dim);
+}

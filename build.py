@@ -120,6 +120,13 @@ def _render_pages(pkg: Path) -> dict:
     sprints = index.get("sprints", [])
     crew_repository = index.get("crew_repository", "")
     sprint_metrics_answers = index.get("sprint_metrics", {}).get("answers", {})
+    cards = index.get("cards", [])
+    analysis_stories = index.get("analysis", {}).get("stories", [])
+
+    cards_by_key: dict[tuple, dict] = {}
+    for card in cards:
+        key = (card.get("number"), card.get("repo"))
+        cards_by_key[key] = card
 
     env.globals["crew_repository"] = crew_repository
 
@@ -137,11 +144,39 @@ def _render_pages(pkg: Path) -> dict:
             )
             continue
         metrics = sprint_metrics_answers[key]
+
+        stories = []
+        for story in analysis_stories:
+            card_key = (story["card"]["number"], story["card"]["repo"])
+            card = cards_by_key.get(card_key)
+            if card and card.get("sprint") == sprint["name"]:
+                raw_blocks = story.get("blocks", [])
+                delivered = story.get("delivered", False)
+                if isinstance(raw_blocks, int):
+                    if delivered:
+                        blocks = ["refused"] * (raw_blocks - 1) + ["landed"]
+                    else:
+                        blocks = ["refused"] * raw_blocks
+                elif raw_blocks:
+                    blocks = list(raw_blocks)
+                else:
+                    blocks = []
+                stories.append(
+                    {
+                        "number": story["card"]["number"],
+                        "title": card.get("title", ""),
+                        "blocks": blocks,
+                        "crew_fixes": story.get("crew_fixes", []),
+                        "delivered": delivered,
+                    }
+                )
+
         context = {
             "sprints": sprints,
             "sprint": sprint,
             "metrics": metrics,
             "sprint_slug": slug,
+            "stories": stories,
         }
         pages[slug] = sprint_template.render(**context)
 
