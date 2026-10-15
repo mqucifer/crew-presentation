@@ -40,9 +40,18 @@ intent:
     - repo: mqucifer/crew
       file: README.md
       section: 'Data packages: how projects use them'
+      pin: delivery-history.tag
+      contract:
+      - contracts/delivery-history/schema.json
+      - contracts/delivery-history/manifest.schema.json
+      - contracts/delivery-history/events.schema.json
     - repo: mqucifer/design-system
       file: README.md
       section: How projects use it
+      pin: site/css/design-system.version
+      contract:
+      - styles.css
+      - DESIGN_SYSTEM.md
   release:
     deploys: true
     publishes: false
