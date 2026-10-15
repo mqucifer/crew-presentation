@@ -166,3 +166,16 @@
 .cause-bar--unrecorded {
   background: var(--color-surface-raised);
 }
+
+/* Feature panel: crew decisions */
+.sprint-decided {
+  grid-column: 8 / -1;
+}
+
+.decided-list {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 6px 12px;
+  font-size: 14px;
+  color: var(--color-feature-dim);
+}

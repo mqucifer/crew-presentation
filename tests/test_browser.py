@@ -1668,3 +1668,189 @@ def test_failure_causes_bar_widths_and_stage2_color():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _make_package_with_decided(tag: str, decided: list[dict]) -> Path:
+    """Create a fake package with analysis.sprints[0].decided populated."""
+    sprints = [{"name": "Sprint 6", "start": "2026-09-22", "end": "2026-09-29"}]
+    metrics = {
+        "Sprint 6": {
+            "throughput": 5,
+            "points_delivered": 10,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "escalation_count": 0,
+            "cycle_time_days": 2.0,
+        }
+    }
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "1.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["sprints"],
+                "properties": {"sprints": {"type": "array"}},
+            }
+        )
+    )
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "delivery-history.json").write_text(
+        json.dumps(
+            {
+                "sprints": sprints,
+                "cards": [],
+                "crew_repository": "mqucifer/crew",
+                "sprint_metrics": {"answers": metrics},
+                "analysis": {
+                    "sprints": [{"sprint": "Sprint 6", "decided": decided}],
+                },
+            }
+        )
+    )
+    return pkg_dir
+
+
+def test_feature_panel_decided_entries():
+    """AC1+AC4+AC6: decided entries render with heading, times in tabular-nums, text, kind, and number."""
+    tag = "delivery-history-TEST"
+    decided = [
+        {"at": "2026-09-25T23:37:00Z", "kind": "design_revision", "number": 122, "repo": "mqucifer/crew", "text": "Architect revised the design into seven modules"},
+        {"at": "2026-09-25T23:38:00Z", "kind": "merge", "number": 123, "repo": "mqucifer/crew", "text": "crew merged the revision"},
+        {"at": "2026-09-25T23:44:00Z", "kind": "split", "number": 124, "repo": "mqucifer/crew", "text": "Business Analyst split 8 stories from the new design"},
+    ]
+    _make_package_with_decided(tag, decided)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Feature panel heading
+        assert "Decided by the crew" in html, "feature panel heading not found"
+        assert 'class="feature' in html, "feature class not found"
+        # Extract the decided-list section
+        section_start = html.index('class="decided-list"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # Three times in order
+        pos_2337 = section.index("23:37")
+        pos_2338 = section.index("23:38")
+        pos_2344 = section.index("23:44")
+        assert pos_2337 < pos_2338 < pos_2344, "times not in order"
+        # tabular-nums via class="num"
+        num_count = section.count('class="num"')
+        assert num_count == 3, f"expected 3 .num spans in decided-list, got {num_count}"
+        # AC1: text field values present
+        assert "Architect revised the design into seven modules" in section
+        assert "crew merged the revision" in section
+        assert "Business Analyst split 8 stories from the new design" in section
+        # AC6: kind name (underscores replaced) and card number present
+        assert "design revision" in section, "kind 'design_revision' not rendered with spaces"
+        assert "#122" in section, "card number #122 not found"
+        assert "merged" in section, "'merged' not found in second entry"
+        assert "#123" in section, "card number #123 not found"
+        assert "split" in section, "'split' not found in third entry"
+        assert "#124" in section, "card number #124 not found"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_feature_panel_empty_decided():
+    """AC2: empty decided renders 'No decisions recorded this sprint' with no timestamped entries."""
+    tag = "delivery-history-TEST"
+    _make_package_with_decided(tag, [])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "No decisions recorded this sprint" in html, "empty message not found"
+        assert 'class="decided-list"' not in html, "decided-list should not appear for empty decided"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_feature_panel_light_theme_colors():
+    """AC3+AC5: light-theme feature panel uses feature-bg, feature-text, feature-dim tokens."""
+    tag = "delivery-history-TEST"
+    decided = [
+        {"at": "2026-09-25T23:37:00Z", "kind": "design_revision", "number": 122, "repo": "mqucifer/crew", "text": "Architect revised the design into seven modules"},
+    ]
+    _make_package_with_decided(tag, decided)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        design_system_version = (
+            REPO_ROOT / "site" / "css" / "design-system.version"
+        ).read_text().strip()
+        css_path = PACKAGE_DIR / f"design-system-{design_system_version}.css"
+        assert css_path.is_file(), f"design-system CSS not found: {css_path}"
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+
+            def handle_route(route):
+                route.fulfill(
+                    status=200,
+                    content_type="text/css",
+                    body=css_path.read_bytes(),
+                )
+
+            page.route(
+                "**/cdn.jsdelivr.net/gh/mqucifer/design-system*/styles.css",
+                handle_route,
+            )
+
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".feature")
+
+            # Ensure light theme
+            page.evaluate("document.documentElement.setAttribute('data-theme', 'light')")
+            page.wait_for_timeout(100)
+
+            # Panel background: --color-feature-bg = #2E1F14 → rgb(46, 31, 20)
+            bg = page.evaluate(
+                "getComputedStyle(document.querySelector('.feature')).backgroundColor"
+            )
+            assert bg == "rgb(46, 31, 20)", (
+                f"feature panel background is {bg!r}, "
+                f"expected rgb(46, 31, 20) (--color-feature-bg)"
+            )
+
+            # Heading text: --color-feature-text = #F6EFE3 → rgb(246, 239, 227)
+            heading_color = page.evaluate(
+                "getComputedStyle(document.querySelector('.feature h2')).color"
+            )
+            assert heading_color == "rgb(246, 239, 227)", (
+                f"feature heading color is {heading_color!r}, "
+                f"expected rgb(246, 239, 227) (--color-feature-text)"
+            )
+
+            # Timestamp text: --color-feature-dim = #E6D8C3 → rgb(230, 216, 195)
+            ts_color = page.evaluate(
+                "getComputedStyle(document.querySelector('.decided-list .num')).color"
+            )
+            assert ts_color == "rgb(230, 216, 195)", (
+                f"timestamp color is {ts_color!r}, "
+                f"expected rgb(230, 216, 195) (--color-feature-dim)"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
