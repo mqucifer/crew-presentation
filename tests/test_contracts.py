@@ -308,3 +308,77 @@ def test_build_fails_on_non_conforming_data_file():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original_tag)
         shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_placeholder_checks_contain_marker():
+    """AC: the browser test file contains assertions proving each acceptance criterion is exercised.
+
+    This is a contract check: it reads tests/test_browser.py and verifies
+    that the assertion markers for each AC are present, so a refactor that
+    silently drops an assertion is caught here.
+    """
+    browser_test = REPO_ROOT / "tests" / "test_browser.py"
+    assert browser_test.is_file(), "tests/test_browser.py not found"
+    source = browser_test.read_text()
+
+    # AC1: stat values match package data, design-system CSS from local file
+    assert ".stat__value" in source, (
+        "AC1: no assertion on .stat__value elements"
+    )
+    assert "stories delivered" in source, (
+        "AC1: no assertion on the 'stories delivered' label"
+    )
+    assert "landed first try" in source, (
+        "AC1: no assertion on the 'landed first try' label"
+    )
+    assert "--color-bg" in source, (
+        "AC1: no assertion that design-system CSS was loaded"
+    )
+
+    # AC2: attempt chart rows match package stories in order
+    assert ".attempt-row" in source, (
+        "AC2: no assertion on .attempt-row elements"
+    )
+    assert "row_numbers" in source, (
+        "AC2: no assertion extracting card numbers from rows"
+    )
+
+    # AC3: no console errors, header shows sprint name
+    assert "console_errors" in source, (
+        "AC3: no console error collection"
+    )
+    assert "sprint_name" in source, (
+        "AC3: no assertion that header shows the sprint name"
+    )
+
+    # AC4: CSS custom properties resolve to light-theme values; IIFE sets data-theme
+    assert "data-theme" in source, (
+        "AC4: no assertion on data-theme attribute"
+    )
+    assert "--color-text" in source, (
+        "AC4: no assertion on --color-text custom property"
+    )
+
+    # AC5: head order — IIFE before both stylesheet links
+    assert "iife" in source, (
+        "AC5: no assertion locating the theme IIFE script"
+    )
+    assert "LINK" in source, (
+        "AC5: no assertion on <link> elements in head"
+    )
+
+    # AC6: exactly one .feature, one .stats, zero crew:placeholder
+    assert ".feature" in source, (
+        "AC6: no assertion on .feature element count"
+    )
+    assert ".stats" in source, (
+        "AC6: no assertion on .stats element count"
+    )
+    assert "crew:placeholder" in source, (
+        "AC6: no check for placeholder text in DOM"
+    )
+
+    # AC7: body background matches --color-bg for active theme
+    assert "backgroundColor" in source, (
+        "AC7: no assertion on body computed background"
+    )
