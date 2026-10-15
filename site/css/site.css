@@ -1,3 +1,10 @@
-/* crew:placeholder */
 /* The site's own CSS: layout, the scrubber, the speed control,
    the board columns, the attempt chart. */
+
+/* Stat values: Public Sans style C — large numbers, tightened, tabular. */
+.stat__value {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}

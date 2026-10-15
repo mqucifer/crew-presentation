@@ -110,27 +110,46 @@ def _render_pages(pkg: Path) -> dict:
 
     env.globals["url_for"] = url_for
 
+    design_system_version = (
+        REPO_ROOT / "site" / "css" / "design-system.version"
+    ).read_text().strip()
+    env.globals["design_system_version"] = design_system_version
+
     manifest = _load_json(pkg / "manifest.json")
     index = _load_json(pkg / "delivery-history.json")
     sprints = index.get("sprints", [])
+    crew_repository = index.get("crew_repository", "")
+    sprint_metrics_answers = index.get("sprint_metrics", {}).get("answers", {})
+
+    env.globals["crew_repository"] = crew_repository
 
     pages = {}
 
     sprint_template = env.get_template("sprint_overview.html")
     for sprint in sprints:
         slug = _slug(sprint["name"])
+        key = sprint["name"]
+        if key not in sprint_metrics_answers:
+            print(
+                f"NOTE: sprint_metrics.answers has no key for sprint {key!r}; "
+                f"skipping {slug}",
+                file=sys.stderr,
+            )
+            continue
+        metrics = sprint_metrics_answers[key]
         context = {
-            "manifest": manifest,
-            "package": index,
             "sprints": sprints,
-            "current_sprint": sprint,
+            "sprint": sprint,
+            "metrics": metrics,
             "sprint_slug": slug,
         }
         pages[slug] = sprint_template.render(**context)
 
     for template_name, output_name in TEMPLATE_MAP.items():
         template = env.get_template(template_name)
-        pages[output_name] = template.render(manifest=manifest, package=index)
+        pages[output_name] = template.render(
+            manifest=manifest, package=index, sprint_slug=""
+        )
 
     return pages
 
