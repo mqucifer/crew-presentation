@@ -82,5 +82,25 @@
       </div>
     </div>
   </section>
+  <section class="card sprint-side" aria-labelledby="why-h">
+    <div class="card__head">
+      <h2 id="why-h">Why work didn't land first time</h2>
+    </div>
+    <div class="card__body">
+      <div class="cause-chart">
+        {% if failure_causes %}
+        {% for cause in failure_causes %}
+        <div class="cause-row">
+          <span{% if cause.unrecorded %} class="meta"{% endif %}>{{ cause.reason | safe }}</span>
+          <div class="cause-bar{% if cause.unrecorded %} cause-bar--unrecorded{% endif %}" style="width:{{ cause.width }}%"></div>
+          <span class="num{% if cause.unrecorded %} meta{% endif %}">{{ cause.count }}</span>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p>No failures recorded</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
 </div>
 {% endblock %}

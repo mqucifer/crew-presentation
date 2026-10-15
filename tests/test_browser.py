@@ -1414,3 +1414,257 @@ def test_changed_trend_values_have_num_class():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_failure_causes_four_rows_in_order():
+    """AC1: four causes render as four rows in package order with proportional bars."""
+    tag = "delivery-history-TEST"
+    causes = [
+        {"reason": "A test's assertion failed", "count": 10},
+        {"reason": '"already exists"', "count": 6},
+        {"reason": "Must create or edit a file", "count": 3},
+        {"reason": "Cause not recorded", "count": 2},
+    ]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_days": 3.2,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # Exactly 4 cause rows
+        row_count = section.count('class="cause-row"')
+        assert row_count == 4, f"expected 4 cause rows, got {row_count}"
+        # Rows in package order
+        pos1 = section.index("A test's assertion failed")
+        pos2 = section.index('"already exists"')
+        pos3 = section.index("Must create or edit a file")
+        pos4 = section.index("Cause not recorded")
+        assert pos1 < pos2 < pos3 < pos4, "rows not in package order"
+        # First bar is longest (100%)
+        assert "width:100%" in section, "first bar should be 100% width"
+        # Last bar uses unrecorded styling (surface-raised background, dim text)
+        assert "cause-bar--unrecorded" in section, "unrecorded bar class missing"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_failure_causes_empty_renders_no_failures():
+    """AC2: empty top_failure_causes renders 'No failures recorded' with no bar elements."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_days": 3.2,
+                "top_failure_causes": [],
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "No failures recorded" in html, "'No failures recorded' not found"
+        # No bar elements
+        assert 'class="cause-bar' not in html, "bar elements found for empty causes"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_failure_causes_bar_width_proportional():
+    """AC3: bar for count 6 of max 10 has width 60% using stage-2 background."""
+    tag = "delivery-history-TEST"
+    causes = [
+        {"reason": "A test's assertion failed", "count": 10},
+        {"reason": '"already exists"', "count": 6},
+    ]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        assert "width:60%" in section, "bar for count 6 should be 60% width"
+        # The .cause-bar class uses var(--stage-2) in site.css
+        css = (BUILD_DIR / "css" / "site.css").read_text()
+        assert "var(--stage-2)" in css, "stage-2 not used for cause-bar background in site.css"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_failure_causes_heading_and_row_count():
+    """AC4: section heading is 'Why work didn't land first time' with exactly 4 cause rows."""
+    tag = "delivery-history-TEST"
+    causes = [
+        {"reason": "A test's assertion failed", "count": 10},
+        {"reason": '"already exists"', "count": 6},
+        {"reason": "Must create or edit a file", "count": 3},
+        {"reason": "Cause not recorded", "count": 2},
+    ]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_days": 3.2,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Why work didn't land first time" in html, "section heading not found"
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        row_count = section.count('class="cause-row"')
+        assert row_count == 4, f"expected exactly 4 cause rows, got {row_count}"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_failure_causes_unrecorded_uses_dim_and_raised():
+    """AC5: 'Cause not recorded' uses dim text colour and surface-raised bar background."""
+    tag = "delivery-history-TEST"
+    causes = [
+        {"reason": "A test's assertion failed", "count": 10},
+        {"reason": "Cause not recorded", "count": 2},
+    ]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # The unrecorded reason span has class="meta" (dim text via design system)
+        assert 'class="meta">Cause not recorded' in section, (
+            "unrecorded reason should use .meta class for dim text"
+        )
+        # The bar uses cause-bar--unrecorded class
+        assert "cause-bar--unrecorded" in section, "unrecorded bar class missing"
+        # CSS maps cause-bar--unrecorded to surface-raised
+        css = (BUILD_DIR / "css" / "site.css").read_text()
+        assert "var(--color-surface-raised)" in css, (
+            "surface-raised not used for unrecorded bar in site.css"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_failure_causes_bar_widths_and_stage2_color():
+    """AC6: first bar 100%, second bar 60%, both use var(--stage-2) background."""
+    tag = "delivery-history-TEST"
+    causes = [
+        {"reason": "A test's assertion failed", "count": 10},
+        {"reason": '"already exists"', "count": 6},
+    ]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # First bar: width:100%
+        assert "width:100%" in section, "first bar should be 100% width"
+        # Second bar: width:60%
+        assert "width:60%" in section, "second bar should be 60% width"
+        # Both bars use .cause-bar (stage-2), not --unrecorded
+        normal_bars = section.count('class="cause-bar"')
+        assert normal_bars == 2, f"expected 2 normal cause-bar elements, got {normal_bars}"
+        assert "cause-bar--unrecorded" not in section, (
+            "unrecorded class should not appear for these causes"
+        )
+        # CSS confirms stage-2 background
+        css = (BUILD_DIR / "css" / "site.css").read_text()
+        assert "var(--stage-2)" in css, "stage-2 not used for cause-bar background"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
