@@ -551,3 +551,96 @@ def _stats_section(html: str) -> str:
     )
     assert match, "no stats section (class='stats') found"
     return match.group(1)
+
+
+def test_dark_theme_background_and_text_tokens():
+    """AC4: under data-theme='dark', page bg resolves to espresso and stat text to light-on-dark."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_days": 3.2,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        design_system_version = (
+            REPO_ROOT / "site" / "css" / "design-system.version"
+        ).read_text().strip()
+        css_path = PACKAGE_DIR / f"design-system-{design_system_version}.css"
+        assert css_path.is_file(), f"design-system CSS not found: {css_path}"
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+
+            def handle_route(route):
+                route.fulfill(
+                    status=200,
+                    content_type="text/css",
+                    body=css_path.read_bytes(),
+                )
+
+            page.route(
+                "**/cdn.jsdelivr.net/gh/mqucifer/design-system*/styles.css",
+                handle_route,
+            )
+
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".stat__value")
+
+            # Switch to dark theme
+            page.evaluate(
+                "document.documentElement.setAttribute('data-theme', 'dark')"
+            )
+            page.wait_for_timeout(100)
+
+            # Page background should resolve to espresso #1C1510
+            bg = page.evaluate(
+                "getComputedStyle(document.body).backgroundColor"
+            )
+            assert bg == "rgb(28, 21, 16)", (
+                f"dark-theme page background is {bg!r}, "
+                f"expected rgb(28, 21, 16) (espresso / --color-bg)"
+            )
+
+            # Stat text should resolve to light-on-dark #F3E9DA
+            stat_color = page.evaluate(
+                "getComputedStyle(document.querySelector('.stat__value')).color"
+            )
+            assert stat_color == "rgb(243, 233, 218)", (
+                f"dark-theme stat text color is {stat_color!r}, "
+                f"expected rgb(243, 233, 218) (--color-text)"
+            )
+
+            # No raw hex colour in inline styles (final clause of AC4)
+            style_attrs = page.evaluate(
+                """
+                () => Array.from(document.querySelectorAll('[style]'))
+                         .map(el => el.getAttribute('style'))
+                """
+            )
+            for style in style_attrs:
+                hex_match = re.search(r"#[0-9A-Fa-f]{3,8}\b", style)
+                assert not hex_match, (
+                    f"raw hex colour in inline style: '{style}' "
+                    f"(found {hex_match.group(0)})"
+                )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
