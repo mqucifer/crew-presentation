@@ -1854,3 +1854,558 @@ def test_feature_panel_light_theme_colors():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _package() -> dict:
+    """Read the delivery-history.json index from the current package directory."""
+    pkg_dir = _package_dir()
+    return json.loads((pkg_dir / "delivery-history.json").read_text())
+
+
+def _intercept_design_system(page) -> None:
+    """Intercept the design-system CDN URL and serve the local CSS file from ./.package/.
+
+    Also intercepts the Google Fonts URL so the sandbox (no network) does not
+    log a console error for the unreachable font fetch.
+    """
+    design_system_version = (
+        REPO_ROOT / "site" / "css" / "design-system.version"
+    ).read_text().strip()
+    css_path = PACKAGE_DIR / f"design-system-{design_system_version}.css"
+    assert css_path.is_file(), f"design-system CSS not found: {css_path}"
+
+    def handle_design_system(route):
+        route.fulfill(
+            status=200,
+            content_type="text/css",
+            body=css_path.read_bytes(),
+        )
+
+    def handle_fonts(route):
+        route.fulfill(
+            status=200,
+            content_type="text/css",
+            body=b"",
+        )
+
+    page.route(
+        "**/cdn.jsdelivr.net/gh/mqucifer/design-system*/styles.css",
+        handle_design_system,
+    )
+    page.route(
+        "**/fonts.googleapis.com/css2*",
+        handle_fonts,
+    )
+
+
+def test_stat_values_match_package_data():
+    """AC1: DOM stat values match package's sprint_metrics.answers; CSS served from local file."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_days": 3.2,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        pkg = _package()
+        sprint_key = pkg["sprints"][0]["name"]
+        answers = pkg["sprint_metrics"]["answers"][sprint_key]
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".stat__value")
+
+            # Exact text for stories delivered
+            throughput_text = page.evaluate("""
+                () => {
+                    const labels = document.querySelectorAll('.stat__label');
+                    for (const label of labels) {
+                        if (label.textContent.trim() === 'stories delivered') {
+                            const stat = label.closest('.stat');
+                            return stat.querySelector('.stat__value').textContent.trim();
+                        }
+                    }
+                    return null;
+                }
+            """)
+            assert throughput_text == str(answers["throughput"]), (
+                f"stories delivered shows {throughput_text!r}, "
+                f"expected {answers['throughput']!r} from package"
+            )
+
+            # Exact text for landed first try
+            first_attempt_text = page.evaluate("""
+                () => {
+                    const labels = document.querySelectorAll('.stat__label');
+                    for (const label of labels) {
+                        if (label.textContent.trim() === 'landed first try') {
+                            const stat = label.closest('.stat');
+                            return stat.querySelector('.stat__value').textContent.trim();
+                        }
+                    }
+                    return null;
+                }
+            """)
+            expected_fa = (
+                f"{answers['first_attempt_numerator']} of "
+                f"{answers['first_attempt_denominator']}"
+            )
+            assert first_attempt_text == expected_fa, (
+                f"landed first try shows {first_attempt_text!r}, expected {expected_fa!r}"
+            )
+
+            # Design-system CSS was served from local file: the sandbox has no
+            # network, so if --color-bg is set the CSS must have come from ./.package/
+            color_bg = page.evaluate(
+                "getComputedStyle(document.documentElement).getPropertyValue('--color-bg')"
+            )
+            assert color_bg.strip() != "", (
+                "--color-bg not set; design-system CSS was not loaded from local file"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_rows_match_package_stories():
+    """AC2: attempt chart contains exactly 7 rows with card numbers matching package in order."""
+    tag = "delivery-history-TEST"
+    story_numbers = [201, 202, 203, 204, 205, 206, 207]
+    stories = [
+        {
+            "card": {"number": n, "repo": "mqucifer/crew"},
+            "blocks": ["refused", "landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+        for n in story_numbers
+    ]
+    cards = [
+        {
+            "number": n,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": f"story-{n}.py",
+        }
+        for n in story_numbers
+    ]
+    _make_package_with_stories(tag, stories=stories, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        pkg = _package()
+        expected_numbers = [s["card"]["number"] for s in pkg["analysis"]["stories"]]
+        assert len(expected_numbers) == 7, (
+            f"package has {len(expected_numbers)} stories, expected 7"
+        )
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".attempt-row")
+
+            # Exactly 7 attempt rows
+            row_count = page.locator(".attempt-row").count()
+            assert row_count == 7, f"expected 7 attempt rows, got {row_count}"
+
+            # Each row's card number matches the package in order
+            row_numbers = page.evaluate("""
+                () => Array.from(document.querySelectorAll('.attempt-row'))
+                    .map(row => {
+                        const num = row.querySelector('.num');
+                        return num ? num.textContent.trim() : null;
+                    })
+            """)
+            expected_texts = [f"#{n}" for n in expected_numbers]
+            assert row_numbers == expected_texts, (
+                f"row card numbers are {row_numbers}, expected {expected_texts}"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_name_in_header_and_no_console_errors():
+    """AC3: single-sprint page renders without error, header shows sprint name, no JS console errors."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        pkg = _package()
+        assert len(pkg["sprints"]) == 1, "expected single-sprint package"
+        sprint_name = pkg["sprints"][0]["name"]
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+
+            console_errors: list[str] = []
+            page.on(
+                "console",
+                lambda msg: console_errors.append(msg.text)
+                if msg.type == "error"
+                else None,
+            )
+
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector("h1")
+
+            # Page rendered without error: h1 exists and has content
+            h1_text = page.locator("h1").text_content()
+            assert h1_text and len(h1_text.strip()) > 0, "h1 is empty; page did not render"
+
+            # Header shows the sprint's name
+            assert sprint_name in h1_text, (
+                f"h1 is {h1_text!r}, expected to contain {sprint_name!r}"
+            )
+
+            # No JavaScript console errors
+            assert not console_errors, (
+                f"JavaScript console errors present: {console_errors}"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_css_custom_properties_resolve_light_theme():
+    """AC4: CSS custom properties resolve to light-theme values; IIFE sets data-theme before paint."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            # Force light color scheme so the IIFE picks 'light'
+            context = browser.new_context(color_scheme="light")
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".stat__value")
+
+            # data-theme is set by the IIFE before the stylesheet loads
+            data_theme = page.evaluate(
+                "document.documentElement.getAttribute('data-theme')"
+            )
+            assert data_theme in ("light", "dark"), (
+                f"data-theme is {data_theme!r}, expected 'light' or 'dark'"
+            )
+            assert data_theme == "light", (
+                f"with color_scheme='light', data-theme should be 'light', got {data_theme!r}"
+            )
+
+            # CSS custom properties resolve to light-theme values
+            color_bg = page.evaluate(
+                "getComputedStyle(document.documentElement).getPropertyValue('--color-bg')"
+            )
+            # Light theme --color-bg is #F6EFE3 → rgb(246, 239, 227)
+            # As a custom property, it returns the raw value: #F6EFE3
+            assert color_bg.strip().lower() == "#f6efe3", (
+                f"--color-bg is {color_bg.strip()!r}, expected '#F6EFE3' (light theme)"
+            )
+
+            color_text = page.evaluate(
+                "getComputedStyle(document.documentElement).getPropertyValue('--color-text')"
+            )
+            # Light theme --color-text is #2E1F14
+            assert color_text.strip().lower() == "#2e1f14", (
+                f"--color-text is {color_text.strip()!r}, expected '#2E1F14' (light theme)"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_head_order_iife_before_links():
+    """AC5: head contains design-system link, site CSS link, and theme IIFE before both."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        design_system_version = (
+            REPO_ROOT / "site" / "css" / "design-system.version"
+        ).read_text().strip()
+        expected_design_system_href = (
+            f"https://cdn.jsdelivr.net/gh/mqucifer/design-system@{design_system_version}/styles.css"
+        )
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Get head children in document order
+            head_children = page.evaluate("""
+                () => Array.from(document.head.children).map(el => ({
+                    tag: el.tagName,
+                    href: el.href || el.getAttribute('href') || '',
+                    hasIIFE: el.tagName === 'SCRIPT'
+                        && el.textContent.includes('data-theme')
+                }))
+            """)
+
+            # Find the IIFE script
+            iife_positions = [
+                i for i, child in enumerate(head_children)
+                if child["tag"] == "SCRIPT" and child["hasIIFE"]
+            ]
+            assert len(iife_positions) == 1, (
+                f"expected exactly 1 theme IIFE script, found {len(iife_positions)}"
+            )
+            iife_pos = iife_positions[0]
+
+            # Find the design-system stylesheet link
+            design_system_positions = [
+                i for i, child in enumerate(head_children)
+                if child["tag"] == "LINK"
+                and child["href"] == expected_design_system_href
+            ]
+            assert len(design_system_positions) == 1, (
+                f"expected exactly 1 design-system link with href "
+                f"{expected_design_system_href!r}, found {len(design_system_positions)}"
+            )
+            ds_pos = design_system_positions[0]
+
+            # Find the site CSS link
+            site_css_positions = [
+                i for i, child in enumerate(head_children)
+                if child["tag"] == "LINK"
+                and "site.css" in child["href"]
+            ]
+            assert len(site_css_positions) == 1, (
+                f"expected exactly 1 site CSS link, found {len(site_css_positions)}"
+            )
+            site_pos = site_css_positions[0]
+
+            # IIFE appears before both links in document order
+            assert iife_pos < ds_pos, (
+                f"theme IIFE at position {iife_pos} should be before "
+                f"design-system link at position {ds_pos}"
+            )
+            assert iife_pos < site_pos, (
+                f"theme IIFE at position {iife_pos} should be before "
+                f"site CSS link at position {site_pos}"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_exactly_one_feature_one_stats_no_placeholder():
+    """AC6: exactly one .feature, one .stats, zero crew:placeholder in the DOM."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".stats")
+
+            # Exactly one .feature element
+            feature_count = page.locator(".feature").count()
+            assert feature_count == 1, (
+                f"expected exactly 1 .feature element, got {feature_count}"
+            )
+
+            # Exactly one .stats element
+            stats_count = page.locator(".stats").count()
+            assert stats_count == 1, (
+                f"expected exactly 1 .stats element, got {stats_count}"
+            )
+
+            # Zero elements with 'crew:placeholder' text
+            placeholder_count = page.locator("text=crew:placeholder").count()
+            assert placeholder_count == 0, (
+                f"expected 0 elements with 'crew:placeholder' text, got {placeholder_count}"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_data_theme_set_and_body_background_matches_token():
+    """AC7: no console errors, data-theme set on html, body background matches --color-bg."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(color_scheme="light")
+            page = context.new_page()
+            _intercept_design_system(page)
+
+            console_errors: list[str] = []
+            page.on(
+                "console",
+                lambda msg: console_errors.append(msg.text)
+                if msg.type == "error"
+                else None,
+            )
+
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".stat__value")
+
+            # No JavaScript console errors
+            assert not console_errors, (
+                f"JavaScript console errors present: {console_errors}"
+            )
+
+            # <html> has data-theme set to 'light' or 'dark'
+            data_theme = page.evaluate(
+                "document.documentElement.getAttribute('data-theme')"
+            )
+            assert data_theme in ("light", "dark"), (
+                f"data-theme is {data_theme!r}, expected 'light' or 'dark'"
+            )
+
+            # Body's computed background matches --color-bg for the active theme
+            body_bg = page.evaluate("getComputedStyle(document.body).backgroundColor")
+            if data_theme == "light":
+                expected_bg = "rgb(246, 239, 227)"  # #F6EFE3
+            else:
+                expected_bg = "rgb(28, 21, 16)"  # #1C1510
+            assert body_bg == expected_bg, (
+                f"body background is {body_bg!r}, expected {expected_bg!r} "
+                f"for theme {data_theme!r}"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
