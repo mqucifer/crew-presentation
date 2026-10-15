@@ -311,11 +311,11 @@ def test_build_fails_on_non_conforming_data_file():
 
 
 def test_placeholder_checks_contain_marker():
-    """AC: the browser test file contains assertions proving each acceptance criterion is exercised.
+    """AC: the check files contain the assertions proving each acceptance criterion is exercised.
 
-    This is a contract check: it reads tests/test_browser.py and verifies
-    that the assertion markers for each AC are present, so a refactor that
-    silently drops an assertion is caught here.
+    A contract check: it reads the check modules and verifies the assertion
+    markers for each AC are present, so a refactor that silently drops a check
+    is caught here.
     """
     browser_test = REPO_ROOT / "tests" / "test_browser.py"
     assert browser_test.is_file(), "tests/test_browser.py not found"
@@ -381,4 +381,20 @@ def test_placeholder_checks_contain_marker():
     # AC7: body background matches --color-bg for active theme
     assert "backgroundColor" in source, (
         "AC7: no assertion on body computed background"
+    )
+
+    # Token check: the site's own contrast and token checks (tools/token_check.py)
+    # must contain the contrast-ratio computation and the raw-colour scan.
+    token_check = REPO_ROOT / "tools" / "token_check.py"
+    assert token_check.is_file(), "tools/token_check.py not found"
+    tc = token_check.read_text()
+    assert "contrast_ratio" in tc, (
+        "token check has no contrast-ratio computation"
+    )
+    assert "0.2126" in tc, (
+        "token check lacks the WCAG relative-luminance formula"
+    )
+    assert "find_raw_colours" in tc, "token check has no raw-colour scan"
+    assert "#[0-9a-fA-F]" in tc, (
+        "token check lacks the hex-colour pattern"
     )
