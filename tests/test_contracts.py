@@ -14,6 +14,7 @@ import urllib.error
 from pathlib import Path
 
 import pytest
+import shutil
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_DIR = REPO_ROOT / ".package"
@@ -49,7 +50,7 @@ def test_design_system_stylesheet_exists():
 
 
 def test_build_check_exits_zero():
-    """AC2: the build check (python build.py) exits 0."""
+    """AC1: build.py validates the package and writes the site to build/."""
     result = subprocess.run(
         [sys.executable, "build.py"],
         capture_output=True,
@@ -58,12 +59,20 @@ def test_build_check_exits_zero():
         check=False,
     )
     assert result.returncode == 0, f"build.py failed:\n{result.stdout}\n{result.stderr}"
+    build_dir = REPO_ROOT / "build"
+    assert (build_dir / "index.html").is_file(), "build/index.html missing"
+    assert (build_dir / "replay.html").is_file(), "build/replay.html missing"
+    assert (build_dir / "story-journey.html").is_file(), "build/story-journey.html missing"
+    assert (build_dir / "css" / "site.css").is_file(), "build/css/site.css missing"
+    assert (build_dir / "css" / "design-system.version").is_file(), (
+        "build/css/design-system.version missing"
+    )
+    assert (build_dir / "js" / "replay.js").is_file(), "build/js/replay.js missing"
 
 
 def test_placeholder_checks_contain_marker():
-    """AC3: build.py, test_browser.py, and test_tokens.py each contain crew:placeholder."""
+    """AC3: test_browser.py and test_tokens.py each contain crew:placeholder."""
     paths = [
-        REPO_ROOT / "build.py",
         REPO_ROOT / "tests" / "test_browser.py",
         REPO_ROOT / "tests" / "test_tokens.py",
     ]
@@ -209,3 +218,93 @@ def test_unsupported_major_version_fails_with_version():
     message = str(exc_info.value)
     assert "2" in message
     assert "cannot display" in message
+
+
+def test_build_fails_on_unsupported_major_version():
+    """AC2: build.py exits non-zero and names the major version as unsupported."""
+    tag = "delivery-history-TEST"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "2.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "delivery-history.json").write_text(json.dumps({}))
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode != 0, "build.py should fail for unsupported major version"
+        output = result.stdout + result.stderr
+        assert "2" in output, f"output should name the major version: {output}"
+        assert "cannot display" in output, (
+            f"output should say the version is unsupported: {output}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_build_fails_on_non_conforming_data_file():
+    """AC3: build.py exits non-zero and identifies the data file that failed to conform."""
+    tag = "delivery-history-TEST"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "1.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["sprints"],
+                "properties": {"sprints": {"type": "array"}},
+            }
+        )
+    )
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "delivery-history.json").write_text(json.dumps({"cards": []}))
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode != 0, "build.py should fail for non-conforming data"
+        output = result.stdout + result.stderr
+        assert "delivery-history.json" in output, (
+            f"output should name the failing file: {output}"
+        )
+        assert "does not conform" in output, (
+            f"output should say the file does not conform: {output}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
