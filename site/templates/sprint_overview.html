@@ -1,7 +1,16 @@
-<!-- crew:placeholder -->
 {% extends "base.html" %}
+{% block title %}{{ current_sprint.name }}{% endblock %}
 {% block content %}
+<nav aria-label="Sprints">
+  {% for sprint in sprints %}
+  <a href="{{ sprint.name | lower | replace(' ', '-') }}.html"{% if sprint.name == current_sprint.name %} aria-current="page"{% endif %}>{{ sprint.name }}</a>
+  {% endfor %}
+</nav>
+<nav aria-label="Views">
+  <a href="{{ sprint_slug }}">Sprint</a>
+  <a href="story-journey.html">A story's journey</a>
+</nav>
 <section>
-  <h1>Sprint Overview</h1>
+  <h1>{{ current_sprint.name }}</h1>
 </section>
 {% endblock %}
