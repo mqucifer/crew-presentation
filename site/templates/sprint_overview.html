@@ -30,6 +30,21 @@
     <span class="stat__label">points delivered</span>
   </div>
 </section>
+{% if changed %}
+<section class="card changed-trend" aria-labelledby="changed-h">
+  <div class="card__head">
+    <h2 id="changed-h">What changed</h2>
+  </div>
+  <div class="card__body">
+    {% for entry in changed %}
+    <div class="changed-trend-entry">
+      <div class="changed-trend-text">{{ entry.text }}</div>
+      <div class="changed-trend-values">{{ entry.measure }}: <span class="num">{{ entry.previous }}</span> &rarr; <span class="num">{{ entry.now }}</span></div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 <div class="sprint-grid">
   <section class="card sprint-chart" aria-labelledby="split-h">
     <div class="card__head">
