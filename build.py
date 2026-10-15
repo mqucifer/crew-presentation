@@ -20,7 +20,6 @@ JS_DIR = REPO_ROOT / "site" / "js"
 SUPPORTED_MAJOR_VERSIONS = (1,)
 
 TEMPLATE_MAP = {
-    "sprint_overview.html": "index.html",
     "replay.html": "replay.html",
     "story_journey.html": "story-journey.html",
 }
@@ -98,7 +97,7 @@ def _validate_package(pkg: Path) -> None:
 
 
 def _render_pages(pkg: Path) -> dict:
-    """Render each template, returning a dict of output filename to HTML content."""
+    """Render each page: one per sprint, plus the other views."""
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(TEMPLATES_DIR)),
         autoescape=True,
@@ -113,13 +112,26 @@ def _render_pages(pkg: Path) -> dict:
 
     manifest = _load_json(pkg / "manifest.json")
     index = _load_json(pkg / "delivery-history.json")
-
-    context = {"manifest": manifest, "package": index}
+    sprints = index.get("sprints", [])
 
     pages = {}
+
+    sprint_template = env.get_template("sprint_overview.html")
+    for sprint in sprints:
+        slug = _slug(sprint["name"])
+        context = {
+            "manifest": manifest,
+            "package": index,
+            "sprints": sprints,
+            "current_sprint": sprint,
+            "sprint_slug": slug,
+        }
+        pages[slug] = sprint_template.render(**context)
+
     for template_name, output_name in TEMPLATE_MAP.items():
         template = env.get_template(template_name)
-        pages[output_name] = template.render(**context)
+        pages[output_name] = template.render(manifest=manifest, package=index)
+
     return pages
 
 
@@ -152,6 +164,11 @@ def main() -> None:
 
     _copy_assets()
     print(f"Build complete: {BUILD_DIR}")
+
+
+def _slug(name: str) -> str:
+    """A sprint name as a filename: lowercase, spaces to hyphens, .html extension."""
+    return name.lower().replace(" ", "-") + ".html"
 
 
 if __name__ == "__main__":

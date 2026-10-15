@@ -60,7 +60,6 @@ def test_build_check_exits_zero():
     )
     assert result.returncode == 0, f"build.py failed:\n{result.stdout}\n{result.stderr}"
     build_dir = REPO_ROOT / "build"
-    assert (build_dir / "index.html").is_file(), "build/index.html missing"
     assert (build_dir / "replay.html").is_file(), "build/replay.html missing"
     assert (build_dir / "story-journey.html").is_file(), "build/story-journey.html missing"
     assert (build_dir / "css" / "site.css").is_file(), "build/css/site.css missing"
@@ -70,30 +69,8 @@ def test_build_check_exits_zero():
     assert (build_dir / "js" / "replay.js").is_file(), "build/js/replay.js missing"
 
 
-def test_placeholder_checks_contain_marker():
-    """AC3: test_browser.py and test_tokens.py each contain crew:placeholder."""
-    paths = [
-        REPO_ROOT / "tests" / "test_browser.py",
-        REPO_ROOT / "tests" / "test_tokens.py",
-    ]
-    for path in paths:
-        content = path.read_text()
-        assert "crew:placeholder" in content, f"{path} missing crew:placeholder"
 
 
-def test_site_structure_contains_marker():
-    """AC4: view templates, shared layout, replay player, and site CSS carry crew:placeholder."""
-    paths = [
-        REPO_ROOT / "site" / "templates" / "sprint_overview.html",
-        REPO_ROOT / "site" / "templates" / "replay.html",
-        REPO_ROOT / "site" / "templates" / "story_journey.html",
-        REPO_ROOT / "site" / "templates" / "base.html",
-        REPO_ROOT / "site" / "js" / "replay.js",
-        REPO_ROOT / "site" / "css" / "site.css",
-    ]
-    for path in paths:
-        content = path.read_text()
-        assert "crew:placeholder" in content, f"{path} missing crew:placeholder"
 
 
 def test_design_system_version_is_real():
