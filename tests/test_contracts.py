@@ -67,6 +67,11 @@ def test_build_check_exits_zero():
         "build/css/design-system.version missing"
     )
     assert (build_dir / "js" / "replay.js").is_file(), "build/js/replay.js missing"
+    sprint_files = [
+        f for f in build_dir.iterdir()
+        if f.suffix == ".html" and f.name not in ("replay.html", "story-journey.html")
+    ]
+    assert sprint_files, "no sprint-overview page in build output"
 
 
 

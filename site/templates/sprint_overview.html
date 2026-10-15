@@ -1,16 +1,33 @@
 {% extends "base.html" %}
-{% block title %}{{ current_sprint.name }}{% endblock %}
+{% block title %}{{ sprint.name }}{% endblock %}
+{% block h1 %}<h1>{{ sprint.name }}</h1>{% endblock %}
 {% block content %}
 <nav aria-label="Sprints">
-  {% for sprint in sprints %}
-  <a href="{{ sprint.name | lower | replace(' ', '-') }}.html"{% if sprint.name == current_sprint.name %} aria-current="page"{% endif %}>{{ sprint.name }}</a>
+  {% for s in sprints %}
+  <a href="{{ s.name | lower | replace(' ', '-') }}.html"{% if s.name == sprint.name %} aria-current="page"{% endif %}>{{ s.name }}</a>
   {% endfor %}
 </nav>
-<nav aria-label="Views">
-  <a href="{{ sprint_slug }}">Sprint</a>
-  <a href="story-journey.html">A story's journey</a>
-</nav>
-<section>
-  <h1>{{ current_sprint.name }}</h1>
+<div class="meta">{{ sprint.start }} – {{ sprint.end }}</div>
+<section class="stats" aria-label="Sprint totals">
+  <div class="stat">
+    <span class="stat__value num">{{ metrics.throughput }}</span>
+    <span class="stat__label">stories delivered</span>
+  </div>
+  <div class="stat">
+    <span class="stat__value num">{{ metrics.first_attempt_numerator }} of {{ metrics.first_attempt_denominator }}</span>
+    <span class="stat__label">landed first try</span>
+  </div>
+  <div class="stat">
+    <span class="stat__value num">{{ metrics.escalation_count }}</span>
+    <span class="stat__label">escalations</span>
+  </div>
+  <div class="stat">
+    <span class="stat__value num">{{ metrics.cycle_time_days }} days</span>
+    <span class="stat__label">cycle time</span>
+  </div>
+  <div class="stat">
+    <span class="stat__value num">{{ metrics.points_delivered }}</span>
+    <span class="stat__label">points delivered</span>
+  </div>
 </section>
 {% endblock %}

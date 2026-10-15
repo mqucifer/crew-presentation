@@ -1,13 +1,34 @@
-<!-- crew:placeholder -->
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <title>{% block title %}Crew Presentation{% endblock %}</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mqucifer/design-system@v0.1.0/styles.css">
+  <script>
+  (function () {
+    var t;
+    try { t = localStorage.getItem('theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+  </script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Public+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mqucifer/design-system@{{ design_system_version }}/styles.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
 </head>
 <body>
+<div class="page">
+  <header class="site-header">
+    <div>
+      <div class="meta">{{ crew_repository.replace('/', ' / ') }} · sprint-metrics</div>
+      {% block h1 %}{% endblock %}
+    </div>
+    <nav class="nav" aria-label="Views">
+      <a href="{{ sprint_slug }}" aria-current="page">Sprint</a>
+      <a href="story-journey.html">A story's journey</a>
+      <a href="replay.html">Replay</a>
+    </nav>
+  </header>
   {% block content %}{% endblock %}
+</div>
 </body>
 </html>
