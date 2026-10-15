@@ -174,6 +174,7 @@ def _render_pages(pkg: Path) -> dict:
                 )
 
         changed = analysis_by_sprint.get(sprint["name"], {}).get("changed", [])
+        decided = analysis_by_sprint.get(sprint["name"], {}).get("decided", [])
 
         context = {
             "sprints": sprints,
@@ -182,6 +183,7 @@ def _render_pages(pkg: Path) -> dict:
             "sprint_slug": slug,
             "stories": stories,
             "changed": changed,
+            "decided": decided,
             "failure_causes": _build_failure_causes(metrics),
         }
         pages[slug] = sprint_template.render(**context)
