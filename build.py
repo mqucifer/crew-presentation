@@ -177,6 +177,7 @@ def _render_pages(pkg: Path) -> dict:
             "metrics": metrics,
             "sprint_slug": slug,
             "stories": stories,
+            "failure_causes": _build_failure_causes(metrics),
         }
         pages[slug] = sprint_template.render(**context)
 
@@ -223,6 +224,71 @@ def main() -> None:
 def _slug(name: str) -> str:
     """A sprint name as a filename: lowercase, spaces to hyphens, .html extension."""
     return name.lower().replace(" ", "-") + ".html"
+
+
+def _normalize_failure_causes(raw) -> list[dict]:
+    """Normalize sprint-metrics' top_failure_causes into [{'reason', 'count'}].
+
+    The site's contract is a list of {reason, count} objects, but the answer
+    shape has drifted across releases: a list of [reason, count] pairs, a
+    {reason: count} mapping, or a bare list of reasons all carry the same
+    information. Anything we cannot read yields a 0 count instead of a crash —
+    the site shows what its package says, it does not compute the metric itself.
+    """
+    if not raw:
+        return []
+    if isinstance(raw, dict):
+        return [
+            {"reason": str(reason), "count": _as_count(count)}
+            for reason, count in raw.items()
+        ]
+    if not isinstance(raw, (list, tuple)):
+        return []
+    causes = []
+    for item in raw:
+        if isinstance(item, dict):
+            reason = item.get("reason", item.get("cause", ""))
+            count = item.get("count", 0)
+        elif isinstance(item, (list, tuple)) and len(item) >= 2:
+            reason, count = item[0], item[1]
+        else:
+            reason, count = item, 0
+        causes.append({"reason": str(reason), "count": _as_count(count)})
+    return causes
+
+
+def _as_count(value) -> int:
+    """Coerce a count value to a non-negative int; anything else is 0."""
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return value if value > 0 else 0
+    if isinstance(value, float):
+        return int(value) if value > 0 else 0
+    if isinstance(value, str) and value.isdigit():
+        return int(value)
+    return 0
+
+
+def _build_failure_causes(metrics: dict) -> list[dict]:
+    """Sprint-metrics' top_failure_causes as ready-to-render bar-chart rows.
+
+    Each row carries the reason, its count, the bar's width as a percentage of
+    the largest count, and whether the reason is the 'Cause not recorded'
+    placeholder. Widths are computed here (display sizing, not a metric) so the
+    template only prints values and the build never divides by zero.
+    """
+    causes = _normalize_failure_causes(metrics.get("top_failure_causes"))
+    max_count = max((c["count"] for c in causes), default=0)
+    return [
+        {
+            "reason": c["reason"],
+            "count": c["count"],
+            "width": int(round(c["count"] / max_count * 100)) if max_count else 0,
+            "unrecorded": c["reason"] == "Cause not recorded",
+        }
+        for c in causes
+    ]
 
 
 if __name__ == "__main__":
