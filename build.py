@@ -122,6 +122,8 @@ def _render_pages(pkg: Path) -> dict:
     sprint_metrics_answers = index.get("sprint_metrics", {}).get("answers", {})
     cards = index.get("cards", [])
     analysis_stories = index.get("analysis", {}).get("stories", [])
+    analysis_sprints = index.get("analysis", {}).get("sprints", [])
+    analysis_by_sprint: dict[str, dict] = {a["sprint"]: a for a in analysis_sprints}
 
     cards_by_key: dict[tuple, dict] = {}
     for card in cards:
@@ -171,12 +173,15 @@ def _render_pages(pkg: Path) -> dict:
                     }
                 )
 
+        changed = analysis_by_sprint.get(sprint["name"], {}).get("changed", [])
+
         context = {
             "sprints": sprints,
             "sprint": sprint,
             "metrics": metrics,
             "sprint_slug": slug,
             "stories": stories,
+            "changed": changed,
         }
         pages[slug] = sprint_template.render(**context)
 

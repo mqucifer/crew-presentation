@@ -1173,3 +1173,244 @@ def test_attempt_chart_heading_text_and_style():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _make_package_with_changed(
+    tag: str,
+    sprint_name: str,
+    changed: list[dict],
+) -> Path:
+    """Create a fake package with analysis.sprints[].changed populated."""
+    sprints = [{"name": sprint_name, "start": "2026-09-22", "end": "2026-09-29"}]
+    metrics = {
+        sprint_name: {
+            "throughput": 5,
+            "points_delivered": 10,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "escalation_count": 0,
+            "cycle_time_days": 2.0,
+        }
+    }
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "1.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["sprints"],
+                "properties": {"sprints": {"type": "array"}},
+            }
+        )
+    )
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "delivery-history.json").write_text(
+        json.dumps(
+            {
+                "sprints": sprints,
+                "cards": [],
+                "crew_repository": "mqucifer/crew",
+                "sprint_metrics": {"answers": metrics},
+                "analysis": {"sprints": [{"sprint": sprint_name, "changed": changed}]},
+            }
+        )
+    )
+    return pkg_dir
+
+
+def test_changed_trend_single_entry_reading_order():
+    """AC1: single changed entry renders text, measure, previous, now in reading order."""
+    tag = "delivery-history-TEST"
+    _make_package_with_changed(
+        tag,
+        "Sprint 7",
+        [
+            {
+                "text": "Cycle time improved",
+                "measure": "cycle_time_days",
+                "previous": 5.2,
+                "now": 3.8,
+                "better": True,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+        section_match = re.search(
+            r'<section class="card changed-trend".*?</section>',
+            html,
+            re.DOTALL,
+        )
+        assert section_match, "changed-trend section not found"
+        section_html = section_match.group(0)
+        pos_text = section_html.index("Cycle time improved")
+        pos_measure = section_html.index("cycle_time_days")
+        pos_prev = section_html.index("5.2")
+        pos_now = section_html.index("3.8")
+        assert pos_text < pos_measure < pos_prev < pos_now, (
+            f"reading order violated: text@{pos_text}, measure@{pos_measure}, "
+            f"prev@{pos_prev}, now@{pos_now}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_trend_two_entries_in_order():
+    """AC2: two changed entries render in package order with correct values."""
+    tag = "delivery-history-TEST"
+    _make_package_with_changed(
+        tag,
+        "Sprint 8",
+        [
+            {
+                "text": "First-attempt rate rose",
+                "measure": "first_attempt_rate_percent",
+                "previous": 40,
+                "now": 55,
+                "better": True,
+                "source": "sprint-metrics",
+            },
+            {
+                "text": "Escalations held steady",
+                "measure": "escalation_count",
+                "previous": 1,
+                "now": 1,
+                "better": False,
+                "source": "sprint-metrics",
+            },
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-8.html").read_text()
+        entry_count = html.count('class="changed-trend-entry"')
+        assert entry_count == 2, f"expected 2 changed-trend entries, got {entry_count}"
+        pos_entry1 = html.index("First-attempt rate rose")
+        pos_entry2 = html.index("Escalations held steady")
+        assert pos_entry1 < pos_entry2, "first entry should appear before second"
+        pos_m1 = html.index("first_attempt_rate_percent", pos_entry1)
+        pos_p1 = html.index("40", pos_m1)
+        pos_n1 = html.index("55", pos_p1)
+        assert pos_entry1 < pos_m1 < pos_p1 < pos_n1
+        pos_m2 = html.index("escalation_count", pos_entry2)
+        second_area = html[pos_m2:]
+        num_values = re.findall(r'class="num">(\d+\.?\d*)<', second_area)
+        assert num_values[0] == "1", f"expected first value '1', got {num_values[0]!r}"
+        assert num_values[1] == "1", f"expected second value '1', got {num_values[1]!r}"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_trend_empty_no_entries():
+    """AC3: empty changed array produces no changed-trend entries."""
+    tag = "delivery-history-TEST"
+    _make_package_with_changed(tag, "Sprint 6", [])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "changed-trend-entry" not in html, (
+            "changed-trend-entry element found with empty changed array"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_trend_heading_before_entries():
+    """AC4: heading with 'changed' appears before entries, in same section."""
+    tag = "delivery-history-TEST"
+    _make_package_with_changed(
+        tag,
+        "Sprint 7",
+        [
+            {
+                "text": "Cycle time improved",
+                "measure": "cycle_time_days",
+                "previous": 5.2,
+                "now": 3.8,
+                "better": True,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+        heading_match = re.search(
+            r'<(h[23])[^>]*>(?:(?!</\1>).)*?changed(?:(?!</\1>).)*?</\1>',
+            html,
+            re.DOTALL | re.IGNORECASE,
+        )
+        assert heading_match, "no h2/h3 heading containing 'changed' found"
+        heading_pos = heading_match.start()
+        entry_pos = html.index("Cycle time improved")
+        assert heading_pos < entry_pos, (
+            f"heading at {heading_pos} should appear before entry at {entry_pos}"
+        )
+        section_match = re.search(
+            r'<section class="card changed-trend".*?</section>',
+            html,
+            re.DOTALL,
+        )
+        assert section_match, "changed-trend section not found"
+        section_start = section_match.start()
+        section_end = section_match.end()
+        assert section_start < heading_pos < section_end, (
+            "heading not inside the changed-trend section"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_trend_values_have_num_class():
+    """AC5: previous and now values carry the CSS class 'num'."""
+    tag = "delivery-history-TEST"
+    _make_package_with_changed(
+        tag,
+        "Sprint 7",
+        [
+            {
+                "text": "Cycle time improved",
+                "measure": "cycle_time_days",
+                "previous": 5.2,
+                "now": 3.8,
+                "better": True,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+        assert 'class="num">5.2<' in html, (
+            "previous value 5.2 does not have class 'num'"
+        )
+        assert 'class="num">3.8<' in html, (
+            "now value 3.8 does not have class 'num'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
