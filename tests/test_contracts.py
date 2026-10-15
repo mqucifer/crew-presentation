@@ -50,7 +50,7 @@ def test_design_system_stylesheet_exists():
 
 
 def test_build_check_exits_zero():
-    """AC1: build.py validates the package and writes the site to build/."""
+    """AC: build.py validates the package, renders the attempt chart, and writes the site to build/."""
     result = subprocess.run(
         [sys.executable, "build.py"],
         capture_output=True,
@@ -72,6 +72,24 @@ def test_build_check_exits_zero():
         if f.suffix == ".html" and f.name not in ("replay.html", "story-journey.html")
     ]
     assert sprint_files, "no sprint-overview page in build output"
+
+    # Attempt-chart section structure in the rendered page
+    page = sprint_files[0].read_text()
+    assert "The Architect's split, story by story" in page, (
+        "attempt chart heading not found in sprint-overview page"
+    )
+    assert "attempt-legend" in page, "attempt legend section not found"
+    assert "attempt-row" in page, "attempt rows not found"
+    assert "attempt-block" in page, "attempt blocks not found"
+
+    # CSS: striped-blocked gradient present, no placeholder marker
+    css = (build_dir / "css" / "site.css").read_text()
+    assert "crew:placeholder" not in css, "crew:placeholder still present in site.css"
+    assert "repeating-linear-gradient" in css, (
+        "repeating-linear-gradient not found in site.css"
+    )
+    assert "--tone-blocked-text" in css, "--tone-blocked-text not in site.css"
+    assert "--tone-blocked-bg" in css, "--tone-blocked-bg not in site.css"
 
 
 

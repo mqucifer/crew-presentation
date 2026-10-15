@@ -644,3 +644,532 @@ def test_dark_theme_background_and_text_tokens():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _make_package_with_stories(
+    tag: str,
+    stories: list[dict],
+    cards: list[dict],
+    sprint_names: list[str] | None = None,
+) -> Path:
+    """Create a fake package with analysis.stories and cards populated."""
+    if sprint_names is None:
+        sprint_names = ["Sprint 6"]
+    sprints = [
+        {"name": n, "start": "2026-09-22", "end": "2026-09-29"}
+        for n in sprint_names
+    ]
+    metrics = {
+        name: {
+            "throughput": len(stories),
+            "points_delivered": 10,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": max(len(stories), 1),
+            "escalation_count": 0,
+            "cycle_time_days": 2.0,
+        }
+        for name in sprint_names
+    }
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "1.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["sprints"],
+                "properties": {"sprints": {"type": "array"}},
+            }
+        )
+    )
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "delivery-history.json").write_text(
+        json.dumps(
+            {
+                "sprints": sprints,
+                "cards": cards,
+                "crew_repository": "mqucifer/crew",
+                "sprint_metrics": {"answers": metrics},
+                "analysis": {"stories": stories},
+            }
+        )
+    )
+    return pkg_dir
+
+
+def test_attempt_row_refused_landed_merged():
+    """AC1: a delivered story with 4 refused + 1 landed blocks renders 4 stage-1 and 1 done blocks, status 'merged'."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 125, "repo": "mqucifer/crew"},
+                "blocks": ["refused", "refused", "refused", "refused", "landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 125,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "card.py",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The row for #125 exists
+        assert "#125" in html, "card number #125 not found in page"
+        # Exactly four refused blocks
+        refused_count = html.count('class="attempt-block attempt-block--refused"')
+        assert refused_count == 4, f"expected 4 refused blocks, got {refused_count}"
+        # Exactly one landed block
+        landed_count = html.count('class="attempt-block attempt-block--landed"')
+        assert landed_count == 1, f"expected 1 landed block, got {landed_count}"
+        # Status label reads 'merged'
+        assert 'class="attempt-status attempt-status--merged"' in html, (
+            "merged status class not found"
+        )
+        assert ">merged<" in html, "status text 'merged' not found"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_row_mixed_blocks_in_order():
+    """AC2: row for #127 has seven blocks in the exact order: refused, refused, blocked, crew_fix, refused, crew_fix, landed."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 127, "repo": "mqucifer/crew"},
+                "blocks": [
+                    "refused",
+                    "refused",
+                    "blocked",
+                    "crew_fix",
+                    "refused",
+                    "crew_fix",
+                    "landed",
+                ],
+                "crew_fixes": [
+                    {"number": 141, "repo": "mqucifer/crew"},
+                    {"number": 144, "repo": "mqucifer/crew"},
+                ],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 127,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "thresholds.py",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "#127" in html, "card number #127 not found"
+        # Extract the blocks div for this row
+        blocks_match = re.search(
+            r"#127.*?<div class=\"blocks\">(.*?)</div>",
+            html,
+            re.DOTALL,
+        )
+        assert blocks_match, "blocks div for #127 not found"
+        blocks_html = blocks_match.group(1)
+        # Verify the order of block classes
+        expected = [
+            "attempt-block--refused",
+            "attempt-block--refused",
+            "attempt-block--blocked",
+            "attempt-block--crew-fix",
+            "attempt-block--refused",
+            "attempt-block--crew-fix",
+            "attempt-block--landed",
+        ]
+        positions = []
+        search_from = 0
+        for cls in expected:
+            pos = blocks_html.find(cls, search_from)
+            assert pos >= 0, f"block {cls} not found or out of order"
+            positions.append(pos)
+            search_from = pos + len(cls)
+        assert len(positions) == 7, f"expected 7 block positions, got {len(positions)}"
+        # Status is merged
+        assert 'class="attempt-status attempt-status--merged"' in html
+        assert ">merged<" in html
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_legend_exactly_four_items():
+    """AC3: the legend contains exactly four items in the required order."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 125, "repo": "mqucifer/crew"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 125,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "x",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Extract the legend
+        legend_match = re.search(
+            r'<div class="attempt-legend">(.*?)</div>',
+            html,
+            re.DOTALL,
+        )
+        assert legend_match, "attempt-legend div not found"
+        legend_html = legend_match.group(1)
+        # Check the four items in order
+        expected_labels = [
+            "attempt that landed",
+            "refused, repaired",
+            "blocked",
+            "crew fix merged",
+        ]
+        for label in expected_labels:
+            assert label in legend_html, f"legend item {label!r} not found"
+        # Verify order
+        positions = [legend_html.index(label) for label in expected_labels]
+        assert positions == sorted(positions), f"legend items out of order: {positions}"
+        # Exactly four items (count the swatch elements)
+        swatch_count = legend_html.count('class="swatch')
+        assert swatch_count == 4, f"expected 4 legend swatches, got {swatch_count}"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_row_empty_blocks_in_progress():
+    """AC4: a story with empty blocks and delivered=false shows a single dashed-border block and 'in progress' in dim text."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 199, "repo": "mqucifer/crew"},
+                "blocks": [],
+                "crew_fixes": [],
+                "delivered": False,
+            }
+        ],
+        cards=[
+            {
+                "number": 199,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "pending.py",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "#199" in html, "card number #199 not found"
+        # Single dashed-border block (crew-fix class)
+        crew_fix_count = html.count('class="attempt-block attempt-block--crew-fix"')
+        assert crew_fix_count == 1, f"expected 1 crew-fix block, got {crew_fix_count}"
+        # No other block types
+        assert 'attempt-block--refused' not in html
+        assert 'attempt-block--landed' not in html
+        assert 'attempt-block--blocked' not in html
+        # Status is 'in progress' with the progress class (dim text colour)
+        assert 'class="attempt-status attempt-status--progress"' in html, (
+            "in-progress status class not found"
+        )
+        assert ">in progress<" in html, "status text 'in progress' not found"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_site_css_no_placeholder_and_striped_gradient():
+    """AC5: site.css has no 'crew:placeholder' and contains a repeating-linear-gradient with the blocked-tone variables."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[],
+        cards=[],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        css = (BUILD_DIR / "css" / "site.css").read_text()
+        # No placeholder marker
+        assert "crew:placeholder" not in css, "crew:placeholder still in site.css"
+        # Striped-blocked background uses repeating-linear-gradient with both tone variables
+        blocked_match = re.search(
+            r"repeating-linear-gradient.*--tone-blocked-text.*--tone-blocked-bg",
+            css,
+            re.DOTALL,
+        )
+        assert blocked_match, (
+            "no repeating-linear-gradient with tone-blocked-text and tone-blocked-bg found"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_chart_row_count_and_order():
+    """AC6: 5 stories produce exactly 5 attempt rows, each with '#<number>' and .num class, in package order."""
+    tag = "delivery-history-TEST"
+    story_numbers = [101, 102, 103, 104, 105]
+    stories = [
+        {
+            "card": {"number": n, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+        for n in story_numbers
+    ]
+    cards = [
+        {
+            "number": n,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": f"story-{n}.py",
+        }
+        for n in story_numbers
+    ]
+    _make_package_with_stories(tag, stories=stories, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Exactly 5 attempt rows
+        row_count = html.count('class="attempt-row"')
+        assert row_count == 5, f"expected 5 attempt rows, got {row_count}"
+        # Each row has a .num class with the card number
+        for n in story_numbers:
+            assert f'class="num meta">#{n}<' in html, f"card #{n} with .num class not found"
+        # Rows appear in the same order as the stories list
+        positions = [html.index(f">#{n}<") for n in story_numbers]
+        assert positions == sorted(positions), (
+            f"rows out of order: positions {positions} for numbers {story_numbers}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_legend_exact_dom_order_no_fifth():
+    """AC7: legend items in exact DOM order, no fifth item present."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 1, "repo": "mqucifer/crew"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 1,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "x",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        legend_match = re.search(
+            r'<div class="attempt-legend">(.*?)</div>',
+            html,
+            re.DOTALL,
+        )
+        assert legend_match, "attempt-legend not found"
+        legend_html = legend_match.group(1)
+        # Exactly four <span> items
+        span_count = len(re.findall(r"<span>", legend_html))
+        assert span_count == 4, f"expected 4 legend spans, got {span_count}"
+        # Check exact order by position
+        expected = [
+            "attempt that landed",
+            "refused, repaired",
+            "blocked",
+            "crew fix merged",
+        ]
+        for i, label in enumerate(expected):
+            pos = legend_html.index(label)
+            if i > 0:
+                prev_pos = legend_html.index(expected[i - 1])
+                assert pos > prev_pos, f"legend item {i} out of order"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_row_block_counts_per_story():
+    """AC8: #125 has exactly 5 blocks, #128 has exactly 1 block using tone-done-text (not stage-1)."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 125, "repo": "mqucifer/crew"},
+            "blocks": ["refused", "refused", "refused", "refused", "landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        },
+        {
+            "card": {"number": 128, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        },
+    ]
+    cards = [
+        {
+            "number": 125,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "card.py",
+        },
+        {
+            "number": 128,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "report.py",
+        },
+    ]
+    _make_package_with_stories(tag, stories=stories, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Extract blocks for #125
+        blocks_125_match = re.search(
+            r"#125.*?<div class=\"blocks\">(.*?)</div>",
+            html,
+            re.DOTALL,
+        )
+        assert blocks_125_match, "blocks div for #125 not found"
+        blocks_125 = blocks_125_match.group(1)
+        block_count_125 = len(re.findall(r'<span class="attempt-block ', blocks_125))
+        assert block_count_125 == 5, f"#125: expected 5 blocks, got {block_count_125}"
+
+        # Extract blocks for #128
+        blocks_128_match = re.search(
+            r"#128.*?<div class=\"blocks\">(.*?)</div>",
+            html,
+            re.DOTALL,
+        )
+        assert blocks_128_match, "blocks div for #128 not found"
+        blocks_128 = blocks_128_match.group(1)
+        block_count_128 = len(re.findall(r'<span class="attempt-block ', blocks_128))
+        assert block_count_128 == 1, f"#128: expected 1 block, got {block_count_128}"
+        # The single block is landed (tone-done-text), not refused (stage-1)
+        assert "attempt-block--landed" in blocks_128, "#128 block should be landed"
+        assert "attempt-block--refused" not in blocks_128, (
+            "#128 block should not be refused/stage-1"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_chart_heading_text_and_style():
+    """AC9: heading text is exact and CSS sets Fraunces at --text-xl for the chart heading."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 1, "repo": "mqucifer/crew"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 1,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "x",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Exact heading text
+        assert "The Architect's split, story by story" in html, (
+            "heading text not found"
+        )
+        # The heading is an h2 with id split-h
+        h2_match = re.search(
+            r'<h2 id="split-h">(.*?)</h2>',
+            html,
+            re.DOTALL,
+        )
+        assert h2_match, "h2#split-h not found"
+        assert h2_match.group(1).strip() == "The Architect's split, story by story"
+        # CSS sets the font and size for this heading
+        css = (BUILD_DIR / "css" / "site.css").read_text()
+        # The .sprint-chart .card__head h2 rule (or equivalent) uses the display font and xl size
+        assert "--font-display" in css, "var(--font-display) not in site.css"
+        assert "--text-xl" in css, "var(--text-xl) not in site.css"
+        # Check the rule targets the chart heading
+        heading_rule = re.search(
+            r"\.sprint-chart\s+\.card__head\s+h2\s*{[^}]*}",
+            css,
+        )
+        assert heading_rule, "no CSS rule for .sprint-chart .card__head h2"
+        rule_body = heading_rule.group(0)
+        assert "var(--font-display)" in rule_body, "heading rule missing font-family"
+        assert "var(--text-xl)" in rule_body, "heading rule missing font-size"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)

@@ -30,4 +30,42 @@
     <span class="stat__label">points delivered</span>
   </div>
 </section>
+<div class="sprint-grid">
+  <section class="card sprint-chart" aria-labelledby="split-h">
+    <div class="card__head">
+      <h2 id="split-h">The Architect's split, story by story</h2>
+    </div>
+    <div class="card__body">
+      <div class="attempt-legend">
+        <span><i class="swatch swatch--landed"></i> attempt that landed</span>
+        <span><i class="swatch swatch--refused"></i> refused, repaired</span>
+        <span><i class="swatch swatch--blocked"></i> blocked</span>
+        <span><i class="swatch swatch--crew-fix"></i> crew fix merged</span>
+      </div>
+      <div class="attempt-chart">
+        {% for story in stories %}
+        <div class="attempt-row">
+          <div><span class="num meta">#{{ story.number }}</span> {{ story.title }}</div>
+          <div class="blocks">
+            {% if story.blocks %}
+            {% for block in story.blocks %}
+            <span class="attempt-block attempt-block--{{ block | replace('_', '-') }}"></span>
+            {% endfor %}
+            {% else %}
+            <span class="attempt-block attempt-block--crew-fix"></span>
+            {% endif %}
+          </div>
+          {% if story.delivered and story.blocks | length == 1 %}
+          <span class="attempt-status attempt-status--first-try">first try</span>
+          {% elif story.delivered %}
+          <span class="attempt-status attempt-status--merged">merged</span>
+          {% else %}
+          <span class="attempt-status attempt-status--progress">in progress</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+</div>
 {% endblock %}
