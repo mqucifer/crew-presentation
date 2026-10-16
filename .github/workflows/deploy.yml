@@ -1,0 +1,135 @@
+# The site's deployment, post-merge only (R3). The pre-merge major-version gate
+# lives in checks.yml via test_contracts.py, so this workflow never runs on a
+# pull request: it fires once a change to delivery-history.tag is on main,
+# builds the site from the latest release of the site's code with the package
+# that merge named, and publishes it to GitHub Pages.
+#
+# `pages: write` is the project record's named deployment target ("a release
+# here is a deployment to GitHub Pages"); `id-token: write` lets deploy-pages
+# exchange the OIDC assertion that publishes the artifact. Nothing here reads
+# a secret other than the runner's GITHUB_TOKEN.
+
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - delivery-history.tag
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A re-run completes the deployment; it never cancels one in progress, so a
+# manual re-run finishes a half-published version rather than racing it.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out the merge
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Name the package the merge points at
+        id: package
+        run: |
+          set -euo pipefail
+          tag="$(tr -d '[:space:]' < delivery-history.tag)"
+          if [ -z "$tag" ]; then
+            echo "::error::delivery-history.tag is empty; nothing to deploy"
+            exit 1
+          fi
+          echo "The merge points the site at $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the latest release of the site's code
+        id: release
+        run: |
+          set -euo pipefail
+          tag="$(git describe --tags --abbrev=0)"
+          echo "Building the site at release $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Check out that release
+        run: |
+          set -euo pipefail
+          git checkout --quiet "refs/tags/${{ steps.release.outputs.tag }}"
+
+      - name: Point the build at the package the merge named
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${{ steps.package.outputs.tag }}" > delivery-history.tag
+          echo "delivery-history.tag -> $(cat delivery-history.tag)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies; fetch the package and design-system CSS
+        run: python tools/setup.py
+
+      - name: Build the site (validate, check the major version, render, assemble)
+        run: python build.py
+
+      - name: Give the site a root page
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          tag = Path("delivery-history.tag").read_text().strip()
+          index = json.loads((Path(".package") / tag / "delivery-history.json").read_text())
+          sprints = index.get("sprints", [])
+          if not sprints:
+              raise SystemExit("the package has no sprints; there is no page to make the root")
+          slug = sprints[-1]["name"].lower().replace(" ", "-") + ".html"
+          body = "<p>Loading the newest sprint: <a href=\"%s\">%s</a>.</p>" % (slug, slug)
+          page = ("<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">"
+                  "<meta http-equiv=\"refresh\" content=\"0; url='" + slug + "\">"
+                  "<title>Crew Presentation</title></head><body>" + body + "</body></html>\n")
+          Path("build/index.html").write_text(page)
+          print("Root page -> " + slug)
+          PY
+
+      - name: Upload the site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Assert the root and the named pages answer 200
+        env:
+          BASE: "https://mqucifer.github.io/crew-presentation/"
+        run: |
+          set -euo pipefail
+          for path in "" "replay.html" "story-journey.html"; do
+            url="${BASE}${path}"
+            code=""
+            for _ in $(seq 1 36); do
+              code="$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)"
+              [ "$code" = "200" ] && break
+              sleep 5
+            done
+            if [ "$code" != "200" ]; then
+              echo "::error::$url answered $code (expected 200)"
+              exit 1
+            fi
+            echo "$url -> $code"
+          done
