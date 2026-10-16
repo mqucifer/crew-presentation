@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.1] - 2026-10-16
+
+### Fixed
+
+- On a phone, every page rendered at desktop width, shrunk to fit. Pages now fit the screen they're on (mqucifer/crew-presentation#98)
+
+### Added
+
+- The deploy workflow: a merged change to `delivery-history.tag` builds the site from the latest release tag with the package it names, and publishes it to GitHub Pages (mqucifer/crew-presentation#74)
+
 ## [0.1.0] - 2026-10-15
 
 The first release: the site that Goal mqucifer/crew-presentation#10 builds, deployed from this tag.
