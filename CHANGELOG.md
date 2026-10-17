@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.1.2] - 2026-10-17
+
+Goal mqucifer/crew-presentation#100: every sprint page tells one consistent story, on a phone or a laptop.
+
+### Changed
+
+- The cycle-time stat reads in hours and minutes, not days, so a one-day sprint no longer shows "0 days" (mqucifer/crew-presentation#119)
+- The trend card's time measures read in hours and minutes (mqucifer/crew-presentation#120)
+- The trend card names each measure in words, not by its field name (mqucifer/crew-presentation#146)
+- The failure causes read in words, such as "A test's assertion failed", not as the crew's codes (mqucifer/crew-presentation#147)
+
+### Added
+
+- Each row of the attempt chart links to that story's journey page (mqucifer/crew-presentation#130)
+- Checks that the page agrees with itself: the cycle-time stat matches the trend card (mqucifer/crew-presentation#127), the lead time matches the package (mqucifer/crew-presentation#128), and the attempt chart's rows match the first-attempt stat (mqucifer/crew-presentation#129)
+
+### Fixed
+
+- On a phone: the main sections stack (mqucifer/crew-presentation#121), the attempt chart's rows fit (mqucifer/crew-presentation#122), the failure-cause labels fit (mqucifer/crew-presentation#123), the stats row wraps (mqucifer/crew-presentation#124), and the nav links are large enough to tap (mqucifer/crew-presentation#125)
+
 ## [0.1.1] - 2026-10-16
 
 ### Fixed
