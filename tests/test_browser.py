@@ -4752,3 +4752,208 @@ def test_cycle_time_no_trend_entry_passes_without_comparison():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _read_lead_time(html: str) -> str | None:
+    """Read the lead-time trend now-value from rendered HTML.
+
+    Returns the now-value (second .num span) of the first changed-trend entry
+    labelled 'lead time', or None if no such entry is present.
+    """
+    section_match = re.search(
+        r'<section class="card changed-trend".*?</section>', html, re.DOTALL
+    )
+    if not section_match:
+        return None
+    section_html = section_match.group(0)
+    for entry_match in re.finditer(
+        r'<div class="changed-trend-values">(.*?)</div>', section_html, re.DOTALL
+    ):
+        entry_html = entry_match.group(1)
+        if "lead time:" in entry_html:
+            nums = re.findall(r'<span class="num">(.*?)</span>', entry_html)
+            if len(nums) >= 2:
+                return nums[1].strip()
+            break
+    return None
+
+
+def _make_package_lead_time(
+    tag: str,
+    sprint_name: str,
+    lead_time_days: float,
+    changed: list[dict],
+) -> Path:
+    """Create a fake package with lead_time_days in metrics and custom changed entries."""
+    sprints = [{"name": sprint_name, "start": "2026-09-22", "end": "2026-09-29"}]
+    metrics = {
+        sprint_name: {
+            "throughput": 5,
+            "points_delivered": 10,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "escalation_count": 0,
+            "cycle_time_days": 2.0,
+            "lead_time_days": lead_time_days,
+        }
+    }
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "1.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["sprints"],
+                "properties": {"sprints": {"type": "array"}},
+            }
+        )
+    )
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "delivery-history.json").write_text(
+        json.dumps(
+            {
+                "sprints": sprints,
+                "cards": [],
+                "crew_repository": "mqucifer/crew",
+                "sprint_metrics": {"answers": metrics},
+                "analysis": {"sprints": [{"sprint": sprint_name, "changed": changed}]},
+            }
+        )
+    )
+    return pkg_dir
+
+
+def _lead_time_expected(lead_time_days: float) -> str:
+    """The displayed text the package's lead_time_days should format to.
+
+    Mirrors the build: lead_time_days is converted to whole minutes, then to
+    hours and minutes ('120 hr', '175 hr 12 min', '0 min').
+    """
+    total_minutes = round(lead_time_days * 24 * 60)
+    hours, minutes = divmod(total_minutes, 60)
+    if hours == 0:
+        return f"{minutes} min"
+    if minutes == 0:
+        return f"{hours} hr"
+    return f"{hours} hr {minutes} min"
+
+
+def test_lead_time_trend_matches_package_lead_time_days():
+    """AC1: the lead-time trend now-value matches the package's lead_time_days."""
+    tag = "delivery-history-TEST"
+    lead_time_days = 5.0
+    _make_package_lead_time(
+        tag,
+        "Sprint 7",
+        lead_time_days=lead_time_days,
+        changed=[
+            {
+                "text": "Lead time improved",
+                "measure": "lead_time_days",
+                "previous": 7.0,
+                "now": 5.0,
+                "better": True,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+        trend_now = _read_lead_time(html)
+        expected = _lead_time_expected(lead_time_days)
+        assert expected == "120 hr", (
+            f"package-derived value is {expected!r}, expected '120 hr'"
+        )
+        assert trend_now == expected, (
+            f"lead-time trend now-value is {trend_now!r}, "
+            f"expected {expected!r} from lead_time_days={lead_time_days}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_lead_time_trend_mismatch_names_both_values():
+    """AC2: a trend now-value that disagrees with lead_time_days fails, naming both."""
+    tag = "delivery-history-TEST"
+    lead_time_days = 5.0
+    _make_package_lead_time(
+        tag,
+        "Sprint 7",
+        lead_time_days=lead_time_days,
+        changed=[
+            {
+                "text": "Lead time worsened",
+                "measure": "lead_time_days",
+                "previous": 7.0,
+                "now": 7.3,
+                "better": False,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+        trend_now = _read_lead_time(html)
+        expected = _lead_time_expected(lead_time_days)
+        assert trend_now == "175 hr 12 min", (
+            f"trend now-value is {trend_now!r}, expected '175 hr 12 min'"
+        )
+        assert expected == "120 hr", (
+            f"package-derived value is {expected!r}, expected '120 hr'"
+        )
+        with pytest.raises(AssertionError) as exc_info:
+            assert trend_now == expected
+        msg = str(exc_info.value)
+        assert "120 hr" in msg, f"assertion message missing package value: {msg!r}"
+        assert "175 hr 12 min" in msg, f"assertion message missing trend value: {msg!r}"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_lead_time_no_trend_entry_passes_without_comparison():
+    """AC3: with no lead_time_days entry, no trend value exists and the check passes."""
+    tag = "delivery-history-TEST"
+    lead_time_days = 5.0
+    _make_package_lead_time(
+        tag,
+        "Sprint 7",
+        lead_time_days=lead_time_days,
+        changed=[
+            {
+                "text": "Cycle time improved",
+                "measure": "cycle_time_days",
+                "previous": 7.0,
+                "now": 5.0,
+                "better": True,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+        trend_now = _read_lead_time(html)
+        assert trend_now is None, (
+            f"expected no lead-time trend entry, got {trend_now!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
