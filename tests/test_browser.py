@@ -6203,3 +6203,214 @@ def test_cause_labels_no_raw_code_pattern():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_header_shows_most_recent_sprint():
+    """AC1: h1 is the most recent sprint name; body contains the date range."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 5", "start": "2026-09-15", "end": "2026-09-29"},
+        {"name": "Sprint 6", "start": "2026-09-29", "end": "2026-10-06"},
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    _make_fake_package(tag, sprints=sprints)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        h1_match = re.search(r"<h1>(.*?)</h1>", html)
+        assert h1_match, "no <h1> element found"
+        assert h1_match.group(1) == "Sprint 7", f"h1 is {h1_match.group(1)!r}"
+        assert "2026-10-07 – 2026-10-13" in html, "date range not found in page"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_structural_containers_empty():
+    """AC2: Timeline, Who, and Event ticker sections exist and are empty."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        timeline_match = re.search(
+            r'<section[^>]*aria-label="Timeline"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert timeline_match, "no section with aria-label='Timeline'"
+        assert timeline_match.group(1).strip() == "", (
+            f"Timeline has children: {timeline_match.group(1).strip()!r}"
+        )
+        who_match = re.search(
+            r'<(?:section|aside)[^>]*aria-label="[^"]*Who[^"]*"[^>]*>(.*?)</(?:section|aside)>',
+            html, re.DOTALL,
+        )
+        assert who_match, "no section/aside with aria-label containing 'Who'"
+        assert who_match.group(1).strip() == "", (
+            f"Who section has children: {who_match.group(1).strip()!r}"
+        )
+        ticker_match = re.search(
+            r'<section[^>]*aria-label="Event ticker"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert ticker_match, "no section with aria-label='Event ticker'"
+        assert ticker_match.group(1).strip() == "", (
+            f"Event ticker has children: {ticker_match.group(1).strip()!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_nav_aria_current():
+    """AC3: Replay link has aria-current='page'; Sprint and journey links do not."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        view_nav = _view_nav(html)
+        links = re.findall(r"<a[^>]*>(.*?)</a>", view_nav)
+        assert "Replay" in links, f"view nav links: {links}"
+        replay_link = re.search(
+            r'<a[^>]*aria-current="page"[^>]*>Replay</a>', view_nav
+        )
+        assert replay_link, "Replay link does not have aria-current='page'"
+        for text in ("Sprint", "A story's journey"):
+            link_match = re.search(
+                rf'<a[^>]*>{re.escape(text)}</a>', view_nav
+            )
+            assert link_match, f"link for {text!r} not found"
+            assert "aria-current" not in link_match.group(0), (
+                f"link {text!r} should not have aria-current"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_single_sprint_header():
+    """AC4: single sprint 'Sprint 1' shows correct h1 and date range."""
+    tag = "delivery-history-TEST"
+    sprints = [{"name": "Sprint 1", "start": "2026-09-01", "end": "2026-09-07"}]
+    _make_fake_package(tag, sprints=sprints)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        h1_match = re.search(r"<h1>(.*?)</h1>", html)
+        assert h1_match, "no <h1> element found"
+        assert h1_match.group(1) == "Sprint 1", f"h1 is {h1_match.group(1)!r}"
+        assert "2026-09-01 – 2026-09-07" in html, "date range not found"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_no_periods_board_empty():
+    """AC5: no periods for most recent sprint, board has 0 columns, containers exist."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 6", "start": "2026-09-29", "end": "2026-10-06"},
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    _make_fake_package(tag, sprints=sprints)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        h1_match = re.search(r"<h1>(.*?)</h1>", html)
+        assert h1_match and "Sprint 7" in h1_match.group(1), (
+            f"h1 is {h1_match.group(1) if h1_match else 'MISSING'!r}"
+        )
+        assert 'aria-label="Timeline"' in html, "Timeline not found"
+        assert 'aria-label="Event ticker"' in html, "Event ticker not found"
+        board_match = re.search(
+            r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert board_match, "no Board section"
+        cols = re.findall(r'class="replay-col"', board_match.group(1))
+        assert len(cols) == 0, f"Board has {len(cols)} columns, expected 0"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_body_element_order():
+    """AC6: Timeline before Board before Who before Event ticker in source order."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        timeline_pos = html.find('aria-label="Timeline"')
+        board_pos = html.find('aria-label="Board"')
+        who_pos = html.find('aria-label="Who')
+        ticker_pos = html.find('aria-label="Event ticker"')
+        assert timeline_pos != -1, "Timeline not found"
+        assert board_pos != -1, "Board not found"
+        assert who_pos != -1, "Who not found"
+        assert ticker_pos != -1, "Event ticker not found"
+        assert timeline_pos < board_pos, "Timeline should appear before Board"
+        assert board_pos < who_pos, "Board should appear before Who"
+        assert who_pos < ticker_pos, "Who should appear before Event ticker"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_board_aria_label_no_placeholder():
+    """AC7: Board section has aria-label='Board' and no 'placeholder' text."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        board_match = re.search(
+            r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert board_match, "no Board section"
+        assert "placeholder" not in board_match.group(1).lower(), (
+            "Board section contains 'placeholder' text"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_no_periods_zero_cols_and_empty_timeline():
+    """AC8: single sprint with no periods, 0 .replay-col in Board, 0 children in Timeline."""
+    tag = "delivery-history-TEST"
+    sprints = [{"name": "Sprint 1", "start": "2026-09-01", "end": "2026-09-07"}]
+    _make_fake_package(tag, sprints=sprints)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        board_match = re.search(
+            r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert board_match, "no Board section"
+        cols = re.findall(r'class="replay-col"', board_match.group(1))
+        assert len(cols) == 0, f"Board has {len(cols)} .replay-col elements, expected 0"
+        timeline_match = re.search(
+            r'<section[^>]*aria-label="Timeline"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert timeline_match, "no Timeline section"
+        assert timeline_match.group(1).strip() == "", (
+            f"Timeline has children: {timeline_match.group(1).strip()!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
