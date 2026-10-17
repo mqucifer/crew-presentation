@@ -2600,3 +2600,472 @@ def test_cycle_time_stat_formats_hours_and_minutes():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _make_package_with_full_sprint(
+    tag: str,
+    stories: list[dict],
+    cards: list[dict],
+    failure_causes: list[dict],
+    decided: list[dict],
+) -> Path:
+    """Create a fake package with stories, failure causes, and decided entries all populated."""
+    sprints = [{"name": "Sprint 6", "start": "2026-09-22", "end": "2026-09-29"}]
+    metrics = {
+        "Sprint 6": {
+            "throughput": len(stories),
+            "points_delivered": 10,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": max(len(stories), 1),
+            "escalation_count": 0,
+            "cycle_time_days": 2.0,
+            "top_failure_causes": failure_causes,
+        }
+    }
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "1.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["sprints"],
+                "properties": {"sprints": {"type": "array"}},
+            }
+        )
+    )
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "delivery-history.json").write_text(
+        json.dumps(
+            {
+                "sprints": sprints,
+                "cards": cards,
+                "crew_repository": "mqucifer/crew",
+                "sprint_metrics": {"answers": metrics},
+                "analysis": {
+                    "stories": stories,
+                    "sprints": [{"sprint": "Sprint 6", "decided": decided}],
+                },
+            }
+        )
+    )
+    return pkg_dir
+
+
+def test_sprint_sections_stacked_at_phone_width():
+    """AC1: at 375px, .sprint-side is below .sprint-chart and .sprint-decided is below .sprint-side."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+    ]
+    cards = [
+        {
+            "number": 1,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "card.py",
+        }
+    ]
+    failure_causes = [{"reason": "A test's assertion failed", "count": 3}]
+    decided = [
+        {
+            "at": "2026-09-25T23:37:00",
+            "kind": "design_revision",
+            "number": 122,
+            "repo": "mqucifer/crew",
+            "text": "Design revision",
+        }
+    ]
+    _make_package_with_full_sprint(tag, stories, cards, failure_causes, decided)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            chart_rect = page.locator(".sprint-chart").bounding_box()
+            side_rect = page.locator(".sprint-side").bounding_box()
+            decided_rect = page.locator(".sprint-decided").bounding_box()
+
+            assert chart_rect, ".sprint-chart not found"
+            assert side_rect, ".sprint-side not found"
+            assert decided_rect, ".sprint-decided not found"
+
+            chart_bottom = chart_rect["y"] + chart_rect["height"]
+            side_bottom = side_rect["y"] + side_rect["height"]
+
+            assert side_rect["y"] >= chart_bottom, (
+                f".sprint-side top ({side_rect['y']}) should be >= "
+                f".sprint-chart bottom ({chart_bottom})"
+            )
+            assert decided_rect["y"] >= side_bottom, (
+                f".sprint-decided top ({decided_rect['y']}) should be >= "
+                f".sprint-side bottom ({side_bottom})"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_sections_side_by_side_at_desktop_width():
+    """AC2: at 1440px, .sprint-side left edge is at or after .sprint-chart right edge."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+    ]
+    cards = [
+        {
+            "number": 1,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "card.py",
+        }
+    ]
+    failure_causes = [{"reason": "A test's assertion failed", "count": 3}]
+    decided = [
+        {
+            "at": "2026-09-25T23:37:00",
+            "kind": "design_revision",
+            "number": 122,
+            "repo": "mqucifer/crew",
+            "text": "Design revision",
+        }
+    ]
+    _make_package_with_full_sprint(tag, stories, cards, failure_causes, decided)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 1440, "height": 900})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            chart_rect = page.locator(".sprint-chart").bounding_box()
+            side_rect = page.locator(".sprint-side").bounding_box()
+
+            assert chart_rect, ".sprint-chart not found"
+            assert side_rect, ".sprint-side not found"
+
+            chart_right = chart_rect["x"] + chart_rect["width"]
+
+            assert side_rect["x"] >= chart_right, (
+                f".sprint-side left ({side_rect['x']}) should be >= "
+                f".sprint-chart right ({chart_right})"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_chart_no_horizontal_overflow_at_phone_width():
+    """AC3: at 375px with no failure-causes or decided, .sprint-chart scrollWidth == clientWidth."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+    ]
+    cards = [
+        {
+            "number": 1,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "card.py",
+        }
+    ]
+    _make_package_with_stories(tag, stories=stories, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const el = document.querySelector('.sprint-chart');
+                    return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
+                })()
+                """
+            )
+
+            assert result["scrollWidth"] == result["clientWidth"], (
+                f".sprint-chart scrollWidth ({result['scrollWidth']}) != "
+                f"clientWidth ({result['clientWidth']}) — horizontal overflow"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_heading_order_at_phone_width():
+    """AC4: at 375px, h2 in .sprint-chart is above h2 in .sprint-side which is above h2 in .sprint-decided."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+    ]
+    cards = [
+        {
+            "number": 1,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "card.py",
+        }
+    ]
+    failure_causes = [{"reason": "A test's assertion failed", "count": 3}]
+    decided = [
+        {
+            "at": "2026-09-25T23:37:00",
+            "kind": "design_revision",
+            "number": 122,
+            "repo": "mqucifer/crew",
+            "text": "Design revision",
+        }
+    ]
+    _make_package_with_full_sprint(tag, stories, cards, failure_causes, decided)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            chart_h2 = page.locator(".sprint-chart h2").bounding_box()
+            side_h2 = page.locator(".sprint-side h2").bounding_box()
+            decided_h2 = page.locator(".sprint-decided h2").bounding_box()
+
+            assert chart_h2, "h2 in .sprint-chart not found"
+            assert side_h2, "h2 in .sprint-side not found"
+            assert decided_h2, "h2 in .sprint-decided not found"
+
+            assert chart_h2["y"] < side_h2["y"], (
+                f"chart h2 top ({chart_h2['y']}) should be < side h2 top ({side_h2['y']})"
+            )
+            assert side_h2["y"] < decided_h2["y"], (
+                f"side h2 top ({side_h2['y']}) should be < "
+                f"decided h2 top ({decided_h2['y']})"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_headings_text_and_no_clipping_at_phone_width():
+    """AC5: at 375px, chart h2 and side h2 have exact text and no horizontal clipping."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+    ]
+    cards = [
+        {
+            "number": 1,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "card.py",
+        }
+    ]
+    failure_causes = [{"reason": "A test's assertion failed", "count": 3}]
+    decided = [
+        {
+            "at": "2026-09-25T23:37:00",
+            "kind": "design_revision",
+            "number": 122,
+            "repo": "mqucifer/crew",
+            "text": "Design revision",
+        }
+    ]
+    _make_package_with_full_sprint(tag, stories, cards, failure_causes, decided)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            chart_h2_text = page.locator(".sprint-chart h2").inner_text()
+            assert chart_h2_text == "The Architect's split, story by story", (
+                f"chart h2 text is {chart_h2_text!r}"
+            )
+
+            side_h2_text = page.locator(".sprint-side h2").inner_text()
+            assert side_h2_text == "Why work didn't land first time", (
+                f"side h2 text is {side_h2_text!r}"
+            )
+
+            chart_scroll = page.evaluate(
+                """
+                (() => {
+                    const el = document.querySelector('.sprint-chart h2');
+                    return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
+                })()
+                """
+            )
+            assert chart_scroll["scrollWidth"] == chart_scroll["clientWidth"], (
+                f"chart h2 scrollWidth ({chart_scroll['scrollWidth']}) != "
+                f"clientWidth ({chart_scroll['clientWidth']}) — heading clipped"
+            )
+
+            side_scroll = page.evaluate(
+                """
+                (() => {
+                    const el = document.querySelector('.sprint-side h2');
+                    return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
+                })()
+                """
+            )
+            assert side_scroll["scrollWidth"] == side_scroll["clientWidth"], (
+                f"side h2 scrollWidth ({side_scroll['scrollWidth']}) != "
+                f"clientWidth ({side_scroll['clientWidth']}) — heading clipped"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_headings_aligned_at_desktop_width():
+    """AC6: at 1440px, h2 in .sprint-chart top equals h2 in .sprint-side top."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+    ]
+    cards = [
+        {
+            "number": 1,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "card.py",
+        }
+    ]
+    failure_causes = [{"reason": "A test's assertion failed", "count": 3}]
+    decided = [
+        {
+            "at": "2026-09-25T23:37:00",
+            "kind": "design_revision",
+            "number": 122,
+            "repo": "mqucifer/crew",
+            "text": "Design revision",
+        }
+    ]
+    _make_package_with_full_sprint(tag, stories, cards, failure_causes, decided)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 1440, "height": 900})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            chart_h2 = page.locator(".sprint-chart h2").bounding_box()
+            side_h2 = page.locator(".sprint-side h2").bounding_box()
+
+            assert chart_h2, "h2 in .sprint-chart not found"
+            assert side_h2, "h2 in .sprint-side not found"
+
+            assert abs(chart_h2["y"] - side_h2["y"]) < 1, (
+                f"chart h2 top ({chart_h2['y']}) should equal "
+                f"side h2 top ({side_h2['y']})"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
