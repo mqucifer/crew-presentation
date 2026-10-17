@@ -5700,3 +5700,272 @@ def test_stats_single_row_height_at_desktop_width():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_view_nav_links_at_least_44px_at_phone_width():
+    """AC1: every <a> in nav.nav has a bounding-box height >= 44px at 375px."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            heights = page.evaluate(
+                "Array.from(document.querySelectorAll('nav.nav a'))"
+                ".map(el => el.getBoundingClientRect().height)"
+            )
+            assert len(heights) == 3, (
+                f"expected 3 view-nav links, got {len(heights)}"
+            )
+            for h in heights:
+                assert h >= 44, f"view-nav link height {h} < 44px"
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_nav_links_at_least_44px_at_phone_width():
+    """AC2: every <a> in the sprint nav has a bounding-box height >= 44px at 375px."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 5", "Sprint 6", "Sprint 7"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            heights = page.evaluate(
+                "Array.from(document.querySelectorAll(\"nav[aria-label='Sprints'] a\"))"
+                ".map(el => el.getBoundingClientRect().height)"
+            )
+            assert len(heights) == 3, (
+                f"expected 3 sprint-nav links, got {len(heights)}"
+            )
+            for h in heights:
+                assert h >= 44, f"sprint-nav link height {h} < 44px"
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_view_nav_no_horizontal_overflow_at_phone_width():
+    """AC3: nav.nav scrollWidth equals clientWidth at 375px (no horizontal overflow)."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            scroll_width = page.evaluate("document.querySelector('nav.nav').scrollWidth")
+            client_width = page.evaluate("document.querySelector('nav.nav').clientWidth")
+            assert scroll_width == client_width, (
+                f"nav.nav scrollWidth {scroll_width} != clientWidth {client_width}: "
+                "links cause horizontal overflow at phone width"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_view_nav_exactly_three_links_in_order_at_phone_width():
+    """AC4: at 375px, nav.nav has exactly 3 links 'Sprint', "A story's journey", 'Replay'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            texts = page.evaluate(
+                "Array.from(document.querySelectorAll('nav.nav a'))"
+                ".map(el => el.textContent.trim())"
+            )
+            assert texts == ["Sprint", "A story's journey", "Replay"], (
+                f"view-nav links are {texts}, expected the desktop set and order"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_view_nav_current_page_is_sprint_at_phone_width():
+    """AC5: at 375px, the nav.nav link with aria-current=page has text 'Sprint'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            text = page.evaluate(
+                "document.querySelector(\"nav.nav a[aria-current='page']\")"
+                ".textContent.trim()"
+            )
+            assert text == "Sprint", (
+                f"aria-current page link text is {text!r}, expected 'Sprint'"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_view_nav_links_at_least_40px_at_desktop_width():
+    """AC6: at 1440px, every <a> in nav.nav has a bounding-box height >= 40px."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 1440, "height": 900})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            heights = page.evaluate(
+                "Array.from(document.querySelectorAll('nav.nav a'))"
+                ".map(el => el.getBoundingClientRect().height)"
+            )
+            assert len(heights) == 3, (
+                f"expected 3 view-nav links, got {len(heights)}"
+            )
+            for h in heights:
+                assert h >= 40, f"view-nav link height {h} < 40px on desktop"
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_nav_links_visible_with_sprint_names_at_phone_width():
+    """AC7: at 375px, sprint-nav links carry sprint names and none is display:none or hidden."""
+    tag = "delivery-history-TEST"
+    names = ["Sprint 5", "Sprint 6", "Sprint 7"]
+    _make_fake_package(tag, names)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            states = page.evaluate(
+                "Array.from(document.querySelectorAll(\"nav[aria-label='Sprints'] a\"))"
+                ".map(el => { const cs = getComputedStyle(el); "
+                "return { text: el.textContent.trim(), display: cs.display, "
+                "visibility: cs.visibility }; })"
+            )
+            assert len(states) == 3, (
+                f"expected 3 sprint-nav links, got {len(states)}"
+            )
+            for s in states:
+                assert s["text"] in names, (
+                    f"unexpected sprint-nav link text {s['text']!r}"
+                )
+                assert s["display"] != "none", (
+                    f"sprint-nav link {s['text']!r} has display:none"
+                )
+                assert s["visibility"] != "hidden", (
+                    f"sprint-nav link {s['text']!r} has visibility:hidden"
+                )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
