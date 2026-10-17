@@ -4959,6 +4959,345 @@ def test_lead_time_no_trend_entry_passes_without_comparison():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def _make_package_first_attempt(
+    tag: str,
+    numerator: int,
+    denominator: int,
+    stories: list[dict],
+    cards: list[dict],
+    sprint_names: list[str] | None = None,
+) -> Path:
+    """Create a fake package with custom first-try metrics and stories."""
+    if sprint_names is None:
+        sprint_names = ["Sprint 6"]
+    sprints = [
+        {"name": n, "start": "2026-09-22", "end": "2026-09-29"}
+        for n in sprint_names
+    ]
+    metrics = {
+        name: {
+            "throughput": len(stories),
+            "points_delivered": 10,
+            "first_attempt_numerator": numerator,
+            "first_attempt_denominator": denominator,
+            "escalation_count": 0,
+            "cycle_time_days": 2.0,
+        }
+        for name in sprint_names
+    }
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "1.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["sprints"],
+                "properties": {"sprints": {"type": "array"}},
+            }
+        )
+    )
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "delivery-history.json").write_text(
+        json.dumps(
+            {
+                "sprints": sprints,
+                "cards": cards,
+                "crew_repository": "mqucifer/crew",
+                "sprint_metrics": {"answers": metrics},
+                "analysis": {"stories": stories},
+            }
+        )
+    )
+    return pkg_dir
+
+
+def test_non_first_try_count_matches_stat_ac1():
+    """AC1: count of non-first-try rows equals denominator - numerator from the stat."""
+    tag = "delivery-history-TEST"
+    # 12 stories: blocks=["landed"], delivered=True -> "first try"
+    stories_first_try = [
+        {
+            "card": {"number": i, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+        for i in range(1, 13)
+    ]
+    # 10 stories: blocks=["refused", "landed"], delivered=True -> "merged"
+    stories_not_first = [
+        {
+            "card": {"number": i, "repo": "mqucifer/crew"},
+            "blocks": ["refused", "landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+        for i in range(13, 23)
+    ]
+    stories = stories_first_try + stories_not_first
+    cards = [
+        {
+            "number": i,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": f"story-{i}.py",
+        }
+        for i in range(1, 23)
+    ]
+    _make_package_first_attempt(
+        tag,
+        numerator=12,
+        denominator=22,
+        stories=stories,
+        cards=cards,
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        pkg = _package()
+        answers = pkg["sprint_metrics"]["answers"]["Sprint 6"]
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".attempt-row")
+
+            non_first_try_count = page.evaluate("""
+                () => Array.from(document.querySelectorAll('.attempt-row'))
+                    .filter(row => {
+                        const status = row.querySelector('.attempt-status');
+                        return status && status.textContent.trim() !== 'first try';
+                    }).length
+            """)
+
+            stat_text = page.evaluate("""
+                () => {
+                    const labels = document.querySelectorAll('.stat__label');
+                    for (const label of labels) {
+                        if (label.textContent.trim() === 'landed first try') {
+                            const stat = label.closest('.stat');
+                            return stat.querySelector('.stat__value').textContent.trim();
+                        }
+                    }
+                    return null;
+                }
+            """)
+            parts = stat_text.split()
+            numerator = int(parts[0])
+            denominator = int(parts[2])
+            expected = denominator - numerator
+
+            assert non_first_try_count == expected, (
+                f"expected {expected} non-first-try rows "
+                f"(denominator {denominator} minus numerator {numerator}), "
+                f"found {non_first_try_count}"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_non_first_try_count_mismatch_names_both_values():
+    """AC2: when 2 stories are missing from the chart, the test fails naming expected 10 and found 8."""
+    tag = "delivery-history-TEST"
+    # 12 first-try stories (all rendered)
+    stories_first_try = [
+        {
+            "card": {"number": i, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+        for i in range(1, 13)
+    ]
+    # 10 not-first-try stories (all in analysis.stories, but only 8 have cards)
+    stories_not_first = [
+        {
+            "card": {"number": i, "repo": "mqucifer/crew"},
+            "blocks": ["refused", "landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+        for i in range(13, 23)
+    ]
+    stories = stories_first_try + stories_not_first
+    # Cards for all 12 first-try + only 8 of the 10 not-first-try (stories 13-20)
+    cards = [
+        {
+            "number": i,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": f"story-{i}.py",
+        }
+        for i in list(range(1, 13)) + list(range(13, 21))
+    ]
+    _make_package_first_attempt(
+        tag,
+        numerator=12,
+        denominator=22,
+        stories=stories,
+        cards=cards,
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        pkg = _package()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".attempt-row")
+
+            non_first_try_count = page.evaluate("""
+                () => Array.from(document.querySelectorAll('.attempt-row'))
+                    .filter(row => {
+                        const status = row.querySelector('.attempt-status');
+                        return status && status.textContent.trim() !== 'first try';
+                    }).length
+            """)
+
+            stat_text = page.evaluate("""
+                () => {
+                    const labels = document.querySelectorAll('.stat__label');
+                    for (const label of labels) {
+                        if (label.textContent.trim() === 'landed first try') {
+                            const stat = label.closest('.stat');
+                            return stat.querySelector('.stat__value').textContent.trim();
+                        }
+                    }
+                    return null;
+                }
+            """)
+            parts = stat_text.split()
+            numerator = int(parts[0])
+            denominator = int(parts[2])
+            expected = denominator - numerator
+
+            # Only 20 rows rendered (12 + 8), so non-first-try count is 8, not 10
+            assert non_first_try_count == 8, (
+                f"expected 8 non-first-try rows rendered, found {non_first_try_count}"
+            )
+            with pytest.raises(AssertionError) as exc_info:
+                assert non_first_try_count == expected, (
+                    f"expected {expected} non-first-try rows "
+                    f"(denominator {denominator} minus numerator {numerator}), "
+                    f"found {non_first_try_count}"
+                )
+            msg = str(exc_info.value)
+            assert "10" in msg, f"assertion message missing expected value 10: {msg!r}"
+            assert "8" in msg, f"assertion message missing found value 8: {msg!r}"
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_non_first_try_count_all_first_try():
+    """AC3: all stories are first-try, so the count of non-first-try rows is 0, equal to 5-5."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": i, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+        for i in range(1, 6)
+    ]
+    cards = [
+        {
+            "number": i,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": f"story-{i}.py",
+        }
+        for i in range(1, 6)
+    ]
+    _make_package_first_attempt(
+        tag,
+        numerator=5,
+        denominator=5,
+        stories=stories,
+        cards=cards,
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".attempt-row")
+
+            non_first_try_count = page.evaluate("""
+                () => Array.from(document.querySelectorAll('.attempt-row'))
+                    .filter(row => {
+                        const status = row.querySelector('.attempt-status');
+                        return status && status.textContent.trim() !== 'first try';
+                    }).length
+            """)
+
+            stat_text = page.evaluate("""
+                () => {
+                    const labels = document.querySelectorAll('.stat__label');
+                    for (const label of labels) {
+                        if (label.textContent.trim() === 'landed first try') {
+                            const stat = label.closest('.stat');
+                            return stat.querySelector('.stat__value').textContent.trim();
+                        }
+                    }
+                    return null;
+                }
+            """)
+            parts = stat_text.split()
+            numerator = int(parts[0])
+            denominator = int(parts[2])
+            expected = denominator - numerator
+
+            assert non_first_try_count == 0, (
+                f"expected 0 non-first-try rows, found {non_first_try_count}"
+            )
+            assert expected == 0, (
+                f"expected denominator minus numerator to be 0, got {expected}"
+            )
+            assert non_first_try_count == expected, (
+                f"expected {expected} non-first-try rows "
+                f"(denominator {denominator} minus numerator {numerator}), "
+                f"found {non_first_try_count}"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_stats_wrap_to_multiple_rows_at_phone_width():
     """AC1: at a 375px viewport the .stats container is taller than a single .stat,
     proving the five stats wrap to at least two rows instead of one."""
