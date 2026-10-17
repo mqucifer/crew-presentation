@@ -181,6 +181,7 @@ def _render_pages(pkg: Path) -> dict:
             "sprints": sprints,
             "sprint": sprint,
             "metrics": metrics,
+            "cycle_time": _format_minutes(metrics.get("cycle_time_minutes")),
             "sprint_slug": slug,
             "stories": stories,
             "changed": changed,
@@ -310,6 +311,24 @@ def _build_failure_causes(metrics: dict) -> list[dict]:
         }
         for c in causes
     ]
+
+
+def _format_minutes(total_minutes) -> str:
+    """A metric's minutes as hours and minutes: '1 hr 29 min', '1 hr', '0 min'.
+
+    Zero units are omitted and days are never shown (R2), so a sprint that
+    ran for a few hundred minutes reads in the reader's terms, not as
+    '0 days'. A missing value (a fixture without cycle_time_minutes) renders
+    empty rather than inventing one.
+    """
+    if total_minutes is None:
+        return ""
+    hours, minutes = divmod(int(total_minutes), 60)
+    if hours == 0:
+        return f"{minutes} min"
+    if minutes == 0:
+        return f"{hours} hr"
+    return f"{hours} hr {minutes} min"
 
 
 if __name__ == "__main__":
