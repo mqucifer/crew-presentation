@@ -207,6 +207,12 @@
   .attempt-row .attempt-status {
     width: 100%;
   }
+  .cause-row {
+    grid-template-columns: 1fr 28px;
+  }
+  .cause-row > span:first-child {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Attempt-row link: journey-page navigation */
