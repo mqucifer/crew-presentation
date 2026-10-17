@@ -4085,3 +4085,475 @@ def test_attempt_row_div_no_overflow_7_blocks_phone():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_label_no_truncation_phone():
+    """AC1: at 375px, the failure-cause label is not truncated or clipped."""
+    tag = "delivery-history-TEST"
+    causes = [{"reason": "A test's assertion failed", "count": 10}]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 1,
+                "points_delivered": 10,
+                "first_attempt_numerator": 0,
+                "first_attempt_denominator": 1,
+                "escalation_count": 0,
+                "cycle_time_days": 1.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const rows = document.querySelectorAll('.cause-row');
+                    const row = Array.from(rows).find(
+                        r => r.textContent.includes("A test's assertion failed")
+                    );
+                    if (!row) return null;
+                    const label = row.querySelector(':first-child');
+                    return {
+                        scrollWidth: label.scrollWidth,
+                        clientWidth: label.clientWidth,
+                    };
+                })()
+                """
+            )
+            assert result is not None, "cause-row for 'A test's assertion failed' not found"
+            assert result["scrollWidth"] == result["clientWidth"], (
+                f"label scrollWidth ({result['scrollWidth']}) != "
+                f"clientWidth ({result['clientWidth']}) — label truncated or clipped"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_bar_visible_and_proportional_phone():
+    """AC2: at 375px, the .cause-bar has width > 0 and <= 100% of its parent's width."""
+    tag = "delivery-history-TEST"
+    causes = [
+        {"reason": "A test's assertion failed", "count": 10},
+        {"reason": '"already exists"', "count": 6},
+    ]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 2,
+                "points_delivered": 10,
+                "first_attempt_numerator": 0,
+                "first_attempt_denominator": 2,
+                "escalation_count": 0,
+                "cycle_time_days": 1.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const rows = document.querySelectorAll('.cause-row');
+                    const results = [];
+                    rows.forEach(row => {
+                        const bar = row.querySelector('.cause-bar');
+                        const parent = bar.parentElement;
+                        results.push({
+                            barWidth: bar.offsetWidth,
+                            parentWidth: parent.offsetWidth,
+                        });
+                    });
+                    return results;
+                })()
+                """
+            )
+            assert result, "no .cause-bar elements found"
+            for i, r in enumerate(result):
+                assert r["barWidth"] > 0, (
+                    f"bar {i} has width 0 — not visible"
+                )
+                assert r["barWidth"] <= r["parentWidth"], (
+                    f"bar {i} width ({r['barWidth']}) exceeds parent "
+                    f"width ({r['parentWidth']})"
+                )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_row_first_column_width_desktop():
+    """AC3: at 1440px, the first column of .cause-row is 210px (desktop unchanged)."""
+    tag = "delivery-history-TEST"
+    causes = [{"reason": "A test's assertion failed", "count": 10}]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 1,
+                "points_delivered": 10,
+                "first_attempt_numerator": 0,
+                "first_attempt_denominator": 1,
+                "escalation_count": 0,
+                "cycle_time_days": 1.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 1440, "height": 900})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const row = document.querySelector('.cause-row');
+                    if (!row) return null;
+                    const firstChild = row.firstElementChild;
+                    return { width: firstChild.offsetWidth };
+                })()
+                """
+            )
+            assert result is not None, ".cause-row not found"
+            assert result["width"] == 210, (
+                f"first column width is {result['width']}, expected 210"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_count_visible_no_clipping_phone():
+    """AC4: at 375px, the .num in the first .cause-row has text '10' and no clipping."""
+    tag = "delivery-history-TEST"
+    causes = [{"reason": "A test's assertion failed", "count": 10}]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 1,
+                "points_delivered": 10,
+                "first_attempt_numerator": 0,
+                "first_attempt_denominator": 1,
+                "escalation_count": 0,
+                "cycle_time_days": 1.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const row = document.querySelector('.cause-row');
+                    if (!row) return null;
+                    const num = row.querySelector('.num');
+                    if (!num) return null;
+                    return {
+                        text: num.textContent,
+                        scrollWidth: num.scrollWidth,
+                        clientWidth: num.clientWidth,
+                    };
+                })()
+                """
+            )
+            assert result is not None, ".num element not found in first .cause-row"
+            assert result["text"] == "10", (
+                f".num text is '{result['text']}', expected '10'"
+            )
+            assert result["scrollWidth"] == result["clientWidth"], (
+                f".num scrollWidth ({result['scrollWidth']}) != "
+                f"clientWidth ({result['clientWidth']}) — count clipped"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_rows_six_in_order_phone():
+    """AC5: at 375px, .cause-chart has exactly 6 rows with correct text in order."""
+    tag = "delivery-history-TEST"
+    causes = [
+        {"reason": "A test's assertion failed", "count": 10},
+        {"reason": '"already exists"', "count": 6},
+        {"reason": "Must create or edit a file", "count": 3},
+        {"reason": "Undefined name (lint)", "count": 2},
+        {"reason": "No test written", "count": 2},
+        {"reason": "Cause not recorded", "count": 2},
+    ]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const chart = document.querySelector('.cause-chart');
+                    if (!chart) return null;
+                    const rows = chart.querySelectorAll('.cause-row');
+                    const labels = Array.from(rows).map(
+                        r => r.querySelector(':first-child').textContent
+                    );
+                    return { count: rows.length, labels };
+                })()
+                """
+            )
+            assert result is not None, ".cause-chart not found"
+            assert result["count"] == 6, (
+                f"expected 6 .cause-row children, got {result['count']}"
+            )
+            expected = [
+                "A test's assertion failed",
+                '"already exists"',
+                "Must create or edit a file",
+                "Undefined name (lint)",
+                "No test written",
+                "Cause not recorded",
+            ]
+            assert result["labels"] == expected, (
+                f"label order mismatch: {result['labels']}"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_unrecorded_label_meta_class_phone():
+    """AC6: at 375px, the 'Cause not recorded' label has class 'meta' and no clipping."""
+    tag = "delivery-history-TEST"
+    causes = [
+        {"reason": "A test's assertion failed", "count": 10},
+        {"reason": "Cause not recorded", "count": 2},
+    ]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 2,
+                "points_delivered": 10,
+                "first_attempt_numerator": 1,
+                "first_attempt_denominator": 2,
+                "escalation_count": 0,
+                "cycle_time_days": 1.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const rows = document.querySelectorAll('.cause-row');
+                    const row = Array.from(rows).find(
+                        r => r.textContent.includes('Cause not recorded')
+                    );
+                    if (!row) return null;
+                    const label = row.querySelector(':first-child');
+                    return {
+                        hasMeta: label.classList.contains('meta'),
+                        scrollWidth: label.scrollWidth,
+                        clientWidth: label.clientWidth,
+                    };
+                })()
+                """
+            )
+            assert result is not None, "cause-row for 'Cause not recorded' not found"
+            assert result["hasMeta"], (
+                "unrecorded label should have class 'meta'"
+            )
+            assert result["scrollWidth"] == result["clientWidth"], (
+                f"label scrollWidth ({result['scrollWidth']}) != "
+                f"clientWidth ({result['clientWidth']}) — truncated"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_rows_no_horizontal_overflow_phone():
+    """AC7: at 375px, each .cause-row has scrollWidth == clientWidth."""
+    tag = "delivery-history-TEST"
+    causes = [
+        {"reason": "A test's assertion failed", "count": 10},
+        {"reason": '"already exists"', "count": 6},
+        {"reason": "Must create or edit a file", "count": 3},
+        {"reason": "Undefined name (lint)", "count": 2},
+        {"reason": "No test written", "count": 2},
+        {"reason": "Cause not recorded", "count": 2},
+    ]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const rows = document.querySelectorAll('.cause-row');
+                    const results = [];
+                    rows.forEach(row => {
+                        results.push({
+                            scrollWidth: row.scrollWidth,
+                            clientWidth: row.clientWidth,
+                        });
+                    });
+                    return results;
+                })()
+                """
+            )
+            assert result, "no .cause-row elements found"
+            for i, r in enumerate(result):
+                assert r["scrollWidth"] == r["clientWidth"], (
+                    f"cause-row {i}: scrollWidth ({r['scrollWidth']}) != "
+                    f"clientWidth ({r['clientWidth']}) — horizontal overflow"
+                )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
