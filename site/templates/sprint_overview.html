@@ -60,7 +60,7 @@
       <div class="attempt-chart">
         {% for story in stories %}
         <div class="attempt-row">
-          <div><span class="num meta">#{{ story.number }}</span> {{ story.title }}</div>
+          <a href="stories/{{ story.repo | replace('/', '-') }}-{{ story.number }}.html">{{ story.repo }}<span class="num meta">#{{ story.number }}</span> {{ story.title }}</a>
           <div class="blocks">
             {% if story.blocks %}
             {% for block in story.blocks %}
