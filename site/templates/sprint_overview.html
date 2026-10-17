@@ -39,7 +39,7 @@
     {% for entry in changed %}
     <div class="changed-trend-entry">
       <div class="changed-trend-text">{{ entry.text }}</div>
-      <div class="changed-trend-values">{{ entry.measure }}: <span class="num">{{ entry.previous }}</span> &rarr; <span class="num">{{ entry.now }}</span></div>
+      <div class="changed-trend-values">{{ entry.label }}: <span class="num">{{ entry.previous }}</span> &rarr; <span class="num">{{ entry.now }}</span></div>
     </div>
     {% endfor %}
   </div>
