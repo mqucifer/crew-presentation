@@ -3500,3 +3500,453 @@ def test_attempt_row_link_focus_outline():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_label_and_blocks_no_truncation_phone():
+    """AC1: at 375px, #127's label and .blocks have no horizontal clipping."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 127, "repo": "mqucifer/crew"},
+            "blocks": [
+                "refused", "refused", "refused", "refused",
+                "refused", "refused", "landed",
+            ],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+    ]
+    cards = [
+        {
+            "number": 127,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "thresholds.py",
+        }
+    ]
+    _make_package_with_stories(tag, stories=stories, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const rows = document.querySelectorAll('.attempt-row');
+                    const row = Array.from(rows).find(r => r.textContent.includes('#127'));
+                    if (!row) return null;
+                    const label = row.querySelector('a');
+                    const blocks = row.querySelector('.blocks');
+                    return {
+                        labelScroll: label.scrollWidth,
+                        labelClient: label.clientWidth,
+                        blocksScroll: blocks.scrollWidth,
+                        blocksClient: blocks.clientWidth,
+                    };
+                })()
+                """
+            )
+            assert result is not None, "attempt-row for #127 not found"
+            assert result["labelScroll"] == result["labelClient"], (
+                f"label scrollWidth ({result['labelScroll']}) != "
+                f"clientWidth ({result['labelClient']}) — horizontal clipping"
+            )
+            assert result["blocksScroll"] == result["blocksClient"], (
+                f".blocks scrollWidth ({result['blocksScroll']}) != "
+                f"clientWidth ({result['blocksClient']}) — horizontal clipping"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_row_no_overflow_8_blocks_phone():
+    """AC2: at 375px, the .attempt-row for a story with 8 blocks has scrollWidth == clientWidth."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 133, "repo": "mqucifer/crew"},
+            "blocks": [
+                "refused", "refused", "refused", "refused",
+                "refused", "refused", "refused", "landed",
+            ],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+    ]
+    cards = [
+        {
+            "number": 133,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "metrics.py",
+        }
+    ]
+    _make_package_with_stories(tag, stories=stories, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const rows = document.querySelectorAll('.attempt-row');
+                    const row = Array.from(rows).find(r => r.textContent.includes('#133'));
+                    if (!row) return null;
+                    return {
+                        scrollWidth: row.scrollWidth,
+                        clientWidth: row.clientWidth,
+                    };
+                })()
+                """
+            )
+            assert result is not None, "attempt-row for #133 not found"
+            assert result["scrollWidth"] == result["clientWidth"], (
+                f".attempt-row scrollWidth ({result['scrollWidth']}) != "
+                f"clientWidth ({result['clientWidth']}) — horizontal overflow"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_row_first_column_width_desktop():
+    """AC3: at 1440px, the first column of .attempt-row is 170px (desktop unchanged)."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+    ]
+    cards = [
+        {
+            "number": 1,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "card.py",
+        }
+    ]
+    _make_package_with_stories(tag, stories=stories, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 1440, "height": 900})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const row = document.querySelector('.attempt-row');
+                    const firstChild = row.firstElementChild;
+                    return { width: firstChild.offsetWidth };
+                })()
+                """
+            )
+            assert result["width"] == 170, (
+                f"first column width is {result['width']}, expected 170"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_status_merged_no_truncation_phone():
+    """AC4: at 375px, #125's .attempt-status has text 'merged' and no horizontal clipping."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 125, "repo": "mqucifer/crew"},
+            "blocks": ["refused", "refused", "refused", "refused", "landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+    ]
+    cards = [
+        {
+            "number": 125,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "card.py",
+        }
+    ]
+    _make_package_with_stories(tag, stories=stories, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const rows = document.querySelectorAll('.attempt-row');
+                    const row = Array.from(rows).find(r => r.textContent.includes('#125'));
+                    if (!row) return null;
+                    const status = row.querySelector('.attempt-status');
+                    return {
+                        text: status.textContent,
+                        scrollWidth: status.scrollWidth,
+                        clientWidth: status.clientWidth,
+                    };
+                })()
+                """
+            )
+            assert result is not None, "attempt-row for #125 not found"
+            assert result["text"] == "merged", (
+                f"status text is '{result['text']}', expected 'merged'"
+            )
+            assert result["scrollWidth"] == result["clientWidth"], (
+                f".attempt-status scrollWidth ({result['scrollWidth']}) != "
+                f"clientWidth ({result['clientWidth']}) — horizontal clipping"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_blocks_retain_40px_width_phone():
+    """AC5: at 375px, each of the 8 .attempt-block elements has a computed width of 40px."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 133, "repo": "mqucifer/crew"},
+            "blocks": [
+                "refused", "refused", "refused", "refused",
+                "refused", "refused", "refused", "landed",
+            ],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+    ]
+    cards = [
+        {
+            "number": 133,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "metrics.py",
+        }
+    ]
+    _make_package_with_stories(tag, stories=stories, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const rows = document.querySelectorAll('.attempt-row');
+                    const row = Array.from(rows).find(r => r.textContent.includes('#133'));
+                    if (!row) return null;
+                    const blocks = row.querySelectorAll('.attempt-block');
+                    return Array.from(blocks).map(
+                        b => parseInt(getComputedStyle(b).width, 10)
+                    );
+                })()
+                """
+            )
+            assert result is not None, "attempt-row for #133 not found"
+            assert len(result) == 8, f"expected 8 blocks, got {len(result)}"
+            for i, w in enumerate(result):
+                assert w == 40, f"block {i} width is {w}px, expected 40px"
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_status_first_try_no_truncation_phone():
+    """AC6: at 375px, #128's .attempt-status has text 'first try' and no horizontal clipping."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 128, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+    ]
+    cards = [
+        {
+            "number": 128,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "report.py",
+        }
+    ]
+    _make_package_with_stories(tag, stories=stories, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const rows = document.querySelectorAll('.attempt-row');
+                    const row = Array.from(rows).find(r => r.textContent.includes('#128'));
+                    if (!row) return null;
+                    const status = row.querySelector('.attempt-status');
+                    return {
+                        text: status.textContent,
+                        scrollWidth: status.scrollWidth,
+                        clientWidth: status.clientWidth,
+                    };
+                })()
+                """
+            )
+            assert result is not None, "attempt-row for #128 not found"
+            assert result["text"] == "first try", (
+                f"status text is '{result['text']}', expected 'first try'"
+            )
+            assert result["scrollWidth"] == result["clientWidth"], (
+                f".attempt-status scrollWidth ({result['scrollWidth']}) != "
+                f"clientWidth ({result['clientWidth']}) — horizontal clipping"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_row_div_no_overflow_7_blocks_phone():
+    """AC7: at 375px, the .attempt-row div for #127 has scrollWidth == clientWidth."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 127, "repo": "mqucifer/crew"},
+            "blocks": [
+                "refused", "refused", "refused", "refused",
+                "refused", "refused", "landed",
+            ],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+    ]
+    cards = [
+        {
+            "number": 127,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "thresholds.py",
+        }
+    ]
+    _make_package_with_stories(tag, stories=stories, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            result = page.evaluate(
+                """
+                (() => {
+                    const rows = document.querySelectorAll('.attempt-row');
+                    const row = Array.from(rows).find(r => r.textContent.includes('#127'));
+                    if (!row) return null;
+                    return {
+                        scrollWidth: row.scrollWidth,
+                        clientWidth: row.clientWidth,
+                    };
+                })()
+                """
+            )
+            assert result is not None, "attempt-row for #127 not found"
+            assert result["scrollWidth"] == result["clientWidth"], (
+                f".attempt-row scrollWidth ({result['scrollWidth']}) != "
+                f"clientWidth ({result['clientWidth']}) — horizontal overflow"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
