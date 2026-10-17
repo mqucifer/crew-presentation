@@ -277,7 +277,7 @@ def test_sprint_overview_header_and_stats():
                 "first_attempt_numerator": 12,
                 "first_attempt_denominator": 22,
                 "escalation_count": 1,
-                "cycle_time_days": 3.2,
+                "cycle_time_minutes": 102,
             }
         },
     )
@@ -303,7 +303,7 @@ def test_sprint_overview_header_and_stats():
         assert ">1<" in stats or " 1 " in stats, (
             f"escalation '1' not in stats: {stats[:200]}"
         )
-        assert "3.2 days" in stats, f"'3.2 days' not in stats: {stats[:200]}"
+        assert "1 hr 42 min" in stats, f"'1 hr 42 min' not in stats: {stats[:200]}"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -494,7 +494,7 @@ def test_view_nav_aria_current():
 
 
 def test_cycle_time_is_fourth_stat():
-    """AC7: '3.2 days' is the fourth stat, label 'cycle time', after throughput/first-attempt/escalation."""
+    """AC7: '1 hr 42 min' is the fourth stat, label 'cycle time', after throughput/first-attempt/escalation."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -506,7 +506,7 @@ def test_cycle_time_is_fourth_stat():
                 "first_attempt_numerator": 12,
                 "first_attempt_denominator": 22,
                 "escalation_count": 1,
-                "cycle_time_days": 3.2,
+                "cycle_time_minutes": 102,
             }
         },
     )
@@ -525,8 +525,8 @@ def test_cycle_time_is_fourth_stat():
         )
         # The fourth stat (index 3) should be cycle time
         assert len(values) >= 4, f"expected at least 4 stats, got {len(values)}"
-        assert "3.2 days" in values[3], (
-            f"4th stat value is {values[3]!r}, expected to contain '3.2 days'"
+        assert values[3].strip() == "1 hr 42 min", (
+            f"4th stat value is {values[3]!r}, expected '1 hr 42 min'"
         )
         assert labels[3].strip() == "cycle time", (
             f"4th stat label is {labels[3].strip()!r}, expected 'cycle time'"
@@ -2530,6 +2530,73 @@ def test_story_journey_scrollwidth_at_phone_width():
             )
 
             browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cycle_time_stat_formats_hours_and_minutes():
+    """AC1-AC4: the cycle time stat renders hours and minutes with exact text.
+
+    Covers AC6 (the value span carries the 'num' class) and AC7 (the value
+    never contains 'day' or 'days'), both named for the 89-minute case.
+    """
+    cases = [
+        (89, "1 hr 29 min"),
+        (60, "1 hr"),
+        (0, "0 min"),
+        (4320, "72 hr"),
+    ]
+    tag = "delivery-history-TEST"
+    original = DELIVERY_HISTORY_TAG.read_text()
+    try:
+        for minutes, expected in cases:
+            _make_fake_package(
+                tag,
+                ["Sprint 6"],
+                metrics={
+                    "Sprint 6": {
+                        "throughput": 22,
+                        "points_delivered": 63,
+                        "first_attempt_numerator": 12,
+                        "first_attempt_denominator": 22,
+                        "escalation_count": 1,
+                        "cycle_time_minutes": minutes,
+                    }
+                },
+            )
+            DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+            _build()
+            html = (BUILD_DIR / "sprint-6.html").read_text()
+            stats = _stats_section(html)
+            cycle_stat = None
+            for block in re.findall(
+                r'<div class="stat">(.*?)</div>', stats, re.DOTALL
+            ):
+                if '<span class="stat__label">cycle time</span>' in block:
+                    cycle_stat = block
+                    break
+            assert cycle_stat is not None, "no stat labelled 'cycle time' found"
+            m = re.search(
+                r'<span class="stat__value([^"]*)">(.*?)</span>',
+                cycle_stat,
+                re.DOTALL,
+            )
+            assert m, "cycle time stat has no .stat__value"
+            value_text = m.group(2).strip()
+            value_class = m.group(1).strip()
+            assert value_text == expected, (
+                f"cycle_time_minutes={minutes}: value is {value_text!r}, "
+                f"expected {expected!r}"
+            )
+            if minutes == 89:
+                assert "num" in value_class.split(), (
+                    f"cycle time value class is {value_class!r}, "
+                    "expected to include 'num'"
+                )
+                assert "day" not in value_text and "days" not in value_text, (
+                    f"cycle time value {value_text!r} mentions days"
+                )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
