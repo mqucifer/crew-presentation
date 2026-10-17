@@ -220,6 +220,14 @@ def _render_pages(pkg: Path) -> dict:
             )
             context["board_columns"] = board_columns
             context["board_cards"] = board_cards
+            events = _load_sprint_events(pkg, sprint_name, index)
+            replay_cards = _build_replay_cards(events, cards)
+            replay_data = {
+                "sprint": sprint_name,
+                "events": events,
+                "cards": replay_cards,
+            }
+            context["replay_data_json"] = json.dumps(replay_data)
         pages[output_name] = template.render(**context)
 
     story_journey_template = env.get_template("story_journey.html")
@@ -507,6 +515,36 @@ def _build_board_state(
         })
 
     return ordered_columns, board
+
+
+def _build_replay_cards(events: list[dict], cards: list[dict]) -> list[dict]:
+    """Build the cards array for the replay JSON.
+
+    One entry per unique card referenced by events, with title from the
+    package's cards array or empty string when not found.
+    """
+    cards_by_key: dict[tuple, dict] = {}
+    for card in cards:
+        key = (card.get("number"), card.get("repo"))
+        cards_by_key[key] = card
+
+    seen: set[tuple] = set()
+    result: list[dict] = []
+    for event in events:
+        card_ref = event.get("card")
+        if not card_ref:
+            continue
+        key = (card_ref.get("number"), card_ref.get("repo"))
+        if key in seen:
+            continue
+        seen.add(key)
+        card = cards_by_key.get(key)
+        result.append({
+            "number": card_ref.get("number"),
+            "repo": card_ref.get("repo", ""),
+            "title": card.get("title", "") if card else "",
+        })
+    return result
 
 
 if __name__ == "__main__":
