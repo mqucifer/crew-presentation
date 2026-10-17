@@ -173,7 +173,15 @@ def _render_pages(pkg: Path) -> dict:
                     }
                 )
 
-        changed = analysis_by_sprint.get(sprint["name"], {}).get("changed", [])
+        changed = [
+            {
+                "text": e["text"],
+                "label": _changed_label(e["measure"]),
+                "previous": _format_changed_value(e["measure"], e["previous"]),
+                "now": _format_changed_value(e["measure"], e["now"]),
+            }
+            for e in analysis_by_sprint.get(sprint["name"], {}).get("changed", [])
+        ]
         decided = analysis_by_sprint.get(sprint["name"], {}).get("decided", [])
 
         context = {
@@ -315,6 +323,37 @@ def _format_minutes(total_minutes) -> str:
     if minutes == 0:
         return f"{hours} hr"
     return f"{hours} hr {minutes} min"
+
+
+def _format_changed_value(measure: str, value) -> str:
+    """Format a changed-trend value for display.
+
+    Time measures (cycle_time, lead_time) are shown as hours and minutes;
+    other measures are shown as their raw number.
+    """
+    if value is None:
+        return ""
+    if measure in ("cycle_time_days", "lead_time_days"):
+        total_minutes = round(value * 24 * 60)
+        return _format_minutes(total_minutes)
+    if measure in ("cycle_time_minutes", "lead_time_minutes"):
+        return _format_minutes(round(value))
+    if isinstance(value, float) and value == int(value):
+        return str(int(value))
+    return str(value)
+
+
+def _changed_label(measure: str) -> str:
+    """A human-readable label for a changed-trend measure.
+
+    Time measures show as 'cycle time' or 'lead time'; others keep their
+    raw measure name.
+    """
+    if measure in ("cycle_time_days", "cycle_time_minutes"):
+        return "cycle time"
+    if measure in ("lead_time_minutes", "lead_time_days"):
+        return "lead time"
+    return measure
 
 
 if __name__ == "__main__":

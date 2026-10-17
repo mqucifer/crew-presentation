@@ -1227,7 +1227,7 @@ def _make_package_with_changed(
 
 
 def test_changed_trend_single_entry_reading_order():
-    """AC1: single changed entry renders text, measure, previous, now in reading order."""
+    """AC1, AC5: cycle_time_days renders 'cycle time' label and hours-and-minutes values."""
     tag = "delivery-history-TEST"
     _make_package_with_changed(
         tag,
@@ -1255,12 +1255,17 @@ def test_changed_trend_single_entry_reading_order():
         )
         assert section_match, "changed-trend section not found"
         section_html = section_match.group(0)
+        # AC5: label is 'cycle time', not the raw measure name
+        pos_label = section_html.index("cycle time")
+        assert "cycle_time_days" not in section_html, (
+            "raw measure name 'cycle_time_days' appears in changed-trend section"
+        )
+        # AC1: values are formatted as hours and minutes
+        pos_prev = section_html.index("124 hr 48 min")
+        pos_now = section_html.index("91 hr 12 min")
         pos_text = section_html.index("Cycle time improved")
-        pos_measure = section_html.index("cycle_time_days")
-        pos_prev = section_html.index("5.2")
-        pos_now = section_html.index("3.8")
-        assert pos_text < pos_measure < pos_prev < pos_now, (
-            f"reading order violated: text@{pos_text}, measure@{pos_measure}, "
+        assert pos_text < pos_label < pos_prev < pos_now, (
+            f"reading order violated: text@{pos_text}, label@{pos_label}, "
             f"prev@{pos_prev}, now@{pos_now}"
         )
     finally:
@@ -1384,7 +1389,7 @@ def test_changed_trend_heading_before_entries():
 
 
 def test_changed_trend_values_have_num_class():
-    """AC5: previous and now values carry the CSS class 'num'."""
+    """AC7: previous and now values carry the 'num' class and are separated by &rarr;."""
     tag = "delivery-history-TEST"
     _make_package_with_changed(
         tag,
@@ -1405,11 +1410,19 @@ def test_changed_trend_values_have_num_class():
     try:
         _build()
         html = (BUILD_DIR / "sprint-7.html").read_text()
-        assert 'class="num">5.2<' in html, (
-            "previous value 5.2 does not have class 'num'"
+        assert 'class="num">124 hr 48 min<' in html, (
+            "previous value does not have class 'num' with formatted text"
         )
-        assert 'class="num">3.8<' in html, (
-            "now value 3.8 does not have class 'num'"
+        assert 'class="num">91 hr 12 min<' in html, (
+            "now value does not have class 'num' with formatted text"
+        )
+        # AC7: the arrow between them
+        values_div = re.search(
+            r'class="changed-trend-values">.*?</div>', html, re.DOTALL
+        )
+        assert values_div, "no changed-trend-values div found"
+        assert "&rarr;" in values_div.group(0), (
+            "no &rarr; entity between the two values"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -2597,6 +2610,128 @@ def test_cycle_time_stat_formats_hours_and_minutes():
                 assert "day" not in value_text and "days" not in value_text, (
                     f"cycle time value {value_text!r} mentions days"
                 )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_trend_lead_time_minutes_format():
+    """AC2, AC6: lead_time_minutes renders 'lead time' label and minute values."""
+    tag = "delivery-history-TEST"
+    _make_package_with_changed(
+        tag,
+        "Sprint 7",
+        [
+            {
+                "text": "Lead time increased",
+                "measure": "lead_time_minutes",
+                "previous": 29,
+                "now": 45,
+                "better": False,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+        section_match = re.search(
+            r'<section class="card changed-trend".*?</section>',
+            html,
+            re.DOTALL,
+        )
+        assert section_match, "changed-trend section not found"
+        section_html = section_match.group(0)
+        # AC6: label is 'lead time', not the raw measure name
+        pos_label = section_html.index("lead time")
+        assert "lead_time_minutes" not in section_html, (
+            "raw measure name 'lead_time_minutes' appears in changed-trend section"
+        )
+        # AC2: values show minutes
+        pos_prev = section_html.index("29 min")
+        pos_now = section_html.index("45 min")
+        assert pos_label < pos_prev < pos_now, (
+            f"reading order violated: label@{pos_label}, "
+            f"prev@{pos_prev}, now@{pos_now}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_trend_non_time_measure_no_unit():
+    """AC3, AC8: first_attempt_rate_percent shows bare numbers, no time unit."""
+    tag = "delivery-history-TEST"
+    _make_package_with_changed(
+        tag,
+        "Sprint 7",
+        [
+            {
+                "text": "First-attempt rate rose",
+                "measure": "first_attempt_rate_percent",
+                "previous": 40,
+                "now": 55,
+                "better": True,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+        # AC3: values are bare numbers in num spans
+        assert 'class="num">40<' in html, (
+            "previous value is not '40' in a num span"
+        )
+        assert 'class="num">55<' in html, (
+            "now value is not '55' in a num span"
+        )
+        # AC8: no time-unit substring in the span text
+        values_div = re.search(
+            r'class="changed-trend-values">(.*?)</div>', html, re.DOTALL
+        )
+        assert values_div, "no changed-trend-values div found"
+        spans = re.findall(r'class="num">(.*?)<', values_div.group(1))
+        assert len(spans) == 2, f"expected 2 num spans, got {len(spans)}"
+        for span_text in spans:
+            assert "hr" not in span_text, f"span text {span_text!r} contains 'hr'"
+            assert "min" not in span_text, f"span text {span_text!r} contains 'min'"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_trend_zero_minutes():
+    """AC4: cycle_time_minutes with 0 shows '0 min' for both values."""
+    tag = "delivery-history-TEST"
+    _make_package_with_changed(
+        tag,
+        "Sprint 7",
+        [
+            {
+                "text": "Cycle time held",
+                "measure": "cycle_time_minutes",
+                "previous": 0,
+                "now": 0,
+                "better": False,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+        assert 'class="num">0 min<' in html, (
+            "zero cycle_time_minutes does not render '0 min'"
+        )
+        count = html.count('class="num">0 min<')
+        assert count >= 2, f"expected at least 2 '0 min' values, found {count}"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
