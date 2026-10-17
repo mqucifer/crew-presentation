@@ -3069,3 +3069,434 @@ def test_sprint_headings_aligned_at_desktop_width():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_row_link_href_and_text():
+    """AC1: attempt row contains an <a> with href to journey page and visible text with card id."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 125, "repo": "mqucifer/crew"},
+                "blocks": ["refused", "landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 125,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "card.py",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        a_match = re.search(
+            r'<a href="stories/mqucifer-crew-125\.html">(.*?)</a>',
+            html,
+            re.DOTALL,
+        )
+        assert a_match, "no <a> with href 'stories/mqucifer-crew-125.html' found in attempt row"
+        link_inner = a_match.group(1)
+        assert "#125" in link_inner, (
+            f"link visible text does not include '#125': {link_inner!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_page_file_exists_with_title():
+    """AC2: built story journey file exists and its title contains the card number."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 114, "repo": "mqucifer/crew-presentation"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 114,
+                "repo": "mqucifer/crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "Link each story from the sprint page to its journey",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "mqucifer-crew-presentation-114.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        content = journey_file.read_text()
+        title_match = re.search(r"<title>(.*?)</title>", content, re.DOTALL)
+        assert title_match, "no <title> element in journey page"
+        assert "114" in title_match.group(1), (
+            f"title is {title_match.group(1)!r}, expected to contain '114'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_pages_exact_file_count():
+    """AC3: two cards produce exactly two files in build/stories/."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 101, "repo": "mqucifer/crew"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            },
+            {
+                "card": {"number": 102, "repo": "mqucifer/crew"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            },
+        ],
+        cards=[
+            {
+                "number": 101,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "a.py",
+            },
+            {
+                "number": 102,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "b.py",
+            },
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        stories_dir = BUILD_DIR / "stories"
+        assert stories_dir.is_dir(), "build/stories/ directory not found"
+        files = sorted(f.name for f in stories_dir.iterdir() if f.is_file())
+        assert files == ["mqucifer-crew-101.html", "mqucifer-crew-102.html"], (
+            f"build/stories/ contains {files}, expected exactly two files"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_page_slug_replaces_slash_with_single_hyphen():
+    """AC4: repo 'org/team' number 77 produces build/stories/org-team-77.html."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 77, "repo": "org/team"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 77,
+                "repo": "org/team",
+                "sprint": "Sprint 6",
+                "title": "x.py",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        expected_path = BUILD_DIR / "stories" / "org-team-77.html"
+        assert expected_path.is_file(), f"expected {expected_path} to exist"
+        stories_dir = BUILD_DIR / "stories"
+        files = [f.name for f in stories_dir.iterdir() if f.is_file()]
+        assert "org-team-77.html" in files, f"org-team-77.html not in {files}"
+        assert "org--team-77.html" not in files, "double hyphen in slug"
+        assert "orgteam-77.html" not in files, "empty string replacement in slug"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_row_first_child_is_anchor_not_div():
+    """AC5: every .attempt-row first child is an <a>, and no <a> has class 'attempt-row'."""
+    tag = "delivery-history-TEST"
+    story_numbers = [101, 102, 103]
+    stories = [
+        {
+            "card": {"number": n, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        }
+        for n in story_numbers
+    ]
+    cards = [
+        {
+            "number": n,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": f"s{n}.py",
+        }
+        for n in story_numbers
+    ]
+    _make_package_with_stories(tag, stories=stories, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".attempt-row")
+            results = page.evaluate("""
+                () => Array.from(document.querySelectorAll('.attempt-row')).map(row => {
+                    const first = row.firstElementChild;
+                    return {
+                        tag: first.tagName,
+                        hasAttemptRowClass: first.classList.contains('attempt-row'),
+                    };
+                })
+            """)
+            assert len(results) == 3, f"expected 3 rows, got {len(results)}"
+            for i, r in enumerate(results):
+                assert r["tag"] == "A", (
+                    f"row {i}: first child is <{r['tag'].lower()}>, expected <a>"
+                )
+                assert not r["hasAttemptRowClass"], (
+                    f"row {i}: <a> has class 'attempt-row'"
+                )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_row_link_has_no_target_attribute():
+    """AC6: the <a> in an attempt row has no target attribute."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 125, "repo": "mqucifer/crew"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 125,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "card.py",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".attempt-row a")
+            has_target = page.evaluate("""
+                () => {
+                    const a = document.querySelector('.attempt-row a');
+                    return a.hasAttribute('target');
+                }
+            """)
+            assert not has_target, (
+                "the <a> element has a 'target' attribute; expected none"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_row_link_color_light_theme():
+    """AC7: light-theme computed colour of the <a> is rgb(168, 74, 22)."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 125, "repo": "mqucifer/crew"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 125,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "card.py",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".attempt-row a")
+            page.evaluate("document.documentElement.setAttribute('data-theme', 'light')")
+            page.wait_for_timeout(100)
+            color = page.evaluate(
+                "getComputedStyle(document.querySelector('.attempt-row a')).color"
+            )
+            assert color == "rgb(168, 74, 22)", (
+                f"light-theme link color is {color!r}, expected rgb(168, 74, 22)"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_row_link_color_dark_theme():
+    """AC8: dark-theme computed colour of the <a> is rgb(224, 138, 74)."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 125, "repo": "mqucifer/crew"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 125,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "card.py",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".attempt-row a")
+            page.evaluate("document.documentElement.setAttribute('data-theme', 'dark')")
+            # The design system animates colour on a theme change; wait for the
+            # link's colour to settle at its dark-theme value before reading it.
+            page.wait_for_function(
+                "() => getComputedStyle(document.querySelector('.attempt-row a'))"
+                ".color === 'rgb(224, 138, 74)'",
+                timeout=2000,
+            )
+            color = page.evaluate(
+                "getComputedStyle(document.querySelector('.attempt-row a')).color"
+            )
+            assert color == "rgb(224, 138, 74)", (
+                f"dark-theme link color is {color!r}, expected rgb(224, 138, 74)"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_row_link_focus_outline():
+    """AC9: focused <a> has outline-width > 0 and outline-style not none."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 125, "repo": "mqucifer/crew"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 125,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "card.py",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".attempt-row a")
+            page.evaluate("document.querySelector('.attempt-row a').focus()")
+            outline_width = page.evaluate(
+                "getComputedStyle(document.querySelector('.attempt-row a')).outlineWidth"
+            )
+            outline_style = page.evaluate(
+                "getComputedStyle(document.querySelector('.attempt-row a')).outlineStyle"
+            )
+            assert outline_style != "none", (
+                f"outline-style is {outline_style!r}, expected not 'none'"
+            )
+            width_px = float(outline_width.rstrip("px"))
+            assert width_px > 0, (
+                f"outline-width is {outline_width!r}, expected > 0px"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
