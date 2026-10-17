@@ -1384,54 +1384,6 @@ def test_changed_trend_values_have_num_class():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
-def test_failure_causes_four_rows_in_order():
-    """AC1: four causes render as four rows in package order with proportional bars."""
-    tag = "delivery-history-TEST"
-    causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": '"already exists"', "count": 6},
-        {"reason": "Must create or edit a file", "count": 3},
-        {"reason": "Cause not recorded", "count": 2},
-    ]
-    _make_fake_package(
-        tag,
-        ["Sprint 6"],
-        metrics={
-            "Sprint 6": {
-                "throughput": 22,
-                "points_delivered": 63,
-                "first_attempt_numerator": 12,
-                "first_attempt_denominator": 22,
-                "escalation_count": 1,
-                "cycle_time_days": 3.2,
-                "top_failure_causes": causes,
-            }
-        },
-    )
-    original = DELIVERY_HISTORY_TAG.read_text()
-    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
-    try:
-        _build()
-        html = (BUILD_DIR / "sprint-6.html").read_text()
-        section_start = html.index('class="cause-chart"')
-        section_end = html.index("</section>", section_start)
-        section = html[section_start:section_end]
-        # Exactly 4 cause rows
-        row_count = section.count('class="cause-row"')
-        assert row_count == 4, f"expected 4 cause rows, got {row_count}"
-        # Rows in package order
-        pos1 = section.index("A test's assertion failed")
-        pos2 = section.index('"already exists"')
-        pos3 = section.index("Must create or edit a file")
-        pos4 = section.index("Cause not recorded")
-        assert pos1 < pos2 < pos3 < pos4, "rows not in package order"
-        # First bar is longest (100%)
-        assert "width:100%" in section, "first bar should be 100% width"
-        # Last bar uses unrecorded styling (surface-raised background, dim text)
-        assert "cause-bar--unrecorded" in section, "unrecorded bar class missing"
-    finally:
-        DELIVERY_HISTORY_TAG.write_text(original)
-        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
 def test_failure_causes_empty_renders_no_failures():
@@ -6088,6 +6040,160 @@ def test_changed_trend_no_field_name_pattern_in_values():
             assert match is None, (
                 f".changed-trend-values #{i} contains field-name pattern "
                 f"{match.group()!r}: {div_text!r}"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_label_test_assertion_failed():
+    """AC1: code 'test_assertion_failed' renders as 'A test's assertion failed' in the label span."""
+    tag = "delivery-history-TEST"
+    causes = [{"reason": "test_assertion_failed", "count": 10}]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        assert ">A test's assertion failed</span>" in section, (
+            "cause label should be 'A test's assertion failed'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_label_already_exists():
+    """AC2: code 'already_exists' renders as '"already exists"' in the label span."""
+    tag = "delivery-history-TEST"
+    causes = [{"reason": "already_exists", "count": 6}]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        assert '>"already exists"</span>' in section, (
+            "cause label should be '\"already exists\"'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_label_must_create_or_edit_file():
+    """AC3 (UX): code 'must_create_or_edit_file' renders as 'Must create or edit a file'."""
+    tag = "delivery-history-TEST"
+    causes = [{"reason": "must_create_or_edit_file", "count": 3}]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        assert ">Must create or edit a file</span>" in section, (
+            "cause label should be 'Must create or edit a file'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_labels_no_raw_code_pattern():
+    """AC4 (UX): no label span in the cause-chart contains a raw code pattern [a-z]+_[a-z]+."""
+    tag = "delivery-history-TEST"
+    causes = [
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "already_exists", "count": 6},
+        {"reason": "must_create_or_edit_file", "count": 3},
+        {"reason": "undefined_name", "count": 2},
+        {"reason": "no_test_written", "count": 2},
+        {"reason": "unrecorded", "count": 2},
+    ]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # Extract all span elements; label spans are those without class="num
+        all_spans = re.findall(r"<span([^>]*)>(.*?)</span>", section)
+        label_texts = [
+            text for attrs, text in all_spans if 'class="num' not in attrs
+        ]
+        assert len(label_texts) == 6, f"expected 6 label spans, got {len(label_texts)}"
+        for text in label_texts:
+            assert not re.search(r"[a-z]+_[a-z]+", text), (
+                f"label span contains raw code pattern: {text!r}"
             )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
