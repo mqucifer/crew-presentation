@@ -6414,3 +6414,375 @@ def test_replay_no_periods_zero_cols_and_empty_timeline():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_board_columns_from_events_in_tone_order():
+    """AC1: events with from/to columns Sprint Backlog, In Progress, Done render 3 columns in tone order."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 6", "start": "2026-09-29", "end": "2026-10-06"},
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"at": "2026-10-07T09:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress"},
+        {"at": "2026-10-07T14:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "Done"},
+    ]
+    cards = [
+        {"number": 1, "repo": "mqucifer/crew", "title": "test.py", "url": "https://github.com/mqucifer/crew-presentation/issues/1"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        board_match = re.search(
+            r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert board_match, "no Board section"
+        headers = re.findall(
+            r'class="replay-col__header">(.*?)<', board_match.group(1)
+        )
+        assert len(headers) == 3, f"Expected 3 columns, got {len(headers)}: {headers}"
+        assert headers == ["Sprint Backlog", "In Progress", "Done"], (
+            f"Column order is {headers}, expected ['Sprint Backlog', 'In Progress', 'Done']"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_card_initial_column_is_earliest_from_column():
+    """AC2: card 127 with earliest event from_column 'Sprint Backlog' is in that column only."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"at": "2026-10-07T09:00:00Z", "card": {"number": 127, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress"},
+        {"at": "2026-10-07T14:00:00Z", "card": {"number": 127, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "Done"},
+    ]
+    cards = [
+        {"number": 127, "repo": "mqucifer/crew", "title": "thresholds.py", "url": "https://github.com/mqucifer/crew-presentation/issues/127"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        board_match = re.search(
+            r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert board_match, "no Board section"
+        card_text = "[mqucifer/crew-presentation#127](https://github.com/mqucifer/crew-presentation/issues/127)"
+        sb_col_match = re.search(
+            r'class="replay-col__header">Sprint Backlog</div>\s*<div class="replay-col__cards">(.*?)</div>\s*</div>',
+            board_match.group(1), re.DOTALL
+        )
+        assert sb_col_match, "Sprint Backlog column not found"
+        assert card_text in sb_col_match.group(1), (
+            f"Card 127 not in Sprint Backlog column"
+        )
+        ip_col_match = re.search(
+            r'class="replay-col__header">In Progress</div>\s*<div class="replay-col__cards">(.*?)</div>\s*</div>',
+            board_match.group(1), re.DOTALL
+        )
+        if ip_col_match:
+            assert card_text not in ip_col_match.group(1), (
+                "Card 127 incorrectly in In Progress column"
+            )
+        done_col_match = re.search(
+            r'class="replay-col__header">Done</div>\s*<div class="replay-col__cards">(.*?)</div>\s*</div>',
+            board_match.group(1), re.DOTALL
+        )
+        if done_col_match:
+            assert card_text not in done_col_match.group(1), (
+                "Card 127 incorrectly in Done column"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_card_text_includes_link_and_title():
+    """AC3: card's visible text includes the exact link string and the card's title."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"at": "2026-10-07T09:00:00Z", "card": {"number": 127, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress"},
+    ]
+    cards = [
+        {"number": 127, "repo": "mqucifer/crew", "title": "thresholds.py", "url": "https://github.com/mqucifer/crew-presentation/issues/127"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        board_match = re.search(
+            r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert board_match, "no Board section"
+        card_text = "[mqucifer/crew-presentation#127](https://github.com/mqucifer/crew-presentation/issues/127)"
+        found = False
+        for m in re.finditer(r'<div class="replay-card">(.*?)</div>', board_match.group(1), re.DOTALL):
+            content = m.group(1)
+            if card_text in content:
+                found = True
+                assert "thresholds.py" in content, (
+                    f"Card title 'thresholds.py' not found in card element: {content!r}"
+                )
+                break
+        assert found, f"Card with link {card_text!r} not found in board"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_card_without_events_not_on_board():
+    """AC4: card 99 in cards array but no events for it → not rendered on board."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"at": "2026-10-07T09:00:00Z", "card": {"number": 127, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress"},
+    ]
+    cards = [
+        {"number": 127, "repo": "mqucifer/crew", "title": "thresholds.py", "url": "https://github.com/mqucifer/crew-presentation/issues/127"},
+        {"number": 99, "repo": "mqucifer/crew", "title": "other.py", "url": "https://github.com/mqucifer/crew-presentation/issues/99"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        board_match = re.search(
+            r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert board_match, "no Board section"
+        card_99_text = "[mqucifer/crew-presentation#99](https://github.com/mqucifer/crew-presentation/issues/99)"
+        assert card_99_text not in board_match.group(1), (
+            f"Card 99 should not be on the board but was found"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_board_single_column_when_all_events_same_column():
+    """AC5: 4 events all from Sprint Backlog to Sprint Backlog → exactly 1 column."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"at": "2026-10-07T08:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "Sprint Backlog"},
+        {"at": "2026-10-07T09:00:00Z", "card": {"number": 2, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "Sprint Backlog"},
+        {"at": "2026-10-07T10:00:00Z", "card": {"number": 3, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "Sprint Backlog"},
+        {"at": "2026-10-07T11:00:00Z", "card": {"number": 4, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "Sprint Backlog"},
+    ]
+    cards = [
+        {"number": 1, "repo": "mqucifer/crew", "title": "a.py", "url": "https://github.com/mqucifer/crew-presentation/issues/1"},
+        {"number": 2, "repo": "mqucifer/crew", "title": "b.py", "url": "https://github.com/mqucifer/crew-presentation/issues/2"},
+        {"number": 3, "repo": "mqucifer/crew", "title": "c.py", "url": "https://github.com/mqucifer/crew-presentation/issues/3"},
+        {"number": 4, "repo": "mqucifer/crew", "title": "d.py", "url": "https://github.com/mqucifer/crew-presentation/issues/4"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        board_match = re.search(
+            r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert board_match, "no Board section"
+        headers = re.findall(
+            r'class="replay-col__header">(.*?)<', board_match.group(1)
+        )
+        assert len(headers) == 1, f"Expected 1 column, got {len(headers)}: {headers}"
+        assert headers[0] == "Sprint Backlog", f"Column is {headers[0]!r}, expected 'Sprint Backlog'"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_done_column_present_but_empty():
+    """AC6: events with to_column Done but no from_column Done → Done column exists with 0 cards."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"at": "2026-10-07T09:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress"},
+        {"at": "2026-10-07T14:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "Done"},
+    ]
+    cards = [
+        {"number": 1, "repo": "mqucifer/crew", "title": "test.py", "url": "https://github.com/mqucifer/crew-presentation/issues/1"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        board_match = re.search(
+            r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert board_match, "no Board section"
+        done_match = re.search(
+            r'class="replay-col__header">Done</div>\s*<div class="replay-col__cards">(.*?)</div>',
+            board_match.group(1), re.DOTALL
+        )
+        assert done_match, "Done column not found"
+        cards_in_done = re.findall(r'class="replay-card"', done_match.group(1))
+        assert len(cards_in_done) == 0, (
+            f"Done column has {len(cards_in_done)} cards, expected 0"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_single_event_card_in_from_column_with_num_class():
+    """AC7: card 130 with single event from Sprint Backlog → in that column, shows title, link in .num element."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"at": "2026-10-07T08:00:00Z", "card": {"number": 130, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress"},
+    ]
+    cards = [
+        {"number": 130, "repo": "mqucifer/crew", "title": "serve.py", "url": "https://github.com/mqucifer/crew-presentation/issues/130"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        board_match = re.search(
+            r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert board_match, "no Board section"
+        card_text = "[mqucifer/crew-presentation#130](https://github.com/mqucifer/crew-presentation/issues/130)"
+        sb_col_match = re.search(
+            r'class="replay-col__header">Sprint Backlog</div>\s*<div class="replay-col__cards">(.*?)</div>\s*</div>',
+            board_match.group(1), re.DOTALL
+        )
+        assert sb_col_match, "Sprint Backlog column not found"
+        assert card_text in sb_col_match.group(1), (
+            "Card 130 not in Sprint Backlog column"
+        )
+        assert "serve.py" in sb_col_match.group(1), (
+            "Card title 'serve.py' not found"
+        )
+        num_match = re.search(
+            r'<(\w+)[^>]*class="[^"]*num[^"]*"[^>]*>([^<]*)</\1>',
+            sb_col_match.group(1)
+        )
+        assert num_match, "No element with class 'num' found in Sprint Backlog column"
+        assert card_text in num_match.group(2), (
+            f"Link text not inside .num element: {num_match.group(2)!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_board_four_columns_in_tone_order():
+    """AC8: events with Sprint Backlog, In Progress, QAing, Merging → 4 columns in tone order."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"at": "2026-10-07T08:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress"},
+        {"at": "2026-10-07T09:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "QAing"},
+        {"at": "2026-10-07T10:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "QAing", "to_column": "Merging"},
+    ]
+    cards = [
+        {"number": 1, "repo": "mqucifer/crew", "title": "test.py", "url": "https://github.com/mqucifer/crew-presentation/issues/1"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        board_match = re.search(
+            r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
+        )
+        assert board_match, "no Board section"
+        headers = re.findall(
+            r'class="replay-col__header">(.*?)<', board_match.group(1)
+        )
+        assert len(headers) == 4, f"Expected 4 columns, got {len(headers)}: {headers}"
+        assert headers == ["Sprint Backlog", "In Progress", "QAing", "Merging"], (
+            f"Column order is {headers}, expected ['Sprint Backlog', 'In Progress', 'QAing', 'Merging']"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _make_package_with_board(
+    tag: str,
+    sprints: list[dict],
+    events: list[dict],
+    cards: list[dict],
+    sprint_name: str,
+) -> Path:
+    """Create a fake package with events for the board tests."""
+    metrics = {
+        name: {
+            "throughput": 5,
+            "points_delivered": 10,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": 5,
+            "escalation_count": 0,
+            "cycle_time_days": 2.0,
+        }
+        for name in [s["name"] for s in sprints]
+    }
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "1.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["sprints"],
+                "properties": {"sprints": {"type": "array"}},
+            }
+        )
+    )
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    events_file_name = f"events/sprint-{sprint_name.lower().replace(' ', '-')}.json"
+    (pkg_dir / "events").mkdir(exist_ok=True)
+    (pkg_dir / events_file_name).write_text(json.dumps({"events": events}))
+    index = {
+        "sprints": sprints,
+        "cards": cards,
+        "crew_repository": "mqucifer/crew",
+        "sprint_metrics": {"answers": metrics},
+        "periods": [
+            {"sprint": sprint_name, "file": events_file_name}
+        ],
+    }
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+    return pkg_dir

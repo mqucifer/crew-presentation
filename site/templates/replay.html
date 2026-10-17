@@ -7,7 +7,21 @@
 <section aria-label="Timeline"></section>
 
 <div class="sprint-grid">
-  <section aria-label="Board" class="replay-board"></section>
+  <section aria-label="Board" class="replay-board">
+  {% for col in board_columns %}
+    <div class="replay-col">
+      <div class="replay-col__header">{{ col }}</div>
+      <div class="replay-col__cards">
+      {% for card in board_cards.get(col, []) %}
+        <div class="replay-card">
+          <span class="num meta">{{ card.link_text }}</span>
+          {{ card.title }}
+        </div>
+      {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+  </section>
   <section aria-label="Who's working"></section>
 </div>
 
