@@ -303,19 +303,21 @@ def _as_count(value) -> int:
 def _build_failure_causes(metrics: dict) -> list[dict]:
     """Sprint-metrics' top_failure_causes as ready-to-render bar-chart rows.
 
-    Each row carries the reason, its count, the bar's width as a percentage of
-    the largest count, and whether the reason is the 'Cause not recorded'
-    placeholder. Widths are computed here (display sizing, not a metric) so the
-    template only prints values and the build never divides by zero.
+    Each row carries the reason (mapped from code to display string via
+    CAUSE_LABELS), its count, the bar's width as a percentage of the largest
+    count, and whether the reason is the unrecorded placeholder. Widths are
+    computed here (display sizing, not a metric) so the template only prints
+    values and the build never divides by zero.
     """
     causes = _normalize_failure_causes(metrics.get("top_failure_causes"))
     max_count = max((c["count"] for c in causes), default=0)
     return [
         {
-            "reason": c["reason"],
+            "reason": CAUSE_LABELS.get(c["reason"], c["reason"]),
             "count": c["count"],
             "width": int(round(c["count"] / max_count * 100)) if max_count else 0,
-            "unrecorded": c["reason"] == "Cause not recorded",
+            "unrecorded": CAUSE_LABELS.get(c["reason"], c["reason"])
+            == "Cause not recorded",
         }
         for c in causes
     ]
@@ -373,6 +375,16 @@ def _changed_label(measure: str) -> str:
         "points_delivered": "points delivered",
     }
     return LABELS.get(measure, measure)
+
+
+CAUSE_LABELS = {
+    "test_assertion_failed": "A test's assertion failed",
+    "already_exists": '"already exists"',
+    "must_create_or_edit_file": "Must create or edit a file",
+    "undefined_name": "Undefined name (lint)",
+    "no_test_written": "No test written",
+    "unrecorded": "Cause not recorded",
+}
 
 
 if __name__ == "__main__":
