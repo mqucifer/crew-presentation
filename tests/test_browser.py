@@ -1457,13 +1457,13 @@ def test_failure_causes_bar_width_proportional():
 
 
 def test_failure_causes_heading_and_row_count():
-    """AC4: section heading is 'Why work didn't land first time' with exactly 4 cause rows."""
+    """Section heading is 'Why work didn't land first time' with exactly 4 cause rows fed as codes."""
     tag = "delivery-history-TEST"
     causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": '"already exists"', "count": 6},
-        {"reason": "Must create or edit a file", "count": 3},
-        {"reason": "Cause not recorded", "count": 2},
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "already_exists", "count": 6},
+        {"reason": "must_create_or_edit_file", "count": 3},
+        {"reason": "unrecorded", "count": 2},
     ]
     _make_fake_package(
         tag,
@@ -6047,7 +6047,7 @@ def test_changed_trend_no_field_name_pattern_in_values():
 
 
 def test_cause_label_test_assertion_failed():
-    """AC1: code 'test_assertion_failed' renders as 'A test's assertion failed' in the label span."""
+    """AC1: code 'test_assertion_failed' renders as exactly 'A test's assertion failed' in the label span."""
     tag = "delivery-history-TEST"
     causes = [{"reason": "test_assertion_failed", "count": 10}]
     _make_fake_package(
@@ -6073,8 +6073,13 @@ def test_cause_label_test_assertion_failed():
         section_start = html.index('class="cause-chart"')
         section_end = html.index("</section>", section_start)
         section = html[section_start:section_end]
-        assert ">A test's assertion failed</span>" in section, (
-            "cause label should be 'A test's assertion failed'"
+        # The label span is the only span in the row without a class attribute;
+        # the count span carries class="num". Extract its exact text content.
+        match = re.search(r"<span>(.*?)</span>", section)
+        assert match is not None, "no label span found in the cause-chart"
+        assert match.group(1) == "A test's assertion failed", (
+            f"label span text is {match.group(1)!r}, "
+            "expected 'A test's assertion failed'"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
