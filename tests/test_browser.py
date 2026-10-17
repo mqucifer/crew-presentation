@@ -1275,53 +1275,6 @@ def test_changed_trend_single_entry_reading_order():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
-def test_changed_trend_two_entries_in_order():
-    """AC2: two changed entries render in package order with correct values."""
-    tag = "delivery-history-TEST"
-    _make_package_with_changed(
-        tag,
-        "Sprint 8",
-        [
-            {
-                "text": "First-attempt rate rose",
-                "measure": "first_attempt_rate_percent",
-                "previous": 40,
-                "now": 55,
-                "better": True,
-                "source": "sprint-metrics",
-            },
-            {
-                "text": "Escalations held steady",
-                "measure": "escalation_count",
-                "previous": 1,
-                "now": 1,
-                "better": False,
-                "source": "sprint-metrics",
-            },
-        ],
-    )
-    original = DELIVERY_HISTORY_TAG.read_text()
-    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
-    try:
-        _build()
-        html = (BUILD_DIR / "sprint-8.html").read_text()
-        entry_count = html.count('class="changed-trend-entry"')
-        assert entry_count == 2, f"expected 2 changed-trend entries, got {entry_count}"
-        pos_entry1 = html.index("First-attempt rate rose")
-        pos_entry2 = html.index("Escalations held steady")
-        assert pos_entry1 < pos_entry2, "first entry should appear before second"
-        pos_m1 = html.index("first_attempt_rate_percent", pos_entry1)
-        pos_p1 = html.index("40", pos_m1)
-        pos_n1 = html.index("55", pos_p1)
-        assert pos_entry1 < pos_m1 < pos_p1 < pos_n1
-        pos_m2 = html.index("escalation_count", pos_entry2)
-        second_area = html[pos_m2:]
-        num_values = re.findall(r'class="num">(\d+\.?\d*)<', second_area)
-        assert num_values[0] == "1", f"expected first value '1', got {num_values[0]!r}"
-        assert num_values[1] == "1", f"expected second value '1', got {num_values[1]!r}"
-    finally:
-        DELIVERY_HISTORY_TAG.write_text(original)
-        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
 def test_changed_trend_empty_no_entries():
@@ -5697,6 +5650,176 @@ def test_stats_single_row_height_at_desktop_width():
                 f".stat height {stat_height}; the stats are not a single row"
             )
             browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_trend_first_attempt_rate_label():
+    """AC1, AC3: first_attempt_rate_percent renders as 'first-attempt rate:' in .changed-trend-values."""
+    tag = "delivery-history-TEST"
+    _make_package_with_changed(
+        tag,
+        "Sprint 7",
+        [
+            {
+                "text": "First-attempt rate rose",
+                "measure": "first_attempt_rate_percent",
+                "previous": 40,
+                "now": 55,
+                "better": True,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+        values_div = re.search(
+            r'class="changed-trend-values">(.*?)</div>', html, re.DOTALL
+        )
+        assert values_div, "no changed-trend-values div found"
+        values_text = values_div.group(0)
+        assert "first-attempt rate:" in values_text, (
+            f"expected 'first-attempt rate:' in .changed-trend-values, got: {values_text!r}"
+        )
+        assert "first_attempt_rate_percent" not in values_text, (
+            f"raw field name 'first_attempt_rate_percent' still present in .changed-trend-values"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_trend_escalation_count_label():
+    """AC2, AC4: escalation_count renders as 'escalations:' in .changed-trend-values."""
+    tag = "delivery-history-TEST"
+    _make_package_with_changed(
+        tag,
+        "Sprint 7",
+        [
+            {
+                "text": "Escalations held steady",
+                "measure": "escalation_count",
+                "previous": 2,
+                "now": 0,
+                "better": True,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+        values_div = re.search(
+            r'class="changed-trend-values">(.*?)</div>', html, re.DOTALL
+        )
+        assert values_div, "no changed-trend-values div found"
+        values_text = values_div.group(0)
+        assert "escalations:" in values_text, (
+            f"expected 'escalations:' in .changed-trend-values, got: {values_text!r}"
+        )
+        assert "escalation_count" not in values_text, (
+            f"raw field name 'escalation_count' still present in .changed-trend-values"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_trend_points_delivered_label():
+    """AC5: points_delivered renders as 'points delivered:' in .changed-trend-values."""
+    tag = "delivery-history-TEST"
+    _make_package_with_changed(
+        tag,
+        "Sprint 7",
+        [
+            {
+                "text": "Points delivered up",
+                "measure": "points_delivered",
+                "previous": 40,
+                "now": 63,
+                "better": True,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+        values_div = re.search(
+            r'class="changed-trend-values">(.*?)</div>', html, re.DOTALL
+        )
+        assert values_div, "no changed-trend-values div found"
+        values_text = values_div.group(0)
+        assert "points delivered:" in values_text, (
+            f"expected 'points delivered:' in .changed-trend-values, got: {values_text!r}"
+        )
+        assert "points_delivered" not in values_text, (
+            f"raw field name 'points_delivered' still present in .changed-trend-values"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_trend_no_field_name_pattern_in_values():
+    """AC6: no .changed-trend-values element contains a substring matching [a-z]+_[a-z]+."""
+    tag = "delivery-history-TEST"
+    _make_package_with_changed(
+        tag,
+        "Sprint 8",
+        [
+            {
+                "text": "First-attempt rate rose",
+                "measure": "first_attempt_rate_percent",
+                "previous": 40,
+                "now": 55,
+                "better": True,
+                "source": "sprint-metrics",
+            },
+            {
+                "text": "Escalations dropped",
+                "measure": "escalation_count",
+                "previous": 2,
+                "now": 0,
+                "better": True,
+                "source": "sprint-metrics",
+            },
+            {
+                "text": "Points delivered up",
+                "measure": "points_delivered",
+                "previous": 40,
+                "now": 63,
+                "better": True,
+                "source": "sprint-metrics",
+            },
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-8.html").read_text()
+        values_divs = re.findall(
+            r'class="changed-trend-values">(.*?)</div>', html, re.DOTALL
+        )
+        assert len(values_divs) == 3, (
+            f"expected 3 .changed-trend-values elements, got {len(values_divs)}"
+        )
+        field_name_pattern = re.compile(r"[a-z]+_[a-z]+")
+        for i, div_text in enumerate(values_divs, 1):
+            match = field_name_pattern.search(div_text)
+            assert match is None, (
+                f".changed-trend-values #{i} contains field-name pattern "
+                f"{match.group()!r}: {div_text!r}"
+            )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)

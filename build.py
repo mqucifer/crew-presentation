@@ -360,14 +360,19 @@ def _format_changed_value(measure: str, value) -> str:
 def _changed_label(measure: str) -> str:
     """A human-readable label for a changed-trend measure.
 
-    Time measures show as 'cycle time' or 'lead time'; others keep their
-    raw measure name.
+    Time measures show as 'cycle time' or 'lead time'; non-time measures
+    show as their human-readable name.
     """
-    if measure in ("cycle_time_days", "cycle_time_minutes"):
-        return "cycle time"
-    if measure in ("lead_time_minutes", "lead_time_days"):
-        return "lead time"
-    return measure
+    LABELS = {
+        "cycle_time_days": "cycle time",
+        "cycle_time_minutes": "cycle time",
+        "lead_time_minutes": "lead time",
+        "lead_time_days": "lead time",
+        "first_attempt_rate_percent": "first-attempt rate",
+        "escalation_count": "escalations",
+        "points_delivered": "points delivered",
+    }
+    return LABELS.get(measure, measure)
 
 
 if __name__ == "__main__":
