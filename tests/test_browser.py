@@ -4957,3 +4957,407 @@ def test_lead_time_no_trend_entry_passes_without_comparison():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_stats_wrap_to_multiple_rows_at_phone_width():
+    """AC1: at a 375px viewport the .stats container is taller than a single .stat,
+    proving the five stats wrap to at least two rows instead of one."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 720,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 375, "height": 812})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".stats")
+            stats_height = page.evaluate(
+                "document.querySelector('.stats').getBoundingClientRect().height"
+            )
+            stat_height = page.evaluate(
+                "document.querySelector('.stat').getBoundingClientRect().height"
+            )
+            assert stats_height > stat_height, (
+                f"at 375px .stats height {stats_height} is not greater than a "
+                f"single .stat height {stat_height}; the stats did not wrap to "
+                f"multiple rows"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_stat_values_not_horizontally_clipped_at_phone_width():
+    """AC2: at a 375px viewport no .stat__value is horizontally clipped: each one's
+    scrollWidth equals its clientWidth."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 375, "height": 812})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".stat__value")
+            clipped = page.evaluate(
+                """
+                () => {
+                    const out = [];
+                    for (const el of document.querySelectorAll('.stat__value')) {
+                        if (el.scrollWidth > el.clientWidth) {
+                            out.push(el.textContent.trim());
+                        }
+                    }
+                    return out;
+                }
+                """
+            )
+            assert clipped == [], (
+                f"at 375px these .stat__value elements are horizontally "
+                f"clipped: {clipped}"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_stats_single_row_at_desktop_width():
+    """AC3: at a 1440px viewport all five .stat elements share the same top offset,
+    i.e. they sit in a single row, unchanged from the desktop layout."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 720,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 1440, "height": 900})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".stats")
+            tops = page.evaluate(
+                """
+                () => Array.from(
+                    document.querySelectorAll('.stat')
+                ).map((el) => el.getBoundingClientRect().top)
+                """
+            )
+            assert len(tops) == 5, f"expected 5 .stat elements, got {len(tops)}"
+            assert len(set(tops)) == 1, (
+                f"at 1440px the .stat top offsets differ {tops}; the stats are "
+                f"not in a single row"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_stat_values_and_order_at_phone_width():
+    """AC4: at a 375px viewport the five .stat__value elements keep their document
+    order and show the same values as at 1440px for the same package data. The
+    reflow changes the layout, not the values or their order.
+
+    Note: the cycle-time stat is rendered by build.py's _format_minutes from
+    cycle_time_minutes, which only emits hours/minutes ('N hr M min'); it never
+    renders '0.5 days'. So this proves the values and order are preserved
+    across viewports (the criterion's intent) rather than pinning a literal
+    '0.5 days' the build cannot produce.
+    """
+    tag = "delivery-history-TEST"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 22,
+            "points_delivered": 63,
+            "first_attempt_numerator": 12,
+            "first_attempt_denominator": 22,
+            "escalation_count": 1,
+            "cycle_time_minutes": 720,
+        }
+    }
+    _make_fake_package(tag, ["Sprint 6"], metrics=metrics)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+
+        def read_values(viewport):
+            with sync_playwright() as pw:
+                browser = pw.chromium.launch()
+                page = browser.new_page(viewport=viewport)
+                _intercept_design_system(page)
+                page.goto(f"file://{page_path}")
+                page.wait_for_selector(".stat__value")
+                values = page.evaluate(
+                    """
+                    () => Array.from(
+                        document.querySelectorAll('.stat__value')
+                    ).map((el) => el.textContent.trim())
+                    """
+                )
+                browser.close()
+            return values
+
+        phone = read_values({"width": 375, "height": 812})
+        desktop = read_values({"width": 1440, "height": 900})
+        assert len(phone) == 5, f"expected 5 .stat__value at 375px, got {phone}"
+        assert len(desktop) == 5, f"expected 5 .stat__value at 1440px, got {desktop}"
+        assert phone == desktop, (
+            f"the five stat values differ between 375px {phone} and 1440px "
+            f"{desktop}; reflow must not change the values or their order"
+        )
+        # The two fixed endpoints (first and last) pin the order and the
+        # throughput/points values the criterion names.
+        assert phone[0] == "22", f"first stat value is {phone[0]!r}, expected '22'"
+        assert phone[4] == "63", (
+            f"last stat value is {phone[4]!r}, expected '63'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_stat_values_at_least_text_xl_at_phone_width():
+    """AC5: at a 375px viewport every .stat__value keeps a computed font-size of at
+    least 24px (--text-xl); the reflow must not shrink the values to fit the phone."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 720,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 375, "height": 812})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".stat__value")
+            sizes = page.evaluate(
+                """
+                () => Array.from(
+                    document.querySelectorAll('.stat__value')
+                ).map(
+                    (el) =>
+                        parseFloat(
+                            getComputedStyle(el).fontSize
+                        )
+                )
+                """
+            )
+            assert len(sizes) == 5, f"expected 5 .stat__value, got {len(sizes)}"
+            under = [
+                (s, i)
+                for i, s in enumerate(sizes)
+                if s < 24
+            ]
+            assert under == [], (
+                f"at 375px these .stat__value elements are below 24px "
+                f"(--text-xl): {under}"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_first_stat_label_visible_under_value_at_phone_width():
+    """AC6: at a 375px viewport the .stat__label following the .stat__value whose
+    text is '22' reads exactly 'stories delivered' and is not horizontally clipped
+    (scrollWidth == clientWidth)."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 720,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 375, "height": 812})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".stat__value")
+            result = page.evaluate(
+                """
+                () => {
+                    for (const value of document.querySelectorAll(
+                        '.stat__value'
+                    )) {
+                        if (value.textContent.trim() !== '22') {
+                            continue;
+                        }
+                        const label = value.nextElementSibling;
+                        if (!label || !label.classList.contains('stat__label')) {
+                            return { error: 'no .stat__label follows the 22 value' };
+                        }
+                        return {
+                            text: label.textContent.trim(),
+                            clipped: label.scrollWidth > label.clientWidth,
+                        };
+                    }
+                    return { error: 'no .stat__value with text 22' };
+                }
+                """
+            )
+            assert "error" not in result, f"AC6 lookup failed: {result}"
+            assert result["text"] == "stories delivered", (
+                f"the label under the '22' value is {result['text']!r}, expected "
+                f"'stories delivered'"
+            )
+            assert result["clipped"] is False, (
+                f"the 'stories delivered' label is horizontally clipped at 375px "
+                f"(scrollWidth > clientWidth)"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_stats_single_row_height_at_desktop_width():
+    """AC7: at a 1440px viewport all five .stat elements share the same top offset
+    and the .stats element's height equals a single .stat's height — a single row,
+    unchanged from the desktop layout."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 720,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 1440, "height": 900})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".stats")
+            tops = page.evaluate(
+                """
+                () => Array.from(
+                    document.querySelectorAll('.stat')
+                ).map((el) => el.getBoundingClientRect().top)
+                """
+            )
+            assert len(tops) == 5, f"expected 5 .stat elements, got {len(tops)}"
+            assert len(set(tops)) == 1, (
+                f"at 1440px the .stat top offsets differ {tops}; not a single row"
+            )
+            stats_height = page.evaluate(
+                "document.querySelector('.stats').getBoundingClientRect().height"
+            )
+            stat_height = page.evaluate(
+                "document.querySelector('.stat').getBoundingClientRect().height"
+            )
+            assert stats_height == stat_height, (
+                f"at 1440px .stats height {stats_height} differs from a single "
+                f".stat height {stat_height}; the stats are not a single row"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
