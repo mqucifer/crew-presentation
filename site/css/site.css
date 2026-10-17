@@ -180,6 +180,18 @@
   color: var(--color-feature-dim);
 }
 
+/* Phone layout: stack the main content sections in DOM order. */
+@media (max-width: 767px) {
+  .sprint-grid {
+    grid-template-columns: 1fr;
+  }
+  .sprint-chart,
+  .sprint-side,
+  .sprint-decided {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Attempt-row link: journey-page navigation */
 .attempt-row > a {
   color: var(--color-link);
