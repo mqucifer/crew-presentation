@@ -1,8 +1,17 @@
-<!-- crew:placeholder -->
 {% extends "base.html" %}
+{% block title %}{{ current_sprint.name }}{% endblock %}
+{% block h1 %}<h1>{{ current_sprint.name }}</h1>{% endblock %}
 {% block content %}
-<section>
-  <h1>Replay</h1>
-  <script src="{{ url_for('static', filename='js/replay.js') }}"></script>
-</section>
+<div class="meta">{{ current_sprint.start }} – {{ current_sprint.end }}</div>
+
+<section aria-label="Timeline"></section>
+
+<div class="sprint-grid">
+  <section aria-label="Board" class="replay-board"></section>
+  <section aria-label="Who's working"></section>
+</div>
+
+<section aria-label="Event ticker"></section>
+
+<script src="js/replay.js"></script>
 {% endblock %}

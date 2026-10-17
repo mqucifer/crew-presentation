@@ -195,14 +195,25 @@ def _render_pages(pkg: Path) -> dict:
             "changed": changed,
             "decided": decided,
             "failure_causes": _build_failure_causes(metrics),
+            "current_view": "sprint",
         }
         pages[slug] = sprint_template.render(**context)
 
+    current_view_map = {
+        "replay.html": "replay",
+        "story_journey.html": "journey",
+    }
     for template_name, output_name in TEMPLATE_MAP.items():
         template = env.get_template(template_name)
-        pages[output_name] = template.render(
-            manifest=manifest, package=index, sprint_slug=""
-        )
+        context = {
+            "manifest": manifest,
+            "package": index,
+            "sprint_slug": "",
+            "current_view": current_view_map.get(template_name, "sprint"),
+        }
+        if template_name == "replay.html":
+            context["current_sprint"] = sprints[-1] if sprints else {}
+        pages[output_name] = template.render(**context)
 
     story_journey_template = env.get_template("story_journey.html")
     for card in cards:
@@ -212,7 +223,11 @@ def _render_pages(pkg: Path) -> dict:
             continue
         slug = f"{repo.replace('/', '-')}-{number}.html"
         pages[f"stories/{slug}"] = story_journey_template.render(
-            card=card, manifest=manifest, package=index, sprint_slug=""
+            card=card,
+            manifest=manifest,
+            package=index,
+            sprint_slug="",
+            current_view="journey",
         )
 
     return pages
