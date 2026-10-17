@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = REPO_ROOT / "build"
 PACKAGE_DIR = REPO_ROOT / ".package"
@@ -4554,6 +4556,199 @@ def test_cause_rows_no_horizontal_overflow_phone():
                 )
 
             browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _make_package_cycle_time(
+    tag: str,
+    sprint_name: str,
+    cycle_time_minutes: int,
+    changed: list[dict],
+) -> Path:
+    """Create a fake package with cycle_time_minutes in metrics and custom changed entries."""
+    sprints = [{"name": sprint_name, "start": "2026-09-22", "end": "2026-09-29"}]
+    metrics = {
+        sprint_name: {
+            "throughput": 5,
+            "points_delivered": 10,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "escalation_count": 0,
+            "cycle_time_days": round(cycle_time_minutes / 1440, 2),
+            "cycle_time_minutes": cycle_time_minutes,
+        }
+    }
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "1.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["sprints"],
+                "properties": {"sprints": {"type": "array"}},
+            }
+        )
+    )
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "delivery-history.json").write_text(
+        json.dumps(
+            {
+                "sprints": sprints,
+                "cards": [],
+                "crew_repository": "mqucifer/crew",
+                "sprint_metrics": {"answers": metrics},
+                "analysis": {"sprints": [{"sprint": sprint_name, "changed": changed}]},
+            }
+        )
+    )
+    return pkg_dir
+
+
+def _read_cycle_time(html: str) -> tuple[str | None, str | None]:
+    """Read the cycle-time stat value and the trend now-value from rendered HTML.
+
+    Returns (stat_text, trend_now). stat_text is None if no stat found.
+    trend_now is None if no trend entry with label 'cycle time' is present.
+    """
+    stat_text = None
+    stats = _stats_section(html)
+    for block in re.findall(r'<div class="stat">(.*?)</div>', stats, re.DOTALL):
+        if '<span class="stat__label">cycle time</span>' in block:
+            m = re.search(
+                r'<span class="stat__value[^"]*">(.*?)</span>', block, re.DOTALL
+            )
+            if m:
+                stat_text = m.group(1).strip()
+            break
+
+    trend_now = None
+    section_match = re.search(
+        r'<section class="card changed-trend".*?</section>', html, re.DOTALL
+    )
+    if section_match:
+        section_html = section_match.group(0)
+        for entry_match in re.finditer(
+            r'<div class="changed-trend-values">(.*?)</div>', section_html, re.DOTALL
+        ):
+            entry_html = entry_match.group(1)
+            if "cycle time:" in entry_html:
+                nums = re.findall(r'<span class="num">(.*?)</span>', entry_html)
+                if len(nums) >= 2:
+                    trend_now = nums[1].strip()
+                break
+
+    return stat_text, trend_now
+
+
+def test_cycle_time_stat_matches_trend_now_value():
+    """AC1: the cycle-time stat and the trend now-value render the same text."""
+    tag = "delivery-history-TEST"
+    _make_package_cycle_time(
+        tag,
+        "Sprint 6",
+        cycle_time_minutes=4608,
+        changed=[
+            {
+                "text": "Cycle time improved",
+                "measure": "cycle_time_days",
+                "previous": 5.2,
+                "now": 3.2,
+                "better": True,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        stat_text, trend_now = _read_cycle_time(html)
+        assert stat_text == "76 hr 48 min", (
+            f"stat text is {stat_text!r}, expected '76 hr 48 min'"
+        )
+        assert trend_now == "76 hr 48 min", (
+            f"trend now-value is {trend_now!r}, expected '76 hr 48 min'"
+        )
+        assert stat_text == trend_now, (
+            f"stat ({stat_text!r}) and trend ({trend_now!r}) disagree"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cycle_time_stat_mismatch_names_both_values():
+    """AC2: when the stat and trend disagree, the assertion names both values."""
+    tag = "delivery-history-TEST"
+    _make_package_cycle_time(
+        tag,
+        "Sprint 6",
+        cycle_time_minutes=4608,
+        changed=[
+            {
+                "text": "Cycle time worsened",
+                "measure": "cycle_time_days",
+                "previous": 3.2,
+                "now": 4.1,
+                "better": False,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        stat_text, trend_now = _read_cycle_time(html)
+        assert stat_text == "76 hr 48 min", (
+            f"stat text is {stat_text!r}, expected '76 hr 48 min'"
+        )
+        assert trend_now == "98 hr 24 min", (
+            f"trend now-value is {trend_now!r}, expected '98 hr 24 min'"
+        )
+        with pytest.raises(AssertionError) as exc_info:
+            assert stat_text == trend_now
+        msg = str(exc_info.value)
+        assert "76 hr 48 min" in msg, f"assertion message missing stat value: {msg!r}"
+        assert "98 hr 24 min" in msg, f"assertion message missing trend value: {msg!r}"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cycle_time_no_trend_entry_passes_without_comparison():
+    """AC3: when changed is empty, no trend entry exists and the test passes."""
+    tag = "delivery-history-TEST"
+    _make_package_cycle_time(
+        tag,
+        "Sprint 6",
+        cycle_time_minutes=4608,
+        changed=[],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        stat_text, trend_now = _read_cycle_time(html)
+        assert stat_text == "76 hr 48 min", (
+            f"stat text is {stat_text!r}, expected '76 hr 48 min'"
+        )
+        assert trend_now is None, (
+            f"expected no cycle-time trend entry, got {trend_now!r}"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
