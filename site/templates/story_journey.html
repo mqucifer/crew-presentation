@@ -1,7 +1,19 @@
-<!-- crew:placeholder -->
 {% extends "base.html" %}
+{% block title %}{% if card %}{{ card.number }} — {{ card.title }}{% else %}A story's journey{% endif %}{% endblock %}
+{% block h1 %}<h1>{% if card %}{{ card.repo }}#{{ card.number }}{% else %}A story's journey{% endif %}</h1>{% endblock %}
 {% block content %}
+{% if card %}
+<section class="card card--padded">
+  <div class="card__head">
+    <h2>{{ card.title }}</h2>
+  </div>
+  <div class="card__body">
+    <p class="meta">{{ card.repo }} · #{{ card.number }}</p>
+  </div>
+</section>
+{% else %}
 <section>
   <h1>A story's journey</h1>
 </section>
+{% endif %}
 {% endblock %}

@@ -97,7 +97,7 @@ def _validate_package(pkg: Path) -> None:
 
 
 def _render_pages(pkg: Path) -> dict:
-    """Render each page: one per sprint, plus the other views."""
+    """Render each page: one per sprint, one per story card, plus the other views."""
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(TEMPLATES_DIR)),
         autoescape=True,
@@ -166,6 +166,7 @@ def _render_pages(pkg: Path) -> dict:
                 stories.append(
                     {
                         "number": story["card"]["number"],
+                        "repo": story["card"]["repo"],
                         "title": card.get("title", ""),
                         "blocks": blocks,
                         "crew_fixes": story.get("crew_fixes", []),
@@ -192,6 +193,17 @@ def _render_pages(pkg: Path) -> dict:
         template = env.get_template(template_name)
         pages[output_name] = template.render(
             manifest=manifest, package=index, sprint_slug=""
+        )
+
+    story_journey_template = env.get_template("story_journey.html")
+    for card in cards:
+        repo = card.get("repo", "")
+        number = card.get("number")
+        if not repo or number is None:
+            continue
+        slug = f"{repo.replace('/', '-')}-{number}.html"
+        pages[f"stories/{slug}"] = story_journey_template.render(
+            card=card, manifest=manifest, package=index, sprint_slug=""
         )
 
     return pages
@@ -222,7 +234,9 @@ def main() -> None:
     BUILD_DIR.mkdir(parents=True)
 
     for name, content in pages.items():
-        (BUILD_DIR / name).write_text(content)
+        path = BUILD_DIR / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
 
     _copy_assets()
     print(f"Build complete: {BUILD_DIR}")
