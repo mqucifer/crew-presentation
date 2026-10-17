@@ -6786,3 +6786,272 @@ def _make_package_with_board(
     }
     (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
     return pkg_dir
+
+
+def _extract_replay_data(html: str) -> dict:
+    """Extract and parse the replay-data JSON from the replay.html."""
+    match = re.search(
+        r'<script type="application/json" id="replay-data">(.*?)</script>',
+        html,
+        re.DOTALL,
+    )
+    assert match, "no replay-data script element found"
+    return json.loads(match.group(1))
+
+
+def test_replay_json_has_sprint_events_and_cards():
+    """AC1: parsed JSON has sprint name, events array of length 5, and cards array."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"kind": "move", "at": "2026-10-07T08:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+        {"kind": "move", "at": "2026-10-07T09:00:00Z", "card": {"number": 2, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+        {"kind": "move", "at": "2026-10-08T10:00:00Z", "card": {"number": 3, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "Reviewing", "role": "Developer"},
+        {"kind": "move", "at": "2026-10-09T11:00:00Z", "card": {"number": 4, "repo": "mqucifer/crew"}, "from_column": "Reviewing", "to_column": "QAing", "role": "QA Engineer"},
+        {"kind": "move", "at": "2026-10-10T12:00:00Z", "card": {"number": 5, "repo": "mqucifer/crew"}, "from_column": "QAing", "to_column": "Done", "role": "QA Engineer"},
+    ]
+    cards = [
+        {"number": 1, "repo": "mqucifer/crew", "title": "alpha"},
+        {"number": 2, "repo": "mqucifer/crew", "title": "beta"},
+        {"number": 3, "repo": "mqucifer/crew", "title": "gamma"},
+        {"number": 4, "repo": "mqucifer/crew", "title": "delta"},
+        {"number": 5, "repo": "mqucifer/crew", "title": "epsilon"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        data = _extract_replay_data(html)
+        assert data["sprint"] == "Sprint 7"
+        assert isinstance(data["events"], list)
+        assert len(data["events"]) == 5
+        assert isinstance(data["cards"], list)
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_json_event_structure_move():
+    """AC2: events array contains a move event with card, from_column, to_column, role."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"kind": "move", "at": "2026-10-07T09:00:00Z", "card": {"number": 127, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+    ]
+    cards = [
+        {"number": 127, "repo": "mqucifer/crew", "title": "thresholds.py"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        data = _extract_replay_data(html)
+        target = next(e for e in data["events"] if e["card"]["number"] == 127)
+        assert target["at"] == "2026-10-07T09:00:00Z"
+        assert target["card"]["number"] == 127
+        assert target["from_column"] == "Sprint Backlog"
+        assert target["to_column"] == "In Progress"
+        assert target["role"] == "Developer"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_json_cards_contain_referenced_card():
+    """AC3: cards array contains the referenced card with number, repo, title."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"kind": "move", "at": "2026-10-07T09:00:00Z", "card": {"number": 127, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+    ]
+    cards = [
+        {"number": 127, "repo": "mqucifer/crew", "title": "thresholds.py"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        data = _extract_replay_data(html)
+        target = next(c for c in data["cards"] if c["number"] == 127)
+        assert target["repo"] == "mqucifer/crew"
+        assert target["title"] == "thresholds.py"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_json_cards_unknown_card_empty_title():
+    """AC4: a card referenced by events but absent from the package gets empty title."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"kind": "move", "at": "2026-10-07T09:00:00Z", "card": {"number": 500, "repo": "other/repo"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+    ]
+    cards = [
+        {"number": 127, "repo": "mqucifer/crew", "title": "thresholds.py"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        data = _extract_replay_data(html)
+        target = next(c for c in data["cards"] if c["number"] == 500)
+        assert target["repo"] == "other/repo"
+        assert target["title"] == ""
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_json_only_most_recent_sprint_events():
+    """AC5: events from an older sprint are not present in the JSON."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 5", "start": "2026-09-15", "end": "2026-09-29"},
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    sprint7_events = [
+        {"kind": "move", "at": "2026-10-07T09:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+    ]
+    sprint5_events = [
+        {"kind": "move", "at": "2026-09-15T09:00:00Z", "card": {"number": 10, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+    ]
+    cards = [
+        {"number": 1, "repo": "mqucifer/crew", "title": "card-one"},
+        {"number": 10, "repo": "mqucifer/crew", "title": "old-card"},
+    ]
+    metrics = {
+        "Sprint 5": {"throughput": 5, "points_delivered": 10, "first_attempt_numerator": 1, "first_attempt_denominator": 5, "escalation_count": 0, "cycle_time_days": 2.0},
+        "Sprint 7": {"throughput": 5, "points_delivered": 10, "first_attempt_numerator": 1, "first_attempt_denominator": 5, "escalation_count": 0, "cycle_time_days": 2.0},
+    }
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "manifest.json").write_text(json.dumps({"schema_version": "1.0.0", "package": "delivery-history", "date": "2026-01-01"}))
+    (pkg_dir / "manifest.schema.json").write_text(json.dumps({"type": "object", "required": ["schema_version"]}))
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object", "required": ["sprints"], "properties": {"sprints": {"type": "array"}}}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events").mkdir(exist_ok=True)
+    (pkg_dir / "events/sprint-sprint-7.json").write_text(json.dumps({"events": sprint7_events}))
+    (pkg_dir / "events/sprint-sprint-5.json").write_text(json.dumps({"events": sprint5_events}))
+    index = {
+        "sprints": sprints,
+        "cards": cards,
+        "crew_repository": "mqucifer/crew",
+        "sprint_metrics": {"answers": metrics},
+        "periods": [
+            {"sprint": "Sprint 5", "file": "events/sprint-sprint-5.json"},
+            {"sprint": "Sprint 7", "file": "events/sprint-sprint-7.json"},
+        ],
+    }
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        data = _extract_replay_data(html)
+        assert data["sprint"] == "Sprint 7"
+        for event in data["events"]:
+            card_num = event.get("card", {}).get("number")
+            assert card_num != 10, f"event from Sprint 5 (card 10) should not be present: {event}"
+        assert any(e["card"]["number"] == 1 for e in data["events"])
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_h1_matches_json_sprint_key():
+    """AC6: the h1 text is identical to the sprint key in the embedded JSON."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"kind": "move", "at": "2026-10-07T09:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+    ]
+    cards = [{"number": 1, "repo": "mqucifer/crew", "title": "card-one"}]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        h1_match = re.search(r"<h1>(.*?)</h1>", html)
+        assert h1_match, "no h1 found"
+        h1_text = h1_match.group(1)
+        data = _extract_replay_data(html)
+        assert h1_text == data["sprint"], f"h1={h1_text!r} != sprint={data['sprint']!r}"
+        assert data["sprint"] == "Sprint 7"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_json_merge_event_structure():
+    """AC7: events array contains a merge event with pull object."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"kind": "merge", "at": "2026-10-09T16:30:00Z", "card": {"number": 125, "repo": "mqucifer/crew"}, "to_column": "Done", "role": "QA Engineer", "pull": {"number": 142, "repo": "mqucifer/crew"}},
+    ]
+    cards = [{"number": 125, "repo": "mqucifer/crew", "title": "replay.js"}]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        data = _extract_replay_data(html)
+        target = next(e for e in data["events"] if e["kind"] == "merge")
+        assert target["at"] == "2026-10-09T16:30:00Z"
+        assert target["card"]["number"] == 125
+        assert target["to_column"] == "Done"
+        assert target["role"] == "QA Engineer"
+        assert target["pull"]["number"] == 142
+        assert target["pull"]["repo"] == "mqucifer/crew"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_data_script_in_body_with_correct_type():
+    """AC8: the replay-data script is in <body>, not <head>, with type='application/json'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        match = re.search(
+            r'<script type="application/json" id="replay-data">', html
+        )
+        assert match, "no script element with correct type and id found"
+        script_pos = match.start()
+        head_close = html.find("</head>")
+        body_open = html.find("<body")
+        assert head_close != -1, "no </head> found"
+        assert body_open != -1, "no <body> found"
+        assert script_pos > head_close, "script element is in <head>, not <body>"
+        assert script_pos > body_open, "script element is before <body>"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
