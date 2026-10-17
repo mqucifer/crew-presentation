@@ -212,7 +212,14 @@ def _render_pages(pkg: Path) -> dict:
             "current_view": current_view_map.get(template_name, "sprint"),
         }
         if template_name == "replay.html":
-            context["current_sprint"] = sprints[-1] if sprints else {}
+            current_sprint = sprints[-1] if sprints else {}
+            context["current_sprint"] = current_sprint
+            sprint_name = current_sprint.get("name", "")
+            board_columns, board_cards = _build_board_state(
+                pkg, index, sprint_name
+            )
+            context["board_columns"] = board_columns
+            context["board_cards"] = board_cards
         pages[output_name] = template.render(**context)
 
     story_journey_template = env.get_template("story_journey.html")
@@ -400,6 +407,106 @@ CAUSE_LABELS = {
     "no_test_written": "No test written",
     "unrecorded": "Cause not recorded",
 }
+
+
+_COLUMN_ORDER: list[str] = [
+    "Inbox (Goals)",
+    "Needs Refinement",
+    "Ready",
+    "Sprint Backlog",
+    "In Progress",
+    "Reviewing",
+    "QAing",
+    "Merging",
+    "Done",
+    "Blocked",
+]
+
+
+def _board_column_order(columns: set[str]) -> list[str]:
+    """Order column names by the design system's tone-table order."""
+    return [c for c in _COLUMN_ORDER if c in columns]
+
+
+def _load_sprint_events(pkg: Path, sprint_name: str, index: dict) -> list[dict]:
+    """Load events for a sprint from the package's events file."""
+    periods = index.get("periods", [])
+    for period in periods:
+        if period.get("sprint") == sprint_name:
+            events_file = pkg / period["file"]
+            if events_file.is_file():
+                data = _load_json(events_file)
+                return data.get("events", [])
+    return []
+
+
+def _build_board_state(
+    pkg: Path,
+    index: dict,
+    sprint_name: str,
+) -> tuple[list[str], dict[str, list[dict]]]:
+    """Compute the board's columns and place each card in its initial column.
+
+    Returns (columns, board_cards) where columns is an ordered list of column
+    names and board_cards maps each column name to a list of card dicts with
+    'link_text' and 'title' keys.
+    """
+    events = _load_sprint_events(pkg, sprint_name, index)
+    cards = index.get("cards", [])
+
+    if not events:
+        return [], {}
+
+    # Determine columns from events
+    columns: set[str] = set()
+    for event in events:
+        if event.get("from_column"):
+            columns.add(event["from_column"])
+        if event.get("to_column"):
+            columns.add(event["to_column"])
+    ordered_columns = _board_column_order(columns)
+
+    # Index cards by (number, repo)
+    cards_by_key: dict[tuple, dict] = {}
+    for card in cards:
+        key = (card.get("number"), card.get("repo"))
+        cards_by_key[key] = card
+
+    # Find each card's earliest event
+    earliest: dict[tuple, dict] = {}
+    for event in events:
+        card_ref = event.get("card")
+        if not card_ref:
+            continue
+        key = (card_ref.get("number"), card_ref.get("repo"))
+        at = event.get("at", "")
+        if key not in earliest or at < earliest[key].get("at", ""):
+            earliest[key] = event
+
+    # Place cards in their initial column
+    board: dict[str, list[dict]] = {col: [] for col in ordered_columns}
+    for key, event in earliest.items():
+        col = event.get("from_column", "")
+        if col not in board:
+            continue
+        card = cards_by_key.get(key)
+        if card is None:
+            continue
+        url = card.get("url", "")
+        match = re.match(
+            r"https://github\.com/([^/]+)/([^/]+)/issues/\d+", url
+        )
+        if match:
+            display_repo = f"{match.group(1)}/{match.group(2)}"
+        else:
+            display_repo = card.get("repo", "")
+        number = card.get("number", "")
+        board[col].append({
+            "link_text": f"[{display_repo}#{number}]({url})",
+            "title": card.get("title", ""),
+        })
+
+    return ordered_columns, board
 
 
 if __name__ == "__main__":
