@@ -1,31 +1,22 @@
 # The project's onboarding record (#111). Intent is the Sponsor's, written
 # through `crew onboard`. Design is the project's Architect's, and learned
 # is the crew's; both are proposed by pull request.
-version: 2
+version: 3
 intent:
   scope:
+    # Who it serves, not what it does (crew ADR 0035), from the mock's three parts
+    # (mqucifer/project-print ADR 0003). What it does today is the design's `built`.
     purpose: Show how the crew works as visuals anyone can read, on a public site
       that someone who has never seen the crew understands. How each sprint went,
       and a story's path from a Goal to merged, played back.
-    in_scope:
-    - A static site on GitHub Pages, built and deployed by GitHub Actions.
-    - 'Its views: a sprint overview, a replay of work from a Goal to merged, and a
-      story''s journey, built to the design reference in docs/design/mock/.'
-    - The crew's delivery-history package, used as the crew's README says. The one
-      line in delivery-history.tag at the repository's root names the release; CI
-      fetches that package and validates it against the schema the package carries.
-      The package already holds sprint-metrics' answers, so the site depends on the
-      crew alone.
-    - Python that shapes the package into the pages, and JavaScript for the replay
-      player.
-    - 'The look from mqucifer/design-system, used as its README''s "How projects use
-      it" says: pinned once, in the site''s code, and bumped by pull request. (The
-      boards in docs/design/mock/ inline those styles only so each opens on its own.)'
-    - 'A check of which major versions of the package''s schema the site can display:
-      a package on any other major version fails the pull request that brought it.
-      Browser tests on the pages, and the site''s own contrast and token checks against
-      the design system''s rules. The design system''s checks/check_tokens.py checks
-      the design system itself, not a site, so the site writes its own.'
+    serves:
+    - who: The Sponsor
+      needs:
+      - 'A sprint overview: what stories, epics and Goals got done, how long the steps
+        took, and DORA''s measures calling out what matters.'
+      - 'The day''s replay: who in the crew did what, and how the board moved over the
+        day.'
+      - A story's life cycle, in detail.
     out_of_scope:
     - Computing metrics. sprint-metrics computes them; the site arranges and shows
       what it is sent.
@@ -151,3 +142,23 @@ design:
     agents must not change it.'
   docs:
   - README.md
+  # History, not scope (crew ADR 0035): the record's former in_scope.
+  built:
+  - A static site on GitHub Pages, built and deployed by GitHub Actions.
+  - 'Its views: a sprint overview, a replay of work from a Goal to merged, and a
+    story''s journey, built to the design reference in docs/design/mock/.'
+  - The crew's delivery-history package, used as the crew's README says. The one
+    line in delivery-history.tag at the repository's root names the release; CI
+    fetches that package and validates it against the schema the package carries.
+    The package already holds sprint-metrics' answers, so the site depends on the
+    crew alone.
+  - Python that shapes the package into the pages, and JavaScript for the replay
+    player.
+  - 'The look from mqucifer/design-system, used as its README''s "How projects use
+    it" says: pinned once, in the site''s code, and bumped by pull request. (The
+    boards in docs/design/mock/ inline those styles only so each opens on its own.)'
+  - 'A check of which major versions of the package''s schema the site can display:
+    a package on any other major version fails the pull request that brought it.
+    Browser tests on the pages, and the site''s own contrast and token checks against
+    the design system''s rules. The design system''s checks/check_tokens.py checks
+    the design system itself, not a site, so the site writes its own.'
