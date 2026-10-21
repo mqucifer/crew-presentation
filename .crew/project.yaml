@@ -17,6 +17,11 @@ intent:
       - 'The day''s replay: who in the crew did what, and how the board moved over the
         day.'
       - A story's life cycle, in detail.
+    - who: A public visitor who has never seen the crew
+      needs:
+      - What the crew is and does, and how it's going, in plain language without the
+        crew's own terms.
+      - The same three parts, readable without knowing how the crew works.
     out_of_scope:
     - Computing metrics. sprint-metrics computes them; the site arranges and shows
       what it is sent.
