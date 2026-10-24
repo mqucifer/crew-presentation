@@ -105,10 +105,14 @@ jobs:
           print("Root page -> " + slug)
           PY
 
+      # Kept 90 days, not the action's default of 1: the crew's UX Designer reviews
+      # each live release from this artifact, exactly what readers are served, and its
+      # review can run days after the deploy (mqucifer/crew#830).
       - name: Upload the site artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: build
+          retention-days: 90
 
       - name: Deploy to GitHub Pages
         id: deployment
