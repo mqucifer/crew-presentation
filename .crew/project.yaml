@@ -12,8 +12,9 @@ intent:
     serves:
     - who: The Sponsor
       needs:
-      - 'A sprint overview: what stories, epics and Goals got done, how long the steps
-        took, and DORA''s measures calling out what matters.'
+      - 'A sprint overview: whether the crew is getting better across sprints and what
+        stands out, what stories, epics and Goals got done, how long the steps took, and
+        DORA''s measures.'
       - 'The day''s replay: who in the crew did what, and how the board moved over the
         day.'
       - A story's life cycle, in detail.
@@ -31,7 +32,8 @@ intent:
     - A copy of the crew's data or of any schema in the repository. History lives
       in the crew's releases, and each package carries its own schema.
     - A server, a backend, accounts or analytics. The site is static.
-    - Comparing model settings, until the performance project supplies the data.
+    - Comparing model settings or showing model-performance results. They stay internal,
+      on the Sponsor's own dashboards.
     uses:
     - repo: mqucifer/crew
       file: README.md
