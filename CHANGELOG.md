@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- The story-journey root page rendered two h1 headings and an empty content area; it now renders a single h1 in the header and a list of story links in the content (mqucifer/crew-presentation#176)
+
+## [Unreleased]
+
 ### Added
 
 - The story's journey page shows the path through the board's stages: a strip of five steps (Refined, Built, Reviewed, QA, Merged) with the stage colours when the story was delivered (mqucifer/crew-presentation#100)

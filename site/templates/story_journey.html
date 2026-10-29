@@ -28,7 +28,12 @@
 </section>
 {% else %}
 <section>
-  <h1>A story's journey</h1>
+  <h2>Stories</h2>
+  <ul>
+  {% for c in package.cards %}
+  <li><a href="stories/{{ c.repo | replace('/', '-') }}-{{ c.number }}.html">{{ c.repo }}#{{ c.number }} — {{ c.title }}</a></li>
+  {% endfor %}
+  </ul>
 </section>
 {% endif %}
 {% endblock %}
