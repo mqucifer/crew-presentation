@@ -267,6 +267,7 @@ def _render_pages(pkg: Path) -> dict:
             package=index,
             sprint_slug="",
             current_view="journey",
+            static_prefix="../",
         )
 
     return pages
