@@ -5927,9 +5927,9 @@ def test_sprint_nav_links_visible_with_sprint_names_at_phone_width():
             assert len(states) == 3, (
                 f"expected 3 sprint-nav links, got {len(states)}"
             )
-            for s in states:
-                assert s["text"] in names, (
-                    f"unexpected sprint-nav link text {s['text']!r}"
+            for i, s in enumerate(states):
+                assert names[i] in s["text"], (
+                    f"sprint-nav link {i} text {s['text']!r} does not contain {names[i]!r}"
                 )
                 assert s["display"] != "none", (
                     f"sprint-nav link {s['text']!r} has display:none"
