@@ -28,6 +28,12 @@
 
 ### Fixed
 
+- Unknown failure-cause codes (such as 'REVIEW' or 'QA') now display as "Cause not recorded" instead of the raw code (mqucifer/crew-presentation#176)
+
+## [Unreleased]
+
+### Fixed
+
 - The sprint navigation strip now shows each sprint's start date beside its name, so the list reads as chronology even when sprint numbers are non-sequential (mqucifer/crew-presentation#176)
 
 ## [0.1.2] - 2026-10-17

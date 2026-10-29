@@ -344,11 +344,11 @@ def _build_failure_causes(metrics: dict) -> list[dict]:
     max_count = max((c["count"] for c in causes), default=0)
     return [
         {
-            "reason": CAUSE_LABELS.get(c["reason"], c["reason"]),
+            "reason": CAUSE_LABELS.get(c["reason"], "Cause not recorded"),
             "count": c["count"],
             "width": int(round(c["count"] / max_count * 100)) if max_count else 0,
-            "unrecorded": CAUSE_LABELS.get(c["reason"], c["reason"])
-            == "Cause not recorded",
+            "unrecorded": c["reason"] not in CAUSE_LABELS
+            or c["reason"] == "unrecorded",
         }
         for c in causes
     ]
