@@ -3213,6 +3213,99 @@ def test_journey_page_slug_replaces_slash_with_single_hyphen():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_journey_page_path_has_data_stage_five_when_delivered():
+    """AC1: delivered story with blocks=['refused','landed'] renders a .path with a .path__step[data-stage='5']."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 100, "repo": "mqucifer/crew-presentation"},
+                "blocks": ["refused", "landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 100,
+                "repo": "mqucifer/crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "mqucifer-crew-presentation-100.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        # Find the .path div
+        path_match = re.search(r'<div class="path"[^>]*>(.*?)</div>\s*(?:</div>\s*)*</div>', html, re.DOTALL)
+        assert path_match, "no <div class='path'> found in journey page"
+        path_html = path_match.group(0)
+        # Check for at least one .path__step with data-stage="5"
+        step_match = re.search(
+            r'<div class="path__step"\s+data-stage="5">', path_html
+        )
+        assert step_match, (
+            "no .path__step with data-stage='5' found in the .path div"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_page_path_step_without_data_stage_when_not_delivered():
+    """AC2: undelivered story with blocks=[] renders a .path with a .path__step that has no data-stage."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 100, "repo": "mqucifer/crew-presentation"},
+                "blocks": [],
+                "crew_fixes": [],
+                "delivered": False,
+            }
+        ],
+        cards=[
+            {
+                "number": 100,
+                "repo": "mqucifer/crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "mqucifer-crew-presentation-100.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        # Find the .path div
+        path_match = re.search(r'<div class="path"[^>]*>(.*?)</div>\s*(?:</div>\s*)*</div>', html, re.DOTALL)
+        assert path_match, "no <div class='path'> found in journey page"
+        path_html = path_match.group(0)
+        # Check for at least one .path__step without a data-stage attribute
+        steps = re.findall(r'<div class="path__step"[^>]*>', path_html)
+        assert steps, "no .path__step elements found in the .path div"
+        has_no_data_stage = any(
+            "data-stage" not in step for step in steps
+        )
+        assert has_no_data_stage, (
+            "all .path__step elements have a data-stage attribute; "
+            "expected at least one without it"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_attempt_row_first_child_is_anchor_not_div():
     """AC5: every .attempt-row first child is an <a>, and no <a> has class 'attempt-row'."""
     tag = "delivery-history-TEST"
