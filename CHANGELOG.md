@@ -22,6 +22,12 @@
 
 ### Fixed
 
+- The trend card's value lines show human-readable measure names for all measures (throughput, blocked_aging_days, superseded_count, crew_fixes_merged, wip_violations), not just those already in the label map (mqucifer/crew-presentation#176)
+
+## [Unreleased]
+
+### Fixed
+
 - The sprint navigation strip now shows each sprint's start date beside its name, so the list reads as chronology even when sprint numbers are non-sequential (mqucifer/crew-presentation#176)
 
 ## [0.1.2] - 2026-10-17

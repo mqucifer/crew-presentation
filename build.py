@@ -404,6 +404,11 @@ def _changed_label(measure: str) -> str:
         "first_attempt_rate_percent": "first-attempt rate",
         "escalation_count": "escalations",
         "points_delivered": "points delivered",
+        "throughput": "stories delivered",
+        "blocked_aging_days": "days blocked",
+        "superseded_count": "stories superseded",
+        "crew_fixes_merged": "crew fixes merged",
+        "wip_violations": "WIP violations",
     }
     return LABELS.get(measure, measure)
 
