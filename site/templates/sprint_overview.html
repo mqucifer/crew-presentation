@@ -70,9 +70,9 @@
             <span class="attempt-block attempt-block--crew-fix"></span>
             {% endif %}
           </div>
-          {% if story.delivered and story.blocks | length == 1 %}
+          {% if story.status == 'first try' %}
           <span class="attempt-status attempt-status--first-try">first try</span>
-          {% elif story.delivered %}
+          {% elif story.status == 'merged' %}
           <span class="attempt-status attempt-status--merged">merged</span>
           {% else %}
           <span class="attempt-status attempt-status--progress">in progress</span>
