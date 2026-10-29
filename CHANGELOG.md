@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- The story-journey root page rendered two h1 headings and an empty content area; it now renders a single h1 in the header and a list of story links in the content (mqucifer/crew-presentation#176)
+
+## [Unreleased]
+
+### Fixed
+
 - The trend card's value lines show human-readable measure names for all measures (throughput, blocked_aging_days, superseded_count, crew_fixes_merged, wip_violations), not just those already in the label map (mqucifer/crew-presentation#176)
 
 ## [0.1.2] - 2026-10-17
