@@ -2455,6 +2455,60 @@ def test_story_journey_scrollwidth_at_phone_width():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_story_journey_root_page_single_h1_and_story_links():
+    """AC1-AC2: root story-journey.html has exactly one h1 and story links."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+            }
+        },
+    )
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["cards"] = [
+        {"repo": "mqucifer/crew", "number": 127, "title": "Extract threshold logic"}
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "story-journey.html").read_text()
+
+        # AC1: exactly one h1 element in the document
+        h1_count = len(re.findall(r"<h1[\s>]", html))
+        assert h1_count == 1, f"found {h1_count} h1 elements, expected exactly 1"
+
+        # AC2: the content section contains at least one anchor whose href
+        # matches the pattern stories/
+        content_start = html.index("</header>")
+        content_html = html[content_start:]
+        section_match = re.search(
+            r'<section[^>]*>(.*?)</section>', content_html, re.DOTALL
+        )
+        assert section_match, "no section element found in content area"
+        section_html = section_match.group(1)
+        story_links = re.findall(
+            r'<a[^>]*href="([^"]*stories/[^"]*)"[^>]*>', section_html
+        )
+        assert story_links, (
+            f"no story links found in content section; "
+            f"section content: {section_html[:200]}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_cycle_time_stat_formats_hours_and_minutes():
     """AC1-AC4: the cycle time stat renders hours and minutes with exact text.
 
