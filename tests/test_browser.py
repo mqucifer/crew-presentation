@@ -1546,8 +1546,8 @@ def test_failure_causes_bar_widths_and_stage2_color():
     """AC6: first bar 100%, second bar 60%, both use var(--stage-2) background."""
     tag = "delivery-history-TEST"
     causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": '"already exists"', "count": 6},
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "already_exists", "count": 6},
     ]
     _make_fake_package(
         tag,
@@ -4144,7 +4144,7 @@ def test_attempt_row_div_no_overflow_7_blocks_phone():
 def test_cause_label_no_truncation_phone():
     """AC1: at 375px, the failure-cause label is not truncated or clipped."""
     tag = "delivery-history-TEST"
-    causes = [{"reason": "A test's assertion failed", "count": 10}]
+    causes = [{"reason": "test_assertion_failed", "count": 10}]
     _make_fake_package(
         tag,
         ["Sprint 6"],
@@ -4400,12 +4400,12 @@ def test_cause_rows_six_in_order_phone():
     """AC5: at 375px, .cause-chart has exactly 6 rows with correct text in order."""
     tag = "delivery-history-TEST"
     causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": '"already exists"', "count": 6},
-        {"reason": "Must create or edit a file", "count": 3},
-        {"reason": "Undefined name (lint)", "count": 2},
-        {"reason": "No test written", "count": 2},
-        {"reason": "Cause not recorded", "count": 2},
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "already_exists", "count": 6},
+        {"reason": "must_create_or_edit_file", "count": 3},
+        {"reason": "undefined_name", "count": 2},
+        {"reason": "no_test_written", "count": 2},
+        {"reason": "unrecorded", "count": 2},
     ]
     _make_fake_package(
         tag,
@@ -4477,8 +4477,8 @@ def test_cause_unrecorded_label_meta_class_phone():
     """AC6: at 375px, the 'Cause not recorded' label has class 'meta' and no clipping."""
     tag = "delivery-history-TEST"
     causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": "Cause not recorded", "count": 2},
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "unrecorded", "count": 2},
     ]
     _make_fake_package(
         tag,
@@ -4547,12 +4547,12 @@ def test_cause_rows_no_horizontal_overflow_phone():
     """AC7: at 375px, each .cause-row has scrollWidth == clientWidth."""
     tag = "delivery-history-TEST"
     causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": '"already exists"', "count": 6},
-        {"reason": "Must create or edit a file", "count": 3},
-        {"reason": "Undefined name (lint)", "count": 2},
-        {"reason": "No test written", "count": 2},
-        {"reason": "Cause not recorded", "count": 2},
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "already_exists", "count": 6},
+        {"reason": "must_create_or_edit_file", "count": 3},
+        {"reason": "undefined_name", "count": 2},
+        {"reason": "no_test_written", "count": 2},
+        {"reason": "unrecorded", "count": 2},
     ]
     _make_fake_package(
         tag,
@@ -6363,6 +6363,86 @@ def test_cause_labels_no_raw_code_pattern():
             assert not re.search(r"[a-z]+_[a-z]+", text), (
                 f"label span contains raw code pattern: {text!r}"
             )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_label_review_renders_as_cause_not_recorded():
+    """AC1: code 'REVIEW' (not in CAUSE_LABELS) renders as 'Cause not recorded', not 'REVIEW'."""
+    tag = "delivery-history-TEST"
+    causes = [{"reason": "REVIEW", "count": 1}]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # The label span must contain 'Cause not recorded'
+        assert ">Cause not recorded</span>" in section, (
+            "label span should read 'Cause not recorded' for unknown code 'REVIEW'"
+        )
+        # The raw code 'REVIEW' must not appear in a label span
+        assert ">REVIEW</span>" not in section, (
+            "raw code 'REVIEW' must not appear as a label"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_label_qa_renders_as_cause_not_recorded():
+    """AC2: code 'QA' (not in CAUSE_LABELS) renders as 'Cause not recorded', not 'QA'."""
+    tag = "delivery-history-TEST"
+    causes = [{"reason": "QA", "count": 1}]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # The label span must contain 'Cause not recorded'
+        assert ">Cause not recorded</span>" in section, (
+            "label span should read 'Cause not recorded' for unknown code 'QA'"
+        )
+        # The raw code 'QA' must not appear in a label span
+        assert ">QA</span>" not in section, (
+            "raw code 'QA' must not appear as a label"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
