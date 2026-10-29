@@ -661,11 +661,14 @@ def _make_package_with_stories(
         {"name": n, "start": "2026-09-22", "end": "2026-09-29"}
         for n in sprint_names
     ]
+    first_try_count = sum(
+        1 for s in stories if s.get("delivered") and len(s.get("blocks", [])) == 1
+    )
     metrics = {
         name: {
             "throughput": len(stories),
             "points_delivered": 10,
-            "first_attempt_numerator": 1,
+            "first_attempt_numerator": first_try_count,
             "first_attempt_denominator": max(len(stories), 1),
             "escalation_count": 0,
             "cycle_time_days": 2.0,

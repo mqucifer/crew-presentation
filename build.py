@@ -147,8 +147,8 @@ def _render_pages(pkg: Path) -> dict:
             continue
         metrics = sprint_metrics_answers[key]
 
-        denominator = metrics.get("first_attempt_denominator", 0)
-        numerator = metrics.get("first_attempt_numerator", 0)
+        denominator = metrics.get("first_attempt_denominator") or 0
+        numerator = metrics.get("first_attempt_numerator") or 0
 
         stories = []
         for story in analysis_stories:
