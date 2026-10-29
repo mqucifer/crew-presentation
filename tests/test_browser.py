@@ -3997,7 +3997,7 @@ def test_attempt_row_div_no_overflow_7_blocks_phone():
 def test_cause_label_no_truncation_phone():
     """AC1: at 375px, the failure-cause label is not truncated or clipped."""
     tag = "delivery-history-TEST"
-    causes = [{"reason": "A test's assertion failed", "count": 10}]
+    causes = [{"reason": "test_assertion_failed", "count": 10}]
     _make_fake_package(
         tag,
         ["Sprint 6"],
@@ -4253,12 +4253,12 @@ def test_cause_rows_six_in_order_phone():
     """AC5: at 375px, .cause-chart has exactly 6 rows with correct text in order."""
     tag = "delivery-history-TEST"
     causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": '"already exists"', "count": 6},
-        {"reason": "Must create or edit a file", "count": 3},
-        {"reason": "Undefined name (lint)", "count": 2},
-        {"reason": "No test written", "count": 2},
-        {"reason": "Cause not recorded", "count": 2},
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "already_exists", "count": 6},
+        {"reason": "must_create_or_edit_file", "count": 3},
+        {"reason": "undefined_name", "count": 2},
+        {"reason": "no_test_written", "count": 2},
+        {"reason": "unrecorded", "count": 2},
     ]
     _make_fake_package(
         tag,
@@ -4330,8 +4330,8 @@ def test_cause_unrecorded_label_meta_class_phone():
     """AC6: at 375px, the 'Cause not recorded' label has class 'meta' and no clipping."""
     tag = "delivery-history-TEST"
     causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": "Cause not recorded", "count": 2},
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "unrecorded", "count": 2},
     ]
     _make_fake_package(
         tag,
@@ -4400,12 +4400,12 @@ def test_cause_rows_no_horizontal_overflow_phone():
     """AC7: at 375px, each .cause-row has scrollWidth == clientWidth."""
     tag = "delivery-history-TEST"
     causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": '"already exists"', "count": 6},
-        {"reason": "Must create or edit a file", "count": 3},
-        {"reason": "Undefined name (lint)", "count": 2},
-        {"reason": "No test written", "count": 2},
-        {"reason": "Cause not recorded", "count": 2},
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "already_exists", "count": 6},
+        {"reason": "must_create_or_edit_file", "count": 3},
+        {"reason": "undefined_name", "count": 2},
+        {"reason": "no_test_written", "count": 2},
+        {"reason": "unrecorded", "count": 2},
     ]
     _make_fake_package(
         tag,
