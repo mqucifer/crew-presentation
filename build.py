@@ -189,6 +189,15 @@ def _render_pages(pkg: Path) -> dict:
             "sprints": sprints,
             "sprint": sprint,
             "metrics": metrics,
+            "stats": {
+                "throughput": _stat_value(metrics.get("throughput")),
+                "first_try": _first_try_stat(
+                    metrics.get("first_attempt_numerator"),
+                    metrics.get("first_attempt_denominator"),
+                ),
+                "escalation_count": _stat_value(metrics.get("escalation_count")),
+                "points_delivered": _stat_value(metrics.get("points_delivered")),
+            },
             "cycle_time": _format_minutes(metrics.get("cycle_time_minutes")),
             "sprint_slug": slug,
             "stories": stories,
@@ -352,6 +361,24 @@ def _build_failure_causes(metrics: dict) -> list[dict]:
         }
         for c in causes
     ]
+
+
+def _stat_value(value) -> str:
+    """A stat's numeric value as display text: the number, or an em dash when missing.
+
+    A missing value (JSON null) renders '—' rather than the programming literal
+    'None', keeping the page readable for a public visitor.
+    """
+    if value is None:
+        return "—"
+    return str(value)
+
+
+def _first_try_stat(numerator, denominator) -> str:
+    """The first-try stat: 'X of Y' when present, an em dash when missing."""
+    if numerator is None or denominator is None:
+        return "—"
+    return f"{numerator} of {denominator}"
 
 
 def _format_minutes(total_minutes) -> str:
