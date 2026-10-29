@@ -6,6 +6,12 @@
 
 - The story-journey root page rendered two h1 headings and an empty content area; it now renders a single h1 in the header and a list of story links in the content (mqucifer/crew-presentation#176)
 
+## [Unreleased]
+
+### Added
+
+- The story's journey page shows the path through the board's stages: a strip of five steps (Refined, Built, Reviewed, QA, Merged) with the stage colours when the story was delivered (mqucifer/crew-presentation#100)
+
 ## [0.1.2] - 2026-10-17
 
 Goal mqucifer/crew-presentation#100: every sprint page tells one consistent story, on a phone or a laptop.
