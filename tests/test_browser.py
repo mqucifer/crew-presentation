@@ -7055,3 +7055,100 @@ def test_replay_data_script_in_body_with_correct_type():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _find_site_css_href(html: str) -> str:
+    """Extract the href of the <link rel="stylesheet"> whose href contains site.css."""
+    matches = re.findall(
+        r'<link\s+rel="stylesheet"\s+href="([^"]*site\.css[^"]*)"', html
+    )
+    assert matches, "no <link rel='stylesheet'> with 'site.css' in href found"
+    return matches[0]
+
+
+def test_story_page_stylesheet_resolves_to_build_css():
+    """AC1: story page's site.css href, resolved relative to the page path, yields css/site.css."""
+    from urllib.parse import urljoin
+
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 114, "repo": "mqucifer/crew-presentation"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 114,
+                "repo": "mqucifer/crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "test.py",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = BUILD_DIR / "stories" / "mqucifer-crew-presentation-114.html"
+        assert page_path.is_file(), f"story page not found: {page_path}"
+        html = page_path.read_text()
+        href = _find_site_css_href(html)
+        # Resolve relative to the page's own path (stories/mqucifer-crew-presentation-114.html)
+        resolved = urljoin("stories/mqucifer-crew-presentation-114.html", href)
+        assert resolved == "css/site.css", (
+            f"resolved to {resolved!r}, expected 'css/site.css'"
+        )
+        css_path = BUILD_DIR / "css" / "site.css"
+        assert css_path.is_file(), f"build/css/site.css does not exist"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_page_stylesheet_resolves_to_build_css():
+    """AC2: sprint page's site.css href, resolved relative to the page path, yields css/site.css."""
+    from urllib.parse import urljoin
+
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 1, "repo": "mqucifer/crew"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 1,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "x.py",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = BUILD_DIR / "sprint-6.html"
+        assert page_path.is_file(), f"sprint page not found: {page_path}"
+        html = page_path.read_text()
+        href = _find_site_css_href(html)
+        # Resolve relative to the page's own path (sprint-6.html)
+        resolved = urljoin("sprint-6.html", href)
+        assert resolved == "css/site.css", (
+            f"resolved to {resolved!r}, expected 'css/site.css'"
+        )
+        css_path = BUILD_DIR / "css" / "site.css"
+        assert css_path.is_file(), f"build/css/site.css does not exist"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
