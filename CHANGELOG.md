@@ -18,6 +18,12 @@
 
 - Story pages load the site stylesheet: the CSS link now uses a path correct for the stories/ subdirectory (mqucifer/crew-presentation#176)
 
+## [Unreleased]
+
+### Fixed
+
+- The trend card's value lines show human-readable measure names for all measures (throughput, blocked_aging_days, superseded_count, crew_fixes_merged, wip_violations), not just those already in the label map (mqucifer/crew-presentation#176)
+
 ## [0.1.2] - 2026-10-17
 
 Goal mqucifer/crew-presentation#100: every sprint page tells one consistent story, on a phone or a laptop.
