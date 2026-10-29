@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- The story-journey root page rendered two h1 headings and an empty content area; it now renders a single h1 in the header and a list of story links in the content (mqucifer/crew-presentation#176)
+
+## [Unreleased]
+
+### Fixed
+
 - Unknown failure-cause codes (such as 'REVIEW' or 'QA') now display as "Cause not recorded" instead of the raw code (mqucifer/crew-presentation#176)
 
 ## [0.1.2] - 2026-10-17
