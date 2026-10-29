@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- The sprint navigation strip now shows each sprint's start date beside its name, so the list reads as chronology even when sprint numbers are non-sequential (mqucifer/crew-presentation#176)
+
 ## [0.1.2] - 2026-10-17
 
 Goal mqucifer/crew-presentation#100: every sprint page tells one consistent story, on a phone or a laptop.
