@@ -6021,6 +6021,22 @@ def test_changed_trend_no_field_name_pattern_in_values():
                 "better": True,
                 "source": "sprint-metrics",
             },
+            {
+                "text": "Stories delivered up",
+                "measure": "throughput",
+                "previous": 1,
+                "now": 12,
+                "better": True,
+                "source": "sprint-metrics",
+            },
+            {
+                "text": "Days blocked down",
+                "measure": "blocked_aging_days",
+                "previous": 1,
+                "now": 0,
+                "better": True,
+                "source": "sprint-metrics",
+            },
         ],
     )
     original = DELIVERY_HISTORY_TAG.read_text()
@@ -6031,8 +6047,8 @@ def test_changed_trend_no_field_name_pattern_in_values():
         values_divs = re.findall(
             r'class="changed-trend-values">(.*?)</div>', html, re.DOTALL
         )
-        assert len(values_divs) == 3, (
-            f"expected 3 .changed-trend-values elements, got {len(values_divs)}"
+        assert len(values_divs) == 5, (
+            f"expected 5 .changed-trend-values elements, got {len(values_divs)}"
         )
         field_name_pattern = re.compile(r"[a-z]+_[a-z]+")
         for i, div_text in enumerate(values_divs, 1):
