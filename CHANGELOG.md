@@ -8,6 +8,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- The story's journey page shows the path through the board's stages: a strip of five steps (Refined, Built, Reviewed, QA, Merged) with the stage colours when the story was delivered (mqucifer/crew-presentation#100)
+
+## [Unreleased]
+
 ### Fixed
 
 - Unknown failure-cause codes (such as 'REVIEW' or 'QA') now display as "Cause not recorded" instead of the raw code (mqucifer/crew-presentation#176)
