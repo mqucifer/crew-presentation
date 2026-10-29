@@ -36,6 +36,12 @@
 
 - The attempt chart's rows now match the first-attempt stat: the number of rows equals the stat's denominator, and the 'first try' badge appears on exactly the stat's numerator rows, even when the cards array is missing entries for some stories (mqucifer/crew-presentation#176)
 
+## [Unreleased]
+
+### Fixed
+
+- The sprint navigation strip now shows each sprint's start date beside its name, so the list reads as chronology even when sprint numbers are non-sequential (mqucifer/crew-presentation#176)
+
 ## [0.1.2] - 2026-10-17
 
 Goal mqucifer/crew-presentation#100: every sprint page tells one consistent story, on a phone or a laptop.

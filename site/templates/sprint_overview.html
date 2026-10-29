@@ -4,7 +4,7 @@
 {% block content %}
 <nav aria-label="Sprints">
   {% for s in sprints %}
-  <a href="{{ s.name | lower | replace(' ', '-') }}.html"{% if s.name == sprint.name %} aria-current="page"{% endif %}>{{ s.name }}</a>
+  <a href="{{ s.name | lower | replace(' ', '-') }}.html"{% if s.name == sprint.name %} aria-current="page"{% endif %}>{{ s.name }} · {{ s.start }}</a>
   {% endfor %}
 </nav>
 <div class="meta">{{ sprint.start }} – {{ sprint.end }}</div>
