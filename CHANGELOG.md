@@ -28,6 +28,12 @@
 
 ### Fixed
 
+- Unknown failure-cause codes (such as 'REVIEW' or 'QA') now display as "Cause not recorded" instead of the raw code (mqucifer/crew-presentation#176)
+
+## [Unreleased]
+
+### Fixed
+
 - The attempt chart's rows now match the first-attempt stat: the number of rows equals the stat's denominator, and the 'first try' badge appears on exactly the stat's numerator rows, even when the cards array is missing entries for some stories (mqucifer/crew-presentation#176)
 
 ## [0.1.2] - 2026-10-17
