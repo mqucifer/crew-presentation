@@ -138,9 +138,14 @@ def test_sprint_files_and_nav_strip():
         for f in expected_files:
             html = (BUILD_DIR / f).read_text()
             nav = _sprint_nav(html)
-            assert _nav_links(nav) == names, (
-                f"nav links in {f} are {_nav_links(nav)}, expected {names}"
+            links = _nav_links(nav)
+            assert len(links) == len(names), (
+                f"nav in {f} has {len(links)} links, expected {len(names)}"
             )
+            for i, name in enumerate(names):
+                assert name in links[i], (
+                    f"'{name}' not in link {i} of {f}: {links[i]!r}"
+                )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -160,8 +165,11 @@ def test_aria_current_on_sprint_page():
             html = (BUILD_DIR / filename).read_text()
             nav = _sprint_nav(html)
             current = _nav_aria_current_links(nav)
-            assert current == [name], (
-                f"{filename}: aria-current links are {current}, expected [{name!r}]"
+            assert len(current) == 1, (
+                f"{filename}: expected 1 aria-current link, got {len(current)}: {current}"
+            )
+            assert name in current[0], (
+                f"{filename}: aria-current link {current[0]!r} does not contain {name!r}"
             )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -184,8 +192,14 @@ def test_single_sprint_nav():
         assert sprint_files == [filename], f"unexpected sprint files: {sprint_files}"
         html = (BUILD_DIR / filename).read_text()
         nav = _sprint_nav(html)
-        assert _nav_links(nav) == ["Sprint 1"]
-        assert _nav_aria_current_links(nav) == ["Sprint 1"]
+        links = _nav_links(nav)
+        assert len(links) == 1, f"expected 1 link, got {len(links)}: {links}"
+        assert "Sprint 1" in links[0], f"link {links[0]!r} does not contain 'Sprint 1'"
+        current = _nav_aria_current_links(nav)
+        assert len(current) == 1, f"expected 1 aria-current link, got {len(current)}"
+        assert "Sprint 1" in current[0], (
+            f"aria-current link {current[0]!r} does not contain 'Sprint 1'"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -216,8 +230,8 @@ def test_title_and_two_navs():
         sprint_nav = _sprint_nav(html)
         sprint_links = _nav_links(sprint_nav)
         for name in names:
-            assert name in sprint_links, (
-                f"'{name}' not in sprint nav links: {sprint_links}"
+            assert any(name in link for link in sprint_links), (
+                f"'{name}' not found in any sprint nav link: {sprint_links}"
             )
         # Document order: view nav before sprint nav
         view_pos = html.find('aria-label="Views"')
@@ -252,6 +266,60 @@ def test_sprint_nav_hrefs_resolve():
                 assert target.is_file(), (
                     f"href '{href}' in {filename} does not resolve to an existing file"
                 )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_nav_shows_start_date():
+    """AC1: each sprint nav link includes the sprint's start date alongside its name."""
+    sprints = [
+        {"name": "Sprint 6", "start": "2026-09-22", "end": "2026-09-29"},
+        {"name": "Sprint 7", "start": "2026-09-29", "end": "2026-10-05"},
+    ]
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, sprints=sprints)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        nav = _sprint_nav(html)
+        links = _nav_links(nav)
+        assert len(links) == 2, f"expected 2 links, got {len(links)}: {links}"
+        # First link: Sprint 6 with start 2026-09-22
+        assert "Sprint 6" in links[0], f"link 0 {links[0]!r} missing 'Sprint 6'"
+        assert "2026-09-22" in links[0], f"link 0 {links[0]!r} missing '2026-09-22'"
+        # Second link: Sprint 7 with start 2026-09-29
+        assert "Sprint 7" in links[1], f"link 1 {links[1]!r} missing 'Sprint 7'"
+        assert "2026-09-29" in links[1], f"link 1 {links[1]!r} missing '2026-09-29'"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_nav_chronological_order_preserved():
+    """AC2: non-sequential sprint names preserve document order with dates visible."""
+    sprints = [
+        {"name": "Sprint 35", "start": "2026-10-24", "end": "2026-10-24"},
+        {"name": "Sprint 15", "start": "2026-10-25", "end": "2026-10-25"},
+    ]
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, sprints=sprints)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-35.html").read_text()
+        nav = _sprint_nav(html)
+        links = _nav_links(nav)
+        assert len(links) == 2, f"expected 2 links, got {len(links)}: {links}"
+        # First link: Sprint 35 with start 2026-10-24
+        assert "Sprint 35" in links[0], f"link 0 {links[0]!r} missing 'Sprint 35'"
+        assert "2026-10-24" in links[0], f"link 0 {links[0]!r} missing '2026-10-24'"
+        # Second link: Sprint 15 with start 2026-10-25
+        assert "Sprint 15" in links[1], f"link 1 {links[1]!r} missing 'Sprint 15'"
+        assert "2026-10-25" in links[1], f"link 1 {links[1]!r} missing '2026-10-25'"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
