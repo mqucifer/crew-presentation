@@ -1546,8 +1546,8 @@ def test_failure_causes_bar_widths_and_stage2_color():
     """AC6: first bar 100%, second bar 60%, both use var(--stage-2) background."""
     tag = "delivery-history-TEST"
     causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": '"already exists"', "count": 6},
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "already_exists", "count": 6},
     ]
     _make_fake_package(
         tag,
