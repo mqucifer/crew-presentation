@@ -4,6 +4,24 @@
 
 ### Fixed
 
+- The story-journey root page rendered two h1 headings and an empty content area; it now renders a single h1 in the header and a list of story links in the content (mqucifer/crew-presentation#176)
+
+## [Unreleased]
+
+### Added
+
+- The story's journey page shows the path through the board's stages: a strip of five steps (Refined, Built, Reviewed, QA, Merged) with the stage colours when the story was delivered (mqucifer/crew-presentation#100)
+
+## [Unreleased]
+
+### Fixed
+
+- Story pages load the site stylesheet: the CSS link now uses a path correct for the stories/ subdirectory (mqucifer/crew-presentation#176)
+
+## [Unreleased]
+
+### Fixed
+
 - The sprint navigation strip now shows each sprint's start date beside its name, so the list reads as chronology even when sprint numbers are non-sequential (mqucifer/crew-presentation#176)
 
 ## [0.1.2] - 2026-10-17

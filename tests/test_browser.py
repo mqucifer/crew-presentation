@@ -2523,6 +2523,60 @@ def test_story_journey_scrollwidth_at_phone_width():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_story_journey_root_page_single_h1_and_story_links():
+    """AC1-AC2: root story-journey.html has exactly one h1 and story links."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+            }
+        },
+    )
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["cards"] = [
+        {"repo": "mqucifer/crew", "number": 127, "title": "Extract threshold logic"}
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "story-journey.html").read_text()
+
+        # AC1: exactly one h1 element in the document
+        h1_count = len(re.findall(r"<h1[\s>]", html))
+        assert h1_count == 1, f"found {h1_count} h1 elements, expected exactly 1"
+
+        # AC2: the content section contains at least one anchor whose href
+        # matches the pattern stories/
+        content_start = html.index("</header>")
+        content_html = html[content_start:]
+        section_match = re.search(
+            r'<section[^>]*>(.*?)</section>', content_html, re.DOTALL
+        )
+        assert section_match, "no section element found in content area"
+        section_html = section_match.group(1)
+        story_links = re.findall(
+            r'<a[^>]*href="([^"]*stories/[^"]*)"[^>]*>', section_html
+        )
+        assert story_links, (
+            f"no story links found in content section; "
+            f"section content: {section_html[:200]}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_cycle_time_stat_formats_hours_and_minutes():
     """AC1-AC4: the cycle time stat renders hours and minutes with exact text.
 
@@ -3222,6 +3276,99 @@ def test_journey_page_slug_replaces_slash_with_single_hyphen():
         assert "org-team-77.html" in files, f"org-team-77.html not in {files}"
         assert "org--team-77.html" not in files, "double hyphen in slug"
         assert "orgteam-77.html" not in files, "empty string replacement in slug"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_page_path_has_data_stage_five_when_delivered():
+    """AC1: delivered story with blocks=['refused','landed'] renders a .path with a .path__step[data-stage='5']."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 100, "repo": "mqucifer/crew-presentation"},
+                "blocks": ["refused", "landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 100,
+                "repo": "mqucifer/crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "mqucifer-crew-presentation-100.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        # Find the .path div
+        path_match = re.search(r'<div class="path"[^>]*>(.*?)</div>\s*(?:</div>\s*)*</div>', html, re.DOTALL)
+        assert path_match, "no <div class='path'> found in journey page"
+        path_html = path_match.group(0)
+        # Check for at least one .path__step with data-stage="5"
+        step_match = re.search(
+            r'<div class="path__step"\s+data-stage="5">', path_html
+        )
+        assert step_match, (
+            "no .path__step with data-stage='5' found in the .path div"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_page_path_step_without_data_stage_when_not_delivered():
+    """AC2: undelivered story with blocks=[] renders a .path with a .path__step that has no data-stage."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 100, "repo": "mqucifer/crew-presentation"},
+                "blocks": [],
+                "crew_fixes": [],
+                "delivered": False,
+            }
+        ],
+        cards=[
+            {
+                "number": 100,
+                "repo": "mqucifer/crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "mqucifer-crew-presentation-100.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        # Find the .path div
+        path_match = re.search(r'<div class="path"[^>]*>(.*?)</div>\s*(?:</div>\s*)*</div>', html, re.DOTALL)
+        assert path_match, "no <div class='path'> found in journey page"
+        path_html = path_match.group(0)
+        # Check for at least one .path__step without a data-stage attribute
+        steps = re.findall(r'<div class="path__step"[^>]*>', path_html)
+        assert steps, "no .path__step elements found in the .path div"
+        has_no_data_stage = any(
+            "data-stage" not in step for step in steps
+        )
+        assert has_no_data_stage, (
+            "all .path__step elements have a data-stage attribute; "
+            "expected at least one without it"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -7120,6 +7267,103 @@ def test_replay_data_script_in_body_with_correct_type():
         assert body_open != -1, "no <body> found"
         assert script_pos > head_close, "script element is in <head>, not <body>"
         assert script_pos > body_open, "script element is before <body>"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _find_site_css_href(html: str) -> str:
+    """Extract the href of the <link rel="stylesheet"> whose href contains site.css."""
+    matches = re.findall(
+        r'<link\s+rel="stylesheet"\s+href="([^"]*site\.css[^"]*)"', html
+    )
+    assert matches, "no <link rel='stylesheet'> with 'site.css' in href found"
+    return matches[0]
+
+
+def test_story_page_stylesheet_resolves_to_build_css():
+    """AC1: story page's site.css href, resolved relative to the page path, yields css/site.css."""
+    from urllib.parse import urljoin
+
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 114, "repo": "mqucifer/crew-presentation"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 114,
+                "repo": "mqucifer/crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "test.py",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = BUILD_DIR / "stories" / "mqucifer-crew-presentation-114.html"
+        assert page_path.is_file(), f"story page not found: {page_path}"
+        html = page_path.read_text()
+        href = _find_site_css_href(html)
+        # Resolve relative to the page's own path (stories/mqucifer-crew-presentation-114.html)
+        resolved = urljoin("stories/mqucifer-crew-presentation-114.html", href)
+        assert resolved == "css/site.css", (
+            f"resolved to {resolved!r}, expected 'css/site.css'"
+        )
+        css_path = BUILD_DIR / "css" / "site.css"
+        assert css_path.is_file(), f"build/css/site.css does not exist"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_page_stylesheet_resolves_to_build_css():
+    """AC2: sprint page's site.css href, resolved relative to the page path, yields css/site.css."""
+    from urllib.parse import urljoin
+
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 1, "repo": "mqucifer/crew"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+            }
+        ],
+        cards=[
+            {
+                "number": 1,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "x.py",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = BUILD_DIR / "sprint-6.html"
+        assert page_path.is_file(), f"sprint page not found: {page_path}"
+        html = page_path.read_text()
+        href = _find_site_css_href(html)
+        # Resolve relative to the page's own path (sprint-6.html)
+        resolved = urljoin("sprint-6.html", href)
+        assert resolved == "css/site.css", (
+            f"resolved to {resolved!r}, expected 'css/site.css'"
+        )
+        css_path = BUILD_DIR / "css" / "site.css"
+        assert css_path.is_file(), f"build/css/site.css does not exist"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)

@@ -3,17 +3,37 @@
 {% block h1 %}<h1>{% if card %}{{ card.repo }}#{{ card.number }}{% else %}A story's journey{% endif %}</h1>{% endblock %}
 {% block content %}
 {% if card %}
-<section class="card card--padded">
+{% set story = namespace(found=None) %}
+{% for s in package.get('analysis', {}).get('stories', []) %}
+  {% if s.card.number == card.number and s.card.repo == card.repo %}
+    {% set story.found = s %}
+  {% endif %}
+{% endfor %}
+{% set is_delivered = story.found is not none and story.found.delivered %}
+<section class="card card--padded" aria-labelledby="journey-h">
   <div class="card__head">
-    <h2>{{ card.title }}</h2>
+    <h2 id="journey-h">{{ card.title }}</h2>
   </div>
   <div class="card__body">
     <p class="meta">{{ card.repo }} · #{{ card.number }}</p>
+    {% if story.found and story.found.text %}
+    <p>{{ story.found.text }}</p>
+    {% endif %}
+    <div class="path" role="img" aria-label="Path: {% if is_delivered %}refined, built, reviewed, QA, merged — all reached{% else %}in progress{% endif %}">
+      {% for name, num in [("Refined", "1"), ("Built", "2"), ("Reviewed", "3"), ("QA", "4"), ("Merged", "5")] %}
+      <div class="path__step"{% if is_delivered %} data-stage="{{ num }}"{% endif %}>{{ name }}</div>
+      {% endfor %}
+    </div>
   </div>
 </section>
 {% else %}
 <section>
-  <h1>A story's journey</h1>
+  <h2>Stories</h2>
+  <ul>
+  {% for c in package.cards %}
+  <li><a href="stories/{{ c.repo | replace('/', '-') }}-{{ c.number }}.html">{{ c.repo }}#{{ c.number }} — {{ c.title }}</a></li>
+  {% endfor %}
+  </ul>
 </section>
 {% endif %}
 {% endblock %}
