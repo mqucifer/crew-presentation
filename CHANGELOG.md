@@ -16,6 +16,12 @@
 
 ### Fixed
 
+- Story pages load the site stylesheet: the CSS link now uses a path correct for the stories/ subdirectory (mqucifer/crew-presentation#176)
+
+## [Unreleased]
+
+### Fixed
+
 - Unknown failure-cause codes (such as 'REVIEW' or 'QA') now display as "Cause not recorded" instead of the raw code (mqucifer/crew-presentation#176)
 
 ## [0.1.2] - 2026-10-17
