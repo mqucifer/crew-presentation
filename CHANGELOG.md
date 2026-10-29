@@ -8,6 +8,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- The story's journey page shows the path through the board's stages: a strip of five steps (Refined, Built, Reviewed, QA, Merged) with the stage colours when the story was delivered (mqucifer/crew-presentation#100)
+
+## [Unreleased]
+
 ### Fixed
 
 - The trend card's value lines show human-readable measure names for all measures (throughput, blocked_aging_days, superseded_count, crew_fixes_merged, wip_violations), not just those already in the label map (mqucifer/crew-presentation#176)
