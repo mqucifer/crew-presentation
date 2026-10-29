@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- The story-journey root page rendered two h1 headings and an empty content area; it now renders a single h1 in the header and a list of story links in the content (mqucifer/crew-presentation#176)
+
+## [Unreleased]
+
+### Fixed
+
 - The attempt chart's rows now match the first-attempt stat: the number of rows equals the stat's denominator, and the 'first try' badge appears on exactly the stat's numerator rows, even when the cards array is missing entries for some stories (mqucifer/crew-presentation#176)
 
 ## [0.1.2] - 2026-10-17
