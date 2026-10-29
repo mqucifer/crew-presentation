@@ -6205,6 +6205,86 @@ def test_cause_labels_no_raw_code_pattern():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_cause_label_review_renders_as_cause_not_recorded():
+    """AC1: code 'REVIEW' (not in CAUSE_LABELS) renders as 'Cause not recorded', not 'REVIEW'."""
+    tag = "delivery-history-TEST"
+    causes = [{"reason": "REVIEW", "count": 1}]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # The label span must contain 'Cause not recorded'
+        assert ">Cause not recorded</span>" in section, (
+            "label span should read 'Cause not recorded' for unknown code 'REVIEW'"
+        )
+        # The raw code 'REVIEW' must not appear in a label span
+        assert ">REVIEW</span>" not in section, (
+            "raw code 'REVIEW' must not appear as a label"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_label_qa_renders_as_cause_not_recorded():
+    """AC2: code 'QA' (not in CAUSE_LABELS) renders as 'Cause not recorded', not 'QA'."""
+    tag = "delivery-history-TEST"
+    causes = [{"reason": "QA", "count": 1}]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # The label span must contain 'Cause not recorded'
+        assert ">Cause not recorded</span>" in section, (
+            "label span should read 'Cause not recorded' for unknown code 'QA'"
+        )
+        # The raw code 'QA' must not appear in a label span
+        assert ">QA</span>" not in section, (
+            "raw code 'QA' must not appear as a label"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_replay_header_shows_most_recent_sprint():
     """AC1: h1 is the most recent sprint name; body contains the date range."""
     tag = "delivery-history-TEST"
