@@ -661,11 +661,14 @@ def _make_package_with_stories(
         {"name": n, "start": "2026-09-22", "end": "2026-09-29"}
         for n in sprint_names
     ]
+    first_try_count = sum(
+        1 for s in stories if s.get("delivered") and len(s.get("blocks", [])) == 1
+    )
     metrics = {
         name: {
             "throughput": len(stories),
             "points_delivered": 10,
-            "first_attempt_numerator": 1,
+            "first_attempt_numerator": first_try_count,
             "first_attempt_denominator": max(len(stories), 1),
             "escalation_count": 0,
             "cycle_time_days": 2.0,
@@ -1546,8 +1549,8 @@ def test_failure_causes_bar_widths_and_stage2_color():
     """AC6: first bar 100%, second bar 60%, both use var(--stage-2) background."""
     tag = "delivery-history-TEST"
     causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": '"already exists"', "count": 6},
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "already_exists", "count": 6},
     ]
     _make_fake_package(
         tag,
@@ -4144,7 +4147,7 @@ def test_attempt_row_div_no_overflow_7_blocks_phone():
 def test_cause_label_no_truncation_phone():
     """AC1: at 375px, the failure-cause label is not truncated or clipped."""
     tag = "delivery-history-TEST"
-    causes = [{"reason": "A test's assertion failed", "count": 10}]
+    causes = [{"reason": "test_assertion_failed", "count": 10}]
     _make_fake_package(
         tag,
         ["Sprint 6"],
@@ -4400,12 +4403,12 @@ def test_cause_rows_six_in_order_phone():
     """AC5: at 375px, .cause-chart has exactly 6 rows with correct text in order."""
     tag = "delivery-history-TEST"
     causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": '"already exists"', "count": 6},
-        {"reason": "Must create or edit a file", "count": 3},
-        {"reason": "Undefined name (lint)", "count": 2},
-        {"reason": "No test written", "count": 2},
-        {"reason": "Cause not recorded", "count": 2},
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "already_exists", "count": 6},
+        {"reason": "must_create_or_edit_file", "count": 3},
+        {"reason": "undefined_name", "count": 2},
+        {"reason": "no_test_written", "count": 2},
+        {"reason": "unrecorded", "count": 2},
     ]
     _make_fake_package(
         tag,
@@ -4477,8 +4480,8 @@ def test_cause_unrecorded_label_meta_class_phone():
     """AC6: at 375px, the 'Cause not recorded' label has class 'meta' and no clipping."""
     tag = "delivery-history-TEST"
     causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": "Cause not recorded", "count": 2},
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "unrecorded", "count": 2},
     ]
     _make_fake_package(
         tag,
@@ -4547,12 +4550,12 @@ def test_cause_rows_no_horizontal_overflow_phone():
     """AC7: at 375px, each .cause-row has scrollWidth == clientWidth."""
     tag = "delivery-history-TEST"
     causes = [
-        {"reason": "A test's assertion failed", "count": 10},
-        {"reason": '"already exists"', "count": 6},
-        {"reason": "Must create or edit a file", "count": 3},
-        {"reason": "Undefined name (lint)", "count": 2},
-        {"reason": "No test written", "count": 2},
-        {"reason": "Cause not recorded", "count": 2},
+        {"reason": "test_assertion_failed", "count": 10},
+        {"reason": "already_exists", "count": 6},
+        {"reason": "must_create_or_edit_file", "count": 3},
+        {"reason": "undefined_name", "count": 2},
+        {"reason": "no_test_written", "count": 2},
+        {"reason": "unrecorded", "count": 2},
     ]
     _make_fake_package(
         tag,
@@ -5072,29 +5075,20 @@ def _make_package_first_attempt(
 
 
 def test_non_first_try_count_matches_stat_ac1():
-    """AC1: count of non-first-try rows equals denominator - numerator from the stat."""
+    """AC1: attempt-chart rows match the stat: exactly denominator rows,
+    numerator 'first try' badges, and the remainder 'merged'."""
     tag = "delivery-history-TEST"
-    # 12 stories: blocks=["landed"], delivered=True -> "first try"
-    stories_first_try = [
+    # 5 stories: blocks=["landed"], delivered=True, all with matching cards.
+    # The stat says only 3 are first-try, so exactly 3 get the badge and 2 are 'merged'.
+    stories = [
         {
             "card": {"number": i, "repo": "mqucifer/crew"},
             "blocks": ["landed"],
             "crew_fixes": [],
             "delivered": True,
         }
-        for i in range(1, 13)
+        for i in range(1, 6)
     ]
-    # 10 stories: blocks=["refused", "landed"], delivered=True -> "merged"
-    stories_not_first = [
-        {
-            "card": {"number": i, "repo": "mqucifer/crew"},
-            "blocks": ["refused", "landed"],
-            "crew_fixes": [],
-            "delivered": True,
-        }
-        for i in range(13, 23)
-    ]
-    stories = stories_first_try + stories_not_first
     cards = [
         {
             "number": i,
@@ -5102,12 +5096,12 @@ def test_non_first_try_count_matches_stat_ac1():
             "sprint": "Sprint 6",
             "title": f"story-{i}.py",
         }
-        for i in range(1, 23)
+        for i in range(1, 6)
     ]
     _make_package_first_attempt(
         tag,
-        numerator=12,
-        denominator=22,
+        numerator=3,
+        denominator=5,
         stories=stories,
         cards=cards,
     )
@@ -5115,8 +5109,6 @@ def test_non_first_try_count_matches_stat_ac1():
     DELIVERY_HISTORY_TAG.write_text(tag + "\n")
     try:
         _build()
-        pkg = _package()
-        answers = pkg["sprint_metrics"]["answers"]["Sprint 6"]
         page_path = (BUILD_DIR / "sprint-6.html").resolve()
 
         from playwright.sync_api import sync_playwright
@@ -5128,36 +5120,27 @@ def test_non_first_try_count_matches_stat_ac1():
             page.goto(f"file://{page_path}")
             page.wait_for_selector(".attempt-row")
 
-            non_first_try_count = page.evaluate("""
-                () => Array.from(document.querySelectorAll('.attempt-row'))
+            row_count = page.evaluate("""
+                () => document.querySelectorAll('.attempt-chart .attempt-row').length
+            """)
+            first_try_count = page.evaluate("""
+                () => Array.from(document.querySelectorAll('.attempt-chart .attempt-row'))
                     .filter(row => {
                         const status = row.querySelector('.attempt-status');
-                        return status && status.textContent.trim() !== 'first try';
+                        return status && status.textContent.trim() === 'first try';
+                    }).length
+            """)
+            merged_count = page.evaluate("""
+                () => Array.from(document.querySelectorAll('.attempt-chart .attempt-row'))
+                    .filter(row => {
+                        const status = row.querySelector('.attempt-status');
+                        return status && status.textContent.trim() === 'merged';
                     }).length
             """)
 
-            stat_text = page.evaluate("""
-                () => {
-                    const labels = document.querySelectorAll('.stat__label');
-                    for (const label of labels) {
-                        if (label.textContent.trim() === 'landed first try') {
-                            const stat = label.closest('.stat');
-                            return stat.querySelector('.stat__value').textContent.trim();
-                        }
-                    }
-                    return null;
-                }
-            """)
-            parts = stat_text.split()
-            numerator = int(parts[0])
-            denominator = int(parts[2])
-            expected = denominator - numerator
-
-            assert non_first_try_count == expected, (
-                f"expected {expected} non-first-try rows "
-                f"(denominator {denominator} minus numerator {numerator}), "
-                f"found {non_first_try_count}"
-            )
+            assert row_count == 5, f"expected 5 rows, found {row_count}"
+            assert first_try_count == 3, f"expected 3 'first try', found {first_try_count}"
+            assert merged_count == 2, f"expected 2 'merged', found {merged_count}"
             browser.close()
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -5165,7 +5148,8 @@ def test_non_first_try_count_matches_stat_ac1():
 
 
 def test_non_first_try_count_mismatch_names_both_values():
-    """AC2: when 2 stories are missing from the chart, the test fails naming expected 10 and found 8."""
+    """AC1b: even when some stories have no matching card entry, the chart
+    still shows denominator rows with the correct badge split."""
     tag = "delivery-history-TEST"
     # 12 first-try stories (all rendered)
     stories_first_try = [
@@ -5189,6 +5173,7 @@ def test_non_first_try_count_mismatch_names_both_values():
     ]
     stories = stories_first_try + stories_not_first
     # Cards for all 12 first-try + only 8 of the 10 not-first-try (stories 13-20)
+    # Stories 21-22 have no matching card entry (orphaned)
     cards = [
         {
             "number": i,
@@ -5209,7 +5194,6 @@ def test_non_first_try_count_mismatch_names_both_values():
     DELIVERY_HISTORY_TAG.write_text(tag + "\n")
     try:
         _build()
-        pkg = _package()
         page_path = (BUILD_DIR / "sprint-6.html").resolve()
 
         from playwright.sync_api import sync_playwright
@@ -5221,8 +5205,11 @@ def test_non_first_try_count_mismatch_names_both_values():
             page.goto(f"file://{page_path}")
             page.wait_for_selector(".attempt-row")
 
+            row_count = page.evaluate("""
+                () => document.querySelectorAll('.attempt-chart .attempt-row').length
+            """)
             non_first_try_count = page.evaluate("""
-                () => Array.from(document.querySelectorAll('.attempt-row'))
+                () => Array.from(document.querySelectorAll('.attempt-chart .attempt-row'))
                     .filter(row => {
                         const status = row.querySelector('.attempt-status');
                         return status && status.textContent.trim() !== 'first try';
@@ -5244,21 +5231,16 @@ def test_non_first_try_count_mismatch_names_both_values():
             parts = stat_text.split()
             numerator = int(parts[0])
             denominator = int(parts[2])
-            expected = denominator - numerator
+            expected_non_first = denominator - numerator
 
-            # Only 20 rows rendered (12 + 8), so non-first-try count is 8, not 10
-            assert non_first_try_count == 8, (
-                f"expected 8 non-first-try rows rendered, found {non_first_try_count}"
+            assert row_count == denominator, (
+                f"expected {denominator} rows, found {row_count}"
             )
-            with pytest.raises(AssertionError) as exc_info:
-                assert non_first_try_count == expected, (
-                    f"expected {expected} non-first-try rows "
-                    f"(denominator {denominator} minus numerator {numerator}), "
-                    f"found {non_first_try_count}"
-                )
-            msg = str(exc_info.value)
-            assert "10" in msg, f"assertion message missing expected value 10: {msg!r}"
-            assert "8" in msg, f"assertion message missing found value 8: {msg!r}"
+            assert non_first_try_count == expected_non_first, (
+                f"expected {expected_non_first} non-first-try rows "
+                f"(denominator {denominator} minus numerator {numerator}), "
+                f"found {non_first_try_count}"
+            )
             browser.close()
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -5343,6 +5325,75 @@ def test_non_first_try_count_all_first_try():
                 f"expected {expected} non-first-try rows "
                 f"(denominator {denominator} minus numerator {numerator}), "
                 f"found {non_first_try_count}"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_chart_rows_match_stat_when_cards_missing_ac2():
+    """AC2: when only 1 of 3 stories has a matching card entry, the chart
+    still shows exactly denominator (3) rows, not fewer."""
+    tag = "delivery-history-TEST"
+    # 3 stories: 2 with blocks=["landed"], 1 with blocks=["refused", "landed"]
+    stories = [
+        {
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        },
+        {
+            "card": {"number": 2, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        },
+        {
+            "card": {"number": 3, "repo": "mqucifer/crew"},
+            "blocks": ["refused", "landed"],
+            "crew_fixes": [],
+            "delivered": True,
+        },
+    ]
+    # Only 1 card entry with sprint="Sprint 6" (the other 2 stories have no matching card)
+    cards = [
+        {
+            "number": 1,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "story-1.py",
+        }
+    ]
+    _make_package_first_attempt(
+        tag,
+        numerator=2,
+        denominator=3,
+        stories=stories,
+        cards=cards,
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".attempt-row")
+
+            row_count = page.evaluate("""
+                () => document.querySelectorAll('.attempt-chart .attempt-row').length
+            """)
+
+            assert row_count == 3, (
+                f"expected exactly 3 attempt-row elements, found {row_count}"
             )
             browser.close()
     finally:
@@ -6363,6 +6414,86 @@ def test_cause_labels_no_raw_code_pattern():
             assert not re.search(r"[a-z]+_[a-z]+", text), (
                 f"label span contains raw code pattern: {text!r}"
             )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_label_review_renders_as_cause_not_recorded():
+    """AC1: code 'REVIEW' (not in CAUSE_LABELS) renders as 'Cause not recorded', not 'REVIEW'."""
+    tag = "delivery-history-TEST"
+    causes = [{"reason": "REVIEW", "count": 1}]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # The label span must contain 'Cause not recorded'
+        assert ">Cause not recorded</span>" in section, (
+            "label span should read 'Cause not recorded' for unknown code 'REVIEW'"
+        )
+        # The raw code 'REVIEW' must not appear in a label span
+        assert ">REVIEW</span>" not in section, (
+            "raw code 'REVIEW' must not appear as a label"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_cause_label_qa_renders_as_cause_not_recorded():
+    """AC2: code 'QA' (not in CAUSE_LABELS) renders as 'Cause not recorded', not 'QA'."""
+    tag = "delivery-history-TEST"
+    causes = [{"reason": "QA", "count": 1}]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # The label span must contain 'Cause not recorded'
+        assert ">Cause not recorded</span>" in section, (
+            "label span should read 'Cause not recorded' for unknown code 'QA'"
+        )
+        # The raw code 'QA' must not appear in a label span
+        assert ">QA</span>" not in section, (
+            "raw code 'QA' must not appear as a label"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)

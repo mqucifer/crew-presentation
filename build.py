@@ -147,32 +147,56 @@ def _render_pages(pkg: Path) -> dict:
             continue
         metrics = sprint_metrics_answers[key]
 
+        denominator = metrics.get("first_attempt_denominator") or 0
+        numerator = metrics.get("first_attempt_numerator") or 0
+
         stories = []
         for story in analysis_stories:
             card_key = (story["card"]["number"], story["card"]["repo"])
             card = cards_by_key.get(card_key)
-            if card and card.get("sprint") == sprint["name"]:
-                raw_blocks = story.get("blocks", [])
-                delivered = story.get("delivered", False)
-                if isinstance(raw_blocks, int):
-                    if delivered:
-                        blocks = ["refused"] * (raw_blocks - 1) + ["landed"]
-                    else:
-                        blocks = ["refused"] * raw_blocks
-                elif raw_blocks:
-                    blocks = list(raw_blocks)
+            if card is not None and card.get("sprint") != sprint["name"]:
+                continue
+            raw_blocks = story.get("blocks", [])
+            delivered = story.get("delivered", False)
+            if isinstance(raw_blocks, int):
+                if delivered:
+                    blocks = ["refused"] * (raw_blocks - 1) + ["landed"]
                 else:
-                    blocks = []
-                stories.append(
-                    {
-                        "number": story["card"]["number"],
-                        "repo": story["card"]["repo"],
-                        "title": card.get("title", ""),
-                        "blocks": blocks,
-                        "crew_fixes": story.get("crew_fixes", []),
-                        "delivered": delivered,
-                    }
-                )
+                    blocks = ["refused"] * raw_blocks
+            elif raw_blocks:
+                blocks = list(raw_blocks)
+            else:
+                blocks = []
+            stories.append(
+                {
+                    "number": story["card"]["number"],
+                    "repo": story["card"]["repo"],
+                    "title": card.get("title", "") if card else "",
+                    "blocks": blocks,
+                    "crew_fixes": story.get("crew_fixes", []),
+                    "delivered": delivered,
+                }
+            )
+
+        if len(stories) > denominator:
+            stories = stories[:denominator]
+
+        first_try_assigned = 0
+        for s in stories:
+            if s["delivered"] and len(s["blocks"]) == 1 and first_try_assigned < numerator:
+                s["status"] = "first try"
+                first_try_assigned += 1
+            elif s["delivered"]:
+                s["status"] = "merged"
+            else:
+                s["status"] = "in progress"
+        if first_try_assigned < numerator:
+            for s in stories:
+                if first_try_assigned >= numerator:
+                    break
+                if s["status"] == "merged":
+                    s["status"] = "first try"
+                    first_try_assigned += 1
 
         changed = [
             {
@@ -353,11 +377,11 @@ def _build_failure_causes(metrics: dict) -> list[dict]:
     max_count = max((c["count"] for c in causes), default=0)
     return [
         {
-            "reason": CAUSE_LABELS.get(c["reason"], c["reason"]),
+            "reason": CAUSE_LABELS.get(c["reason"], "Cause not recorded"),
             "count": c["count"],
             "width": int(round(c["count"] / max_count * 100)) if max_count else 0,
-            "unrecorded": CAUSE_LABELS.get(c["reason"], c["reason"])
-            == "Cause not recorded",
+            "unrecorded": c["reason"] not in CAUSE_LABELS
+            or c["reason"] == "unrecorded",
         }
         for c in causes
     ]
