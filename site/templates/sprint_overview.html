@@ -10,15 +10,15 @@
 <div class="meta">{{ sprint.start }} – {{ sprint.end }}</div>
 <section class="stats" aria-label="Sprint totals">
   <div class="stat">
-    <span class="stat__value num">{{ metrics.throughput }}</span>
+    <span class="stat__value num">{{ stats.throughput }}</span>
     <span class="stat__label">stories delivered</span>
   </div>
   <div class="stat">
-    <span class="stat__value num">{{ metrics.first_attempt_numerator }} of {{ metrics.first_attempt_denominator }}</span>
+    <span class="stat__value num">{{ stats.first_try }}</span>
     <span class="stat__label">landed first try</span>
   </div>
   <div class="stat">
-    <span class="stat__value num">{{ metrics.escalation_count }}</span>
+    <span class="stat__value num">{{ stats.escalation_count }}</span>
     <span class="stat__label">escalations</span>
   </div>
   <div class="stat">
@@ -26,7 +26,7 @@
     <span class="stat__label">cycle time</span>
   </div>
   <div class="stat">
-    <span class="stat__value num">{{ metrics.points_delivered }}</span>
+    <span class="stat__value num">{{ stats.points_delivered }}</span>
     <span class="stat__label">points delivered</span>
   </div>
 </section>

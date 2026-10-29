@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- The sprint overview's stats row rendered the programming literal "None" when sprint-metrics reports null for a sprint with no delivered stories; it now renders an em dash (—) for missing values (mqucifer/crew-presentation#176)
 - The story-journey root page rendered two h1 headings and an empty content area; it now renders a single h1 in the header and a list of story links in the content (mqucifer/crew-presentation#176)
 
 ## [Unreleased]

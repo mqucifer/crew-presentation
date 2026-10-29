@@ -7514,3 +7514,84 @@ def test_sprint_page_stylesheet_resolves_to_build_css():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_null_sprint_metrics_render_no_none_literal():
+    """AC1: null metrics fields render no element containing the text 'None'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 33"],
+        metrics={
+            "Sprint 33": {
+                "throughput": None,
+                "first_attempt_numerator": None,
+                "first_attempt_denominator": None,
+                "escalation_count": None,
+                "points_delivered": None,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-33.html").read_text()
+        stats = _stats_section(html)
+        values = re.findall(
+            r'<span class="stat__value[^"]*">(.*?)</span>', stats, re.DOTALL
+        )
+        for value in values:
+            assert "None" not in value, (
+                f"stat value {value!r} contains the programming literal 'None'"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_zero_sprint_metrics_render_zero_and_fraction():
+    """AC2: zero metrics render '0' for throughput and '0 of 4' for first try."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 33"],
+        metrics={
+            "Sprint 33": {
+                "throughput": 0,
+                "first_attempt_numerator": 0,
+                "first_attempt_denominator": 4,
+                "escalation_count": 0,
+                "points_delivered": 0,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-33.html").read_text()
+        stats = _stats_section(html)
+        # '0' immediately before 'stories delivered'
+        throughput_match = re.search(
+            r'<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>\s*<span class="stat__label">stories delivered</span>',
+            stats,
+            re.DOTALL,
+        )
+        assert throughput_match, "no 'stories delivered' stat found"
+        assert throughput_match.group(1) == "0", (
+            f"throughput stat is {throughput_match.group(1)!r}, expected '0'"
+        )
+        # '0 of 4' immediately before 'landed first try'
+        first_try_match = re.search(
+            r'<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>\s*<span class="stat__label">landed first try</span>',
+            stats,
+            re.DOTALL,
+        )
+        assert first_try_match, "no 'landed first try' stat found"
+        assert first_try_match.group(1) == "0 of 4", (
+            f"first-try stat is {first_try_match.group(1)!r}, expected '0 of 4'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
