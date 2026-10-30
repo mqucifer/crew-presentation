@@ -2709,6 +2709,27 @@ def test_story_journey_scrollwidth_at_phone_width():
                 f"second link text is {li_texts[1]!r}, expected full long title"
             )
 
+            # A card title containing a very long unbreakable segment (no spaces)
+            # must not force horizontal scroll: overflow-wrap: break-word breaks it.
+            unbreakable = "a" * 200
+            data["cards"] = [
+                {
+                    "repo": "mqucifer/crew",
+                    "number": 999,
+                    "title": unbreakable,
+                },
+            ]
+            (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+            _build()
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            scroll_width = page.evaluate("document.documentElement.scrollWidth")
+            assert scroll_width <= 375, (
+                f"story-journey page scrollWidth is {scroll_width} with a long "
+                f"unbreakable title, expected <= 375"
+            )
+
             browser.close()
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
