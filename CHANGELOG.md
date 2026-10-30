@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- The site accepts delivery-history packages on schema major 2 (e.g. 2.0.0); major 2 is now in SUPPORTED_MAJOR_VERSIONS (mqucifer/crew-presentation#212)
+
 ### Fixed
 
 - The sprint overview's story rows now show each story's own pattern from the package (first try, retried, crew fix, etc.) instead of assigning badges by position to match the first-attempt stat; stories are listed by their delivery date within the sprint's days, not cut to the stat's denominator (mqucifer/crew-presentation#193)

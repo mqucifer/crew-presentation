@@ -159,16 +159,16 @@ schemas and mock are not in this repository and the site has no network, so
 the field-shape rulings rest on that changelog, while the version-gate
 refusal is verifiable from this repository's own code.
 
-**The site cannot read a 2.0.0 package today.** `SUPPORTED_MAJOR_VERSIONS` is
-`(1,)` in `build.py`, and it keeps its own copy in `test_contracts.py`.
+**The version gate now accepts schema major 2.** `SUPPORTED_MAJOR_VERSIONS` is
+`(1, 2)` in `build.py`, and it keeps its own copy in `test_contracts.py`.
 `_check_schema_version` in `build.py` exits non-zero when the manifest's
 `schema_version` major is not in that set, and `test_contracts.py` carries the
 same gate. The contract tests pin the refusal: both
 `test_build_fails_on_unsupported_major_version` and
 `test_unsupported_major_version_fails_with_version` feed `schema_version`
-`"2.0.0"` and assert the build and the check fail, naming major 2. So a 2.0.0
-package (schema major 2) is stopped at the pre-merge gate, before a single
-field is read.
+`"3.0.0"` and assert the build and the check fail, naming major 3. A 2.0.0
+package (schema major 2) passes the pre-merge gate; its fields are then
+validated against the schema the package carries.
 
 **What build.py must change to adopt 2.0.0:**
 
