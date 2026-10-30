@@ -17,7 +17,7 @@ TEMPLATES_DIR = REPO_ROOT / "site" / "templates"
 CSS_DIR = REPO_ROOT / "site" / "css"
 JS_DIR = REPO_ROOT / "site" / "js"
 
-SUPPORTED_MAJOR_VERSIONS = (1,)
+SUPPORTED_MAJOR_VERSIONS = (1, 2)
 
 TEMPLATE_MAP = {
     "replay.html": "replay.html",
