@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crew performance: Sprint 6, the overview after delivery-history 2.0.0</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Public+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+:root{--color-bg:#F6EFE3;--color-surface:#FFFBF4;--color-surface-raised:#EFE2CF;--color-border:#E6D8C3;--color-text:#2E1F14;--color-text-dim:#6B5646;--color-link:#A84A16;--color-accent:#A84A16;--color-accent-hover:#7E3510;--color-on-accent:#FFFBF4;--color-feature-bg:#2E1F14;--color-feature-text:#F6EFE3;--color-feature-dim:#E6D8C3;--color-feature-accent:#D9A035;--tone-waiting-bg:#EFE2CF;--tone-waiting-text:#5C4838;--tone-active-bg:#D8E9E6;--tone-active-text:#1F5A5A;--tone-held-bg:#F5E3B5;--tone-held-text:#6E4A06;--tone-done-bg:#E6E7CC;--tone-done-text:#4A5A1E;--tone-blocked-bg:#F4D6CB;--tone-blocked-text:#8E2A12;--stage-1:#D9A035;--stage-2:#D9772E;--stage-3:#A84A16;--stage-5:#5A3218;--font-display:"Fraunces",Georgia,serif;--font-sans:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+body{margin:0;background:#D9CFC0;color:var(--color-text);font-family:var(--font-sans);font-size:16px;line-height:1.5}
+a{color:var(--color-link)}a:hover{color:var(--color-accent-hover)}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;margin:0}
+.num{font-variant-numeric:tabular-nums}
+.meta{font-size:13px;color:var(--color-text-dim)}
+.card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;min-width:0}
+.card__head{padding:16px 24px;border-bottom:1px solid var(--color-border);display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 16px}
+.card__head h2{font-size:24px;line-height:1.2}
+.card__body{padding:20px 24px;display:flex;flex-direction:column;gap:16px}
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:13px;font-weight:600;white-space:nowrap}
+.badge[data-tone="done"]{background:var(--tone-done-bg);color:var(--tone-done-text)}
+.badge[data-tone="active"]{background:var(--tone-active-bg);color:var(--tone-active-text)}
+.badge[data-tone="blocked"]{background:var(--tone-blocked-bg);color:var(--tone-blocked-text)}
+.badge[data-tone="waiting"]{background:var(--tone-waiting-bg);color:var(--tone-waiting-text)}
+.blk{width:28px;height:20px;border-radius:4px;box-sizing:border-box;flex:none}
+.blk--landed{background:var(--tone-done-text)}
+.blk--missed{background:var(--stage-1)}
+.blk--blocked{background:repeating-linear-gradient(45deg,var(--tone-blocked-text) 0 3px,var(--tone-blocked-bg) 3px 5px)}
+.blk--fix{border:2px dashed var(--color-text-dim)}
+.story{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:12px 0;border-top:1px solid var(--color-border)}
+.story__title{flex:1 1 260px;min-width:0;font-size:15px}
+.story__blocks{display:flex;gap:3px;flex:0 1 auto;flex-wrap:wrap}
+.story__time{flex:0 0 150px;font-size:13px;color:var(--color-text-dim);text-align:right}
+.story__text{flex:1 1 100%;font-size:13px;color:var(--color-text-dim)}
+.change{display:flex;flex-direction:column;gap:2px;padding:12px 0;border-top:1px solid var(--color-border)}
+.bar-row{display:grid;grid-template-columns:minmax(0,1fr) 32px;gap:4px 12px;align-items:center}
+.bar{height:10px;border-radius:4px;background:var(--color-accent)}
+.boards{display:flex;gap:80px;align-items:flex-start;padding:48px;width:max-content}
+.board-label{font-size:13px;font-weight:600;color:#2E1F14;margin-bottom:8px}
+.frame{box-sizing:border-box;background:var(--color-bg);--h1-size:40px;padding:32px 56px 64px}
+.frame--phone{--h1-size:32px;padding:24px 16px 48px}
+</style>
+</head>
+<body>
+<!-- The sprint overview after delivery-history 2.0.0: the Sponsor approved it on 2026-10-30.
+     Two widths side by side: 1280px and 375px. The data is delivery-history 2.0.0's mock (Sprint 6);
+     [BRACKETED] values are placeholders for fields the mock leaves empty. -->
+<div class="boards">
+<section class="board-frame" aria-label="Sprint overview · 1280px">
+<div class="board-label">Sprint overview · 1280px</div>
+<div id="w1280" class="frame frame--desktop" style="width: 1280px">
+<div style="display: flex; flex-direction: column; gap: 24px">
+
+<header style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px 24px; padding-bottom: 20px; background: linear-gradient(to right, var(--stage-1) 0 25%, var(--stage-2) 25% 50%, var(--stage-3) 50% 75%, var(--stage-5) 75% 100%) bottom / 100% 5px no-repeat">
+<a href="#w1280" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--color-text)"><span aria-hidden="true" style="width: 32px; height: 32px; border-radius: 8px; background: var(--color-accent); color: var(--color-on-accent); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 600">Q</span><span style="font-family: var(--font-display); font-weight: 600; font-size: 20px">[Site name]</span></a>
+<nav aria-label="Views" style="display: flex; flex-wrap: wrap; gap: 4px; font-size: 14px; font-weight: 500">
+<a href="#w1280" aria-current="page" style="padding: 10px 14px; min-height: 44px; box-sizing: border-box; border-radius: 8px; text-decoration: none; background: var(--color-surface-raised); color: var(--color-text)">Sprints</a>
+<a href="#w1280-about" style="padding: 10px 14px; min-height: 44px; box-sizing: border-box; border-radius: 8px; text-decoration: none; color: var(--color-text-dim)">About the crew</a>
+</nav>
+</header>
+
+<section id="w1280-about" aria-labelledby="w1280-about-h" style="display: flex; flex-wrap: wrap; gap: 8px 32px; align-items: baseline">
+<h2 id="w1280-about-h" style="font-size: 20px; flex: 0 0 auto">What this is</h2>
+<p style="margin: 0; flex: 1 1 420px; color: var(--color-text-dim)">A crew of AI roles (a Product Owner, an Architect, Developers, reviewers and QA) builds real software projects in one-day sprints, with one person approving its plans. Each page is one sprint: what got done, how much of it worked first time, what sent work back, and what the crew decided on its own.</p>
+</section>
+
+<nav aria-label="Sprints" style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px">
+<a href="#w1280-s5" style="padding: 10px 14px; min-height: 44px; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--color-border); text-decoration: none; color: var(--color-text-dim); background: var(--color-surface)">Sprint 5 · Thu 24 Sep</a>
+<a href="#w1280" aria-current="page" style="padding: 10px 14px; min-height: 44px; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--color-text); text-decoration: none; color: var(--color-text); background: var(--color-surface); font-weight: 600">Sprint 6 · Fri 25 Sep</a>
+</nav>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div class="meta">mqucifer · sprint-metrics · Fri 25 September 2026, one day</div>
+<h1 style="font-size: var(--h1-size); line-height: 1.1">Sprint 6, as the crew ran it</h1>
+</div>
+
+<section aria-label="Sprint totals" class="card" style="padding: 20px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px 16px">
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Stories delivered</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">6</div><div class="meta">18 points</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Landed first try</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">3 of 6</div><div style="height: 8px; margin-top: 6px; border-radius: 4px; background: var(--color-surface-raised); display: flex"><div style="width: 50%; background: var(--color-accent); border-radius: 4px"></div></div><div class="meta">50%</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Start to delivered</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">10 h 55 min</div><div class="meta">cycle time</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Filed to delivered</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">1 d 1 h</div><div class="meta">lead time</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Days blocked</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">1</div><div class="meta">1 story superseded, 3 points</div></div>
+</section>
+
+<section aria-labelledby="w1280-changed-h" class="card">
+<div class="card__head"><h2 id="w1280-changed-h">What changed since Sprint 5</h2><span class="meta">each line says it, then shows the two numbers</span></div>
+<div class="card__body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 32px">
+<div class="change"><span>The first-try rate fell from 67% to 50%.</span><span class="meta num">First-try rate: 67% → 50% · worse</span></div>
+<div class="change"><span>Stories delivered rose from 3 to 6.</span><span class="meta num">Stories delivered: 3 → 6 · better</span></div>
+<div class="change"><span>Points delivered rose from 9 to 18.</span><span class="meta num">Points delivered: 9 → 18 · better</span></div>
+<div class="change"><span>Days spent blocked rose from 0 to 1.</span><span class="meta num">Days blocked: 0 → 1 · worse</span></div>
+<div class="change"><span>The time from starting a story to delivering it rose from 6 hours 50 minutes to 10 hours 55 minutes.</span><span class="meta num">Start to delivered: 6 h 50 min → 10 h 55 min · worse</span></div>
+<div class="change"><span>The time from filing a story to delivering it fell from 1 day 7 hours to 1 day 1 hour.</span><span class="meta num">Filed to delivered: 1 d 7 h → 1 d 1 h · better</span></div>
+<div class="change"><span>Stories superseded rose from 0 to 1.</span><span class="meta num">Stories superseded: 0 → 1</span></div>
+<div class="change"><span>Fixes to the crew merged rose from 1 to 2.</span><span class="meta num">Fixes to the crew: 1 → 2</span></div>
+</div>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+<section aria-labelledby="w1280-split-h" class="card" style="flex: 999 1 560px">
+<div class="card__head"><h2 id="w1280-split-h">What got done, story by story</h2><span class="meta">by epic · time worked and model time per story</span></div>
+<div class="card__body">
+<div style="display: flex; flex-wrap: wrap; gap: 8px 18px" class="meta">
+<span style="display: flex; align-items: center; gap: 6px"><span class="blk blk--landed" style="width: 12px; height: 12px; border-radius: 3px"></span>attempt that landed</span>
+<span style="display: flex; align-items: center; gap: 6px"><span class="blk blk--missed" style="width: 12px; height: 12px; border-radius: 3px"></span>missed, tried again</span>
+<span style="display: flex; align-items: center; gap: 6px"><span class="blk blk--blocked" style="width: 12px; height: 12px; border-radius: 3px"></span>blocked</span>
+<span style="display: flex; align-items: center; gap: 6px"><span class="blk blk--fix" style="width: 12px; height: 12px; border-radius: 3px"></span>a fix to the crew merged</span>
+</div>
+
+<div style="display: flex; flex-direction: column">
+<div style="display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 8px 0"><h3 style="font-size: 18px">Split crew_performance.py into seven modules</h3><span class="meta num">epic #123 · not part of a Goal · 4 of 7 stories done · 2 h 8 min worked, 40 min model</span><span class="badge" data-tone="active">In Progress</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#125</span> Move the card model into card.py</span><span class="story__blocks"><span class="blk blk--landed"></span></span><span class="badge" data-tone="done">Done</span><span class="story__time num">23 min · 7 min model</span><span class="story__text">Landed first try.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#126</span> Move the metric functions into metrics.py</span><span class="story__blocks"><span class="blk blk--missed"></span><span class="blk blk--landed"></span></span><span class="badge" data-tone="done">Done</span><span class="story__time num">31 min · 7 min model</span><span class="story__text">Missed once, then landed.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#127</span> Extract threshold logic into thresholds.py</span><span class="story__blocks"><span class="blk blk--missed"></span><span class="blk blk--missed"></span><span class="blk blk--missed"></span><span class="blk blk--blocked"></span><span class="blk blk--fix"></span><span class="blk blk--fix"></span><span class="blk blk--landed"></span></span><span class="badge" data-tone="done">Done</span><span class="story__time num">51 min · 20 min model</span><span class="story__text">Missed 3 times and was blocked once, then landed after the crew's own fixes crew#208 and crew#209 merged. It was refused 3 times with the same reason.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#128</span> Move the report into report.py</span><span class="story__blocks"><span class="blk blk--landed"></span></span><span class="badge" data-tone="done">Done</span><span class="story__time num">23 min · 7 min model</span><span class="story__text">Landed first try.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#129</span> Move sprint ranges into sprint_range.py</span><span class="story__blocks"></span><span class="badge" data-tone="active">In Progress</span><span class="story__time num">not delivered</span><span class="story__text">Not delivered yet.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#130</span> Move serve into serve.py</span><span class="story__blocks"></span><span class="badge" data-tone="waiting">Closed, not planned</span><span class="story__time num">never built</span><span class="story__text">Superseded: closed as not planned, never built.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#131</span> Move the CLI into cli.py</span><span class="story__blocks"><span class="blk blk--missed"></span><span class="blk blk--blocked"></span></span><span class="badge" data-tone="blocked">Blocked</span><span class="story__time num">not delivered</span><span class="story__text">Blocked now; it missed once and was blocked once first.</span></div>
+</div>
+
+<div style="display: flex; flex-direction: column">
+<div style="display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 8px 0"><h3 style="font-size: 18px">One entry point for the CLI and the service</h3><span class="meta num">epic #124 · not part of a Goal · 1 of 3 stories done · 38 min worked, 7 min model</span><span class="badge" data-tone="waiting">Ready</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#132</span> Serve the trend from the package</span><span class="story__blocks"><span class="blk blk--missed"></span></span><span class="badge" data-tone="waiting">Ready</span><span class="story__time num">not delivered</span><span class="story__text">Not delivered yet; it missed once so far.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#133</span> Add the package's entry point</span><span class="story__blocks"><span class="blk blk--missed"></span><span class="blk blk--missed"></span><span class="blk blk--landed"></span></span><span class="badge" data-tone="done">Done</span><span class="story__time num">38 min · 7 min model</span><span class="story__text">Missed twice, then landed after it was escalated.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#136</span> Read the sprint from the service's query</span><span class="story__blocks"><span class="blk blk--missed"></span></span><span class="badge" data-tone="active">Reviewing</span><span class="story__time num">not delivered</span><span class="story__text">Not delivered yet; it missed once so far.</span></div>
+</div>
+</div>
+</section>
+
+<div style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+<section aria-labelledby="w1280-why-h" class="card">
+<div class="card__head"><h2 id="w1280-why-h">Why work didn't land first time</h2></div>
+<div class="card__body">
+<div class="bar-row"><span style="font-size: 14px">Checks didn't pass <span class="meta">· Developer</span></span><span></span><div class="bar" style="width: 100%"></div><span class="num" style="font-weight: 600">2</span></div>
+<div class="bar-row"><span style="font-size: 14px">An edit didn't apply <span class="meta">· Developer</span></span><span></span><div class="bar" style="width: 50%"></div><span class="num" style="font-weight: 600">1</span></div>
+</div>
+</section>
+
+<section aria-labelledby="w1280-back-h" class="card">
+<div class="card__head"><h2 id="w1280-back-h">Sent back</h2><span class="meta num">4 times</span></div>
+<div class="card__body" style="gap: 10px; font-size: 14px">
+<div><span class="num" style="font-weight: 600">#136</span> review asked for changes, so back to building <span class="meta num">· 22:48</span></div>
+<div><span class="num" style="font-weight: 600">#136</span> the checks at done found problems, so back to building <span class="meta num">· 22:36</span></div>
+<div><span class="num" style="font-weight: 600">#132</span> its session was blocked, so back to the split <span class="meta num">· 22:41</span></div>
+<div>A design was refused at review, so back to design <span class="meta num">· 21:49</span></div>
+</div>
+</section>
+
+<section aria-labelledby="w1280-att-h" class="card">
+<div class="card__head"><h2 id="w1280-att-h">Left open at the end</h2></div>
+<div class="card__body" style="gap: 10px; font-size: 14px">
+<div><span class="badge" data-tone="waiting">Waiting</span> sprint-metrics#62 is waiting for the Sponsor's approval, for 2 days.</div>
+<div><span class="badge" data-tone="waiting">Waiting</span> sprint-metrics#63 is waiting for the Sponsor's approval, for 2 days.</div>
+<div><span class="badge" data-tone="blocked">Blocked</span> sprint-metrics#131 is blocked, for 1 hour.</div>
+<div><span class="badge" data-tone="blocked">Refused</span> sprint-metrics#127 was refused 3 times with the same reason.</div>
+</div>
+</section>
+</div>
+</div>
+
+<section aria-labelledby="w1280-decided-h" style="background: var(--color-feature-bg); color: var(--color-feature-text); border-radius: 8px; padding: 24px; display: flex; flex-direction: column; gap: 14px">
+<h2 id="w1280-decided-h" style="font-size: 24px">Decided by the crew</h2>
+<div style="display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px 12px; font-size: 15px">
+<span class="num" style="color: var(--color-feature-accent); font-weight: 600">18:38</span><span>The crew merged sprint-metrics#122, the Architect's revision of the project's design.</span>
+<span class="num" style="color: var(--color-feature-accent); font-weight: 600">18:38</span><span>The crew filed sprint-metrics#123 as technical work, which skips the Sponsor's gate.</span>
+<span class="num" style="color: var(--color-feature-accent); font-weight: 600">18:38</span><span>The crew filed sprint-metrics#124 as technical work, which skips the Sponsor's gate.</span>
+</div>
+</section>
+
+<section aria-labelledby="w1280-dora-h" class="card">
+<div class="card__head"><h2 id="w1280-dora-h">How releases went</h2><span class="meta">DORA's four measures · placeholders until the package carries values</span></div>
+<div style="padding: 20px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px 16px">
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Releases this sprint</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[RELEASES]</div><div class="meta">release frequency</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Change to release</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[DAYS] d</div><div class="meta">lead time for changes</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Releases that failed</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[COUNT]</div><div class="meta">[RATE]% change failure rate</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Time to recover</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[MIN] min</div><div class="meta">mean time to recovery</div></div>
+</div>
+</section>
+
+<section aria-labelledby="w1280-time-h" class="card">
+<div class="card__head"><h2 id="w1280-time-h">Where the time went</h2><span class="meta">placeholders until the package carries values</span></div>
+<div class="card__body">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 15px">Model time: planning against building</div>
+<div style="height: 14px; border-radius: 4px; background: var(--color-surface-raised); display: flex; overflow: hidden"><div style="width: 50%; background: var(--stage-1)"></div><div style="width: 50%; background: var(--stage-3)"></div></div>
+<div class="meta num" style="display: flex; flex-wrap: wrap; gap: 4px 20px"><span>Planning (refinement): [MIN] min</span><span>Building (delivery): [MIN] min</span></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--color-border)">
+<div style="font-size: 15px">Time with no session running</div>
+<div style="height: 14px; border-radius: 4px; background: var(--color-surface-raised); display: flex; overflow: hidden"><div style="width: 20%; background: var(--color-text-dim)"></div></div>
+<div class="meta num">[IDLE] min of the sprint's [SPRINT] min</div>
+</div>
+</div>
+</section>
+
+<footer class="meta" style="border-top: 1px solid var(--color-border); padding-top: 16px">Times are Chicago time. From the crew's delivery-history 2.0.0 package, with sprint-metrics 4.2.1's answers. This board uses the package's mock data.</footer>
+
+</div>
+</div>
+</section>
+<section class="board-frame" aria-label="Sprint overview · 375px">
+<div class="board-label">Sprint overview · 375px</div>
+<div id="w375" class="frame frame--phone" style="width: 375px">
+<div style="display: flex; flex-direction: column; gap: 24px">
+
+<header style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px 24px; padding-bottom: 20px; background: linear-gradient(to right, var(--stage-1) 0 25%, var(--stage-2) 25% 50%, var(--stage-3) 50% 75%, var(--stage-5) 75% 100%) bottom / 100% 5px no-repeat">
+<a href="#w375" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--color-text)"><span aria-hidden="true" style="width: 32px; height: 32px; border-radius: 8px; background: var(--color-accent); color: var(--color-on-accent); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 600">Q</span><span style="font-family: var(--font-display); font-weight: 600; font-size: 20px">[Site name]</span></a>
+<nav aria-label="Views" style="display: flex; flex-wrap: wrap; gap: 4px; font-size: 14px; font-weight: 500">
+<a href="#w375" aria-current="page" style="padding: 10px 14px; min-height: 44px; box-sizing: border-box; border-radius: 8px; text-decoration: none; background: var(--color-surface-raised); color: var(--color-text)">Sprints</a>
+<a href="#w375-about" style="padding: 10px 14px; min-height: 44px; box-sizing: border-box; border-radius: 8px; text-decoration: none; color: var(--color-text-dim)">About the crew</a>
+</nav>
+</header>
+
+<section id="w375-about" aria-labelledby="w375-about-h" style="display: flex; flex-wrap: wrap; gap: 8px 32px; align-items: baseline">
+<h2 id="w375-about-h" style="font-size: 20px; flex: 0 0 auto">What this is</h2>
+<p style="margin: 0; flex: 1 1 420px; color: var(--color-text-dim)">A crew of AI roles (a Product Owner, an Architect, Developers, reviewers and QA) builds real software projects in one-day sprints, with one person approving its plans. Each page is one sprint: what got done, how much of it worked first time, what sent work back, and what the crew decided on its own.</p>
+</section>
+
+<nav aria-label="Sprints" style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px">
+<a href="#w375-s5" style="padding: 10px 14px; min-height: 44px; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--color-border); text-decoration: none; color: var(--color-text-dim); background: var(--color-surface)">Sprint 5 · Thu 24 Sep</a>
+<a href="#w375" aria-current="page" style="padding: 10px 14px; min-height: 44px; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--color-text); text-decoration: none; color: var(--color-text); background: var(--color-surface); font-weight: 600">Sprint 6 · Fri 25 Sep</a>
+</nav>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div class="meta">mqucifer · sprint-metrics · Fri 25 September 2026, one day</div>
+<h1 style="font-size: var(--h1-size); line-height: 1.1">Sprint 6, as the crew ran it</h1>
+</div>
+
+<section aria-label="Sprint totals" class="card" style="padding: 20px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px 16px">
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Stories delivered</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">6</div><div class="meta">18 points</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Landed first try</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">3 of 6</div><div style="height: 8px; margin-top: 6px; border-radius: 4px; background: var(--color-surface-raised); display: flex"><div style="width: 50%; background: var(--color-accent); border-radius: 4px"></div></div><div class="meta">50%</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Start to delivered</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">10 h 55 min</div><div class="meta">cycle time</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Filed to delivered</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">1 d 1 h</div><div class="meta">lead time</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Days blocked</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">1</div><div class="meta">1 story superseded, 3 points</div></div>
+</section>
+
+<section aria-labelledby="w375-changed-h" class="card">
+<div class="card__head"><h2 id="w375-changed-h">What changed since Sprint 5</h2><span class="meta">each line says it, then shows the two numbers</span></div>
+<div class="card__body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 32px">
+<div class="change"><span>The first-try rate fell from 67% to 50%.</span><span class="meta num">First-try rate: 67% → 50% · worse</span></div>
+<div class="change"><span>Stories delivered rose from 3 to 6.</span><span class="meta num">Stories delivered: 3 → 6 · better</span></div>
+<div class="change"><span>Points delivered rose from 9 to 18.</span><span class="meta num">Points delivered: 9 → 18 · better</span></div>
+<div class="change"><span>Days spent blocked rose from 0 to 1.</span><span class="meta num">Days blocked: 0 → 1 · worse</span></div>
+<div class="change"><span>The time from starting a story to delivering it rose from 6 hours 50 minutes to 10 hours 55 minutes.</span><span class="meta num">Start to delivered: 6 h 50 min → 10 h 55 min · worse</span></div>
+<div class="change"><span>The time from filing a story to delivering it fell from 1 day 7 hours to 1 day 1 hour.</span><span class="meta num">Filed to delivered: 1 d 7 h → 1 d 1 h · better</span></div>
+<div class="change"><span>Stories superseded rose from 0 to 1.</span><span class="meta num">Stories superseded: 0 → 1</span></div>
+<div class="change"><span>Fixes to the crew merged rose from 1 to 2.</span><span class="meta num">Fixes to the crew: 1 → 2</span></div>
+</div>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+<section aria-labelledby="w375-split-h" class="card" style="flex: 999 1 560px">
+<div class="card__head"><h2 id="w375-split-h">What got done, story by story</h2><span class="meta">by epic · time worked and model time per story</span></div>
+<div class="card__body">
+<div style="display: flex; flex-wrap: wrap; gap: 8px 18px" class="meta">
+<span style="display: flex; align-items: center; gap: 6px"><span class="blk blk--landed" style="width: 12px; height: 12px; border-radius: 3px"></span>attempt that landed</span>
+<span style="display: flex; align-items: center; gap: 6px"><span class="blk blk--missed" style="width: 12px; height: 12px; border-radius: 3px"></span>missed, tried again</span>
+<span style="display: flex; align-items: center; gap: 6px"><span class="blk blk--blocked" style="width: 12px; height: 12px; border-radius: 3px"></span>blocked</span>
+<span style="display: flex; align-items: center; gap: 6px"><span class="blk blk--fix" style="width: 12px; height: 12px; border-radius: 3px"></span>a fix to the crew merged</span>
+</div>
+
+<div style="display: flex; flex-direction: column">
+<div style="display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 8px 0"><h3 style="font-size: 18px">Split crew_performance.py into seven modules</h3><span class="meta num">epic #123 · not part of a Goal · 4 of 7 stories done · 2 h 8 min worked, 40 min model</span><span class="badge" data-tone="active">In Progress</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#125</span> Move the card model into card.py</span><span class="story__blocks"><span class="blk blk--landed"></span></span><span class="badge" data-tone="done">Done</span><span class="story__time num">23 min · 7 min model</span><span class="story__text">Landed first try.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#126</span> Move the metric functions into metrics.py</span><span class="story__blocks"><span class="blk blk--missed"></span><span class="blk blk--landed"></span></span><span class="badge" data-tone="done">Done</span><span class="story__time num">31 min · 7 min model</span><span class="story__text">Missed once, then landed.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#127</span> Extract threshold logic into thresholds.py</span><span class="story__blocks"><span class="blk blk--missed"></span><span class="blk blk--missed"></span><span class="blk blk--missed"></span><span class="blk blk--blocked"></span><span class="blk blk--fix"></span><span class="blk blk--fix"></span><span class="blk blk--landed"></span></span><span class="badge" data-tone="done">Done</span><span class="story__time num">51 min · 20 min model</span><span class="story__text">Missed 3 times and was blocked once, then landed after the crew's own fixes crew#208 and crew#209 merged. It was refused 3 times with the same reason.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#128</span> Move the report into report.py</span><span class="story__blocks"><span class="blk blk--landed"></span></span><span class="badge" data-tone="done">Done</span><span class="story__time num">23 min · 7 min model</span><span class="story__text">Landed first try.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#129</span> Move sprint ranges into sprint_range.py</span><span class="story__blocks"></span><span class="badge" data-tone="active">In Progress</span><span class="story__time num">not delivered</span><span class="story__text">Not delivered yet.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#130</span> Move serve into serve.py</span><span class="story__blocks"></span><span class="badge" data-tone="waiting">Closed, not planned</span><span class="story__time num">never built</span><span class="story__text">Superseded: closed as not planned, never built.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#131</span> Move the CLI into cli.py</span><span class="story__blocks"><span class="blk blk--missed"></span><span class="blk blk--blocked"></span></span><span class="badge" data-tone="blocked">Blocked</span><span class="story__time num">not delivered</span><span class="story__text">Blocked now; it missed once and was blocked once first.</span></div>
+</div>
+
+<div style="display: flex; flex-direction: column">
+<div style="display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 8px 0"><h3 style="font-size: 18px">One entry point for the CLI and the service</h3><span class="meta num">epic #124 · not part of a Goal · 1 of 3 stories done · 38 min worked, 7 min model</span><span class="badge" data-tone="waiting">Ready</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#132</span> Serve the trend from the package</span><span class="story__blocks"><span class="blk blk--missed"></span></span><span class="badge" data-tone="waiting">Ready</span><span class="story__time num">not delivered</span><span class="story__text">Not delivered yet; it missed once so far.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#133</span> Add the package's entry point</span><span class="story__blocks"><span class="blk blk--missed"></span><span class="blk blk--missed"></span><span class="blk blk--landed"></span></span><span class="badge" data-tone="done">Done</span><span class="story__time num">38 min · 7 min model</span><span class="story__text">Missed twice, then landed after it was escalated.</span></div>
+<div class="story"><span class="story__title"><span class="meta num">#136</span> Read the sprint from the service's query</span><span class="story__blocks"><span class="blk blk--missed"></span></span><span class="badge" data-tone="active">Reviewing</span><span class="story__time num">not delivered</span><span class="story__text">Not delivered yet; it missed once so far.</span></div>
+</div>
+</div>
+</section>
+
+<div style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+<section aria-labelledby="w375-why-h" class="card">
+<div class="card__head"><h2 id="w375-why-h">Why work didn't land first time</h2></div>
+<div class="card__body">
+<div class="bar-row"><span style="font-size: 14px">Checks didn't pass <span class="meta">· Developer</span></span><span></span><div class="bar" style="width: 100%"></div><span class="num" style="font-weight: 600">2</span></div>
+<div class="bar-row"><span style="font-size: 14px">An edit didn't apply <span class="meta">· Developer</span></span><span></span><div class="bar" style="width: 50%"></div><span class="num" style="font-weight: 600">1</span></div>
+</div>
+</section>
+
+<section aria-labelledby="w375-back-h" class="card">
+<div class="card__head"><h2 id="w375-back-h">Sent back</h2><span class="meta num">4 times</span></div>
+<div class="card__body" style="gap: 10px; font-size: 14px">
+<div><span class="num" style="font-weight: 600">#136</span> review asked for changes, so back to building <span class="meta num">· 22:48</span></div>
+<div><span class="num" style="font-weight: 600">#136</span> the checks at done found problems, so back to building <span class="meta num">· 22:36</span></div>
+<div><span class="num" style="font-weight: 600">#132</span> its session was blocked, so back to the split <span class="meta num">· 22:41</span></div>
+<div>A design was refused at review, so back to design <span class="meta num">· 21:49</span></div>
+</div>
+</section>
+
+<section aria-labelledby="w375-att-h" class="card">
+<div class="card__head"><h2 id="w375-att-h">Left open at the end</h2></div>
+<div class="card__body" style="gap: 10px; font-size: 14px">
+<div><span class="badge" data-tone="waiting">Waiting</span> sprint-metrics#62 is waiting for the Sponsor's approval, for 2 days.</div>
+<div><span class="badge" data-tone="waiting">Waiting</span> sprint-metrics#63 is waiting for the Sponsor's approval, for 2 days.</div>
+<div><span class="badge" data-tone="blocked">Blocked</span> sprint-metrics#131 is blocked, for 1 hour.</div>
+<div><span class="badge" data-tone="blocked">Refused</span> sprint-metrics#127 was refused 3 times with the same reason.</div>
+</div>
+</section>
+</div>
+</div>
+
+<section aria-labelledby="w375-decided-h" style="background: var(--color-feature-bg); color: var(--color-feature-text); border-radius: 8px; padding: 24px; display: flex; flex-direction: column; gap: 14px">
+<h2 id="w375-decided-h" style="font-size: 24px">Decided by the crew</h2>
+<div style="display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px 12px; font-size: 15px">
+<span class="num" style="color: var(--color-feature-accent); font-weight: 600">18:38</span><span>The crew merged sprint-metrics#122, the Architect's revision of the project's design.</span>
+<span class="num" style="color: var(--color-feature-accent); font-weight: 600">18:38</span><span>The crew filed sprint-metrics#123 as technical work, which skips the Sponsor's gate.</span>
+<span class="num" style="color: var(--color-feature-accent); font-weight: 600">18:38</span><span>The crew filed sprint-metrics#124 as technical work, which skips the Sponsor's gate.</span>
+</div>
+</section>
+
+<section aria-labelledby="w375-dora-h" class="card">
+<div class="card__head"><h2 id="w375-dora-h">How releases went</h2><span class="meta">DORA's four measures · placeholders until the package carries values</span></div>
+<div style="padding: 20px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px 16px">
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Releases this sprint</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[RELEASES]</div><div class="meta">release frequency</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Change to release</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[DAYS] d</div><div class="meta">lead time for changes</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Releases that failed</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[COUNT]</div><div class="meta">[RATE]% change failure rate</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Time to recover</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[MIN] min</div><div class="meta">mean time to recovery</div></div>
+</div>
+</section>
+
+<section aria-labelledby="w375-time-h" class="card">
+<div class="card__head"><h2 id="w375-time-h">Where the time went</h2><span class="meta">placeholders until the package carries values</span></div>
+<div class="card__body">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 15px">Model time: planning against building</div>
+<div style="height: 14px; border-radius: 4px; background: var(--color-surface-raised); display: flex; overflow: hidden"><div style="width: 50%; background: var(--stage-1)"></div><div style="width: 50%; background: var(--stage-3)"></div></div>
+<div class="meta num" style="display: flex; flex-wrap: wrap; gap: 4px 20px"><span>Planning (refinement): [MIN] min</span><span>Building (delivery): [MIN] min</span></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--color-border)">
+<div style="font-size: 15px">Time with no session running</div>
+<div style="height: 14px; border-radius: 4px; background: var(--color-surface-raised); display: flex; overflow: hidden"><div style="width: 20%; background: var(--color-text-dim)"></div></div>
+<div class="meta num">[IDLE] min of the sprint's [SPRINT] min</div>
+</div>
+</div>
+</section>
+
+<footer class="meta" style="border-top: 1px solid var(--color-border); padding-top: 16px">Times are Chicago time. From the crew's delivery-history 2.0.0 package, with sprint-metrics 4.2.1's answers. This board uses the package's mock data.</footer>
+
+</div>
+</div>
+</section>
+</div>
+</body>
+</html>
