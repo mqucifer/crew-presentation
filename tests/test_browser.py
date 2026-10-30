@@ -5474,6 +5474,165 @@ def test_attempt_chart_rows_match_stat_when_cards_missing_ac2():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_pattern_retried_not_labeled_first_try():
+    """AC1: a story with pattern 'retried' does not display 'first try' even when
+    first_attempt_numerator equals the total story count."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+            "pattern": "first_try",
+        },
+        {
+            "card": {"number": 2, "repo": "mqucifer/crew"},
+            "blocks": ["refused", "landed"],
+            "crew_fixes": [],
+            "delivered": True,
+            "pattern": "retried",
+        },
+    ]
+    cards = [
+        {
+            "number": i,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": f"story-{i}.py",
+        }
+        for i in range(1, 3)
+    ]
+    _make_package_first_attempt(
+        tag,
+        numerator=2,
+        denominator=2,
+        stories=stories,
+        cards=cards,
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The retried story's row must not show 'first try'
+        row_2 = re.search(
+            r'row.*?#2.*?attempt-status.*?>(.*?)</span>', html, re.DOTALL
+        )
+        assert row_2, "row for story #2 not found"
+        status_text = row_2.group(1)
+        assert "first try" not in status_text, (
+            f"retried story shows 'first try', expected a different badge; got {status_text!r}"
+        )
+        assert "retried" in status_text, (
+            f"retried story should show 'retried', got {status_text!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_no_cutting_to_denominator():
+    """AC2: 5 stories with events in a sprint render 5 attempt-row elements
+    even when first_attempt_denominator is 3."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": i, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+            "pattern": "first_try",
+        }
+        for i in range(1, 6)
+    ]
+    cards = [
+        {
+            "number": i,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": f"story-{i}.py",
+        }
+        for i in range(1, 6)
+    ]
+    _make_package_first_attempt(
+        tag,
+        numerator=3,
+        denominator=3,
+        stories=stories,
+        cards=cards,
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        row_count = html.count('class="attempt-row"')
+        assert row_count == 5, (
+            f"expected exactly 5 attempt-row elements, found {row_count}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_first_try_pattern_shows_first_try_regardless_of_position():
+    """AC3: a story with pattern 'first_try' that appears after position
+    first_attempt_numerator still displays 'first try'."""
+    tag = "delivery-history-TEST"
+    # Story 1: retried (position 1, within numerator)
+    # Story 2: first_try (position 2, beyond numerator=1)
+    stories = [
+        {
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "blocks": ["refused", "landed"],
+            "crew_fixes": [],
+            "delivered": True,
+            "pattern": "retried",
+        },
+        {
+            "card": {"number": 2, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+            "pattern": "first_try",
+        },
+    ]
+    cards = [
+        {
+            "number": i,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": f"story-{i}.py",
+        }
+        for i in range(1, 3)
+    ]
+    _make_package_first_attempt(
+        tag,
+        numerator=1,
+        denominator=2,
+        stories=stories,
+        cards=cards,
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Story #2 has pattern first_try and must show 'first try'
+        row_2 = re.search(
+            r'row.*?#2.*?attempt-status.*?>(.*?)</span>', html, re.DOTALL
+        )
+        assert row_2, "row for story #2 not found"
+        status_text = row_2.group(1)
+        assert status_text == "first try", (
+            f"story with pattern first_try should show 'first try', got {status_text!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_stats_wrap_to_multiple_rows_at_phone_width():
     """AC1: at a 375px viewport the .stats container is taller than a single .stat,
     proving the five stats wrap to at least two rows instead of one."""
