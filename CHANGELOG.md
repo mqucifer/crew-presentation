@@ -1,47 +1,20 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.0] - 2026-10-30
+
+### Added
+
+- The story's journey page shows the path through the board's stages: a strip of five steps (Refined, Built, Reviewed, QA, Merged) with the stage colours when the story was delivered (mqucifer/crew-presentation#100)
 
 ### Fixed
 
 - The sprint overview's story rows now show each story's own pattern from the package (first try, retried, crew fix, etc.) instead of assigning badges by position to match the first-attempt stat; stories are listed by their delivery date within the sprint's days, not cut to the stat's denominator (mqucifer/crew-presentation#193)
 - The sprint overview's stats row rendered the programming literal "None" when sprint-metrics reports null for a sprint with no delivered stories; it now renders an em dash (—) for missing values (mqucifer/crew-presentation#176)
 - The story-journey root page rendered two h1 headings and an empty content area; it now renders a single h1 in the header and a list of story links in the content (mqucifer/crew-presentation#176)
-
-## [Unreleased]
-
-### Added
-
-- The story's journey page shows the path through the board's stages: a strip of five steps (Refined, Built, Reviewed, QA, Merged) with the stage colours when the story was delivered (mqucifer/crew-presentation#100)
-
-## [Unreleased]
-
-### Fixed
-
 - Story pages load the site stylesheet: the CSS link now uses a path correct for the stories/ subdirectory (mqucifer/crew-presentation#176)
-
-## [Unreleased]
-
-### Fixed
-
 - The trend card's value lines show human-readable measure names for all measures (throughput, blocked_aging_days, superseded_count, crew_fixes_merged, wip_violations), not just those already in the label map (mqucifer/crew-presentation#176)
-
-## [Unreleased]
-
-### Fixed
-
 - Unknown failure-cause codes (such as 'REVIEW' or 'QA') now display as "Cause not recorded" instead of the raw code (mqucifer/crew-presentation#176)
-
-## [Unreleased]
-
-### Fixed
-
 - The attempt chart's rows now match the first-attempt stat: the number of rows equals the stat's denominator, and the 'first try' badge appears on exactly the stat's numerator rows, even when the cards array is missing entries for some stories (mqucifer/crew-presentation#176)
-
-## [Unreleased]
-
-### Fixed
-
 - The sprint navigation strip now shows each sprint's start date beside its name, so the list reads as chronology even when sprint numbers are non-sequential (mqucifer/crew-presentation#176)
 
 ## [0.1.2] - 2026-10-17
