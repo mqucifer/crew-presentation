@@ -42,7 +42,8 @@ h1,h2,h3{font-family:var(--font-display);font-weight:600;margin:0}
 </head>
 <body>
 <!-- The sprint overview after delivery-history 2.0.0: the Sponsor approved it on 2026-10-30.
-     Two widths side by side: 1280px and 375px. The data is delivery-history 2.0.0's mock (Sprint 6). -->
+     Two widths side by side: 1280px and 375px. The data is delivery-history 2.0.0's mock (Sprint 6);
+     [BRACKETED] values are placeholders for fields the mock leaves empty. -->
 <div class="boards">
 <section class="board-frame" aria-label="Sprint overview · 1280px">
 <div class="board-label">Sprint overview · 1280px</div>
@@ -166,12 +167,29 @@ h1,h2,h3{font-family:var(--font-display);font-weight:600;margin:0}
 </div>
 </section>
 
-<section aria-labelledby="w1280-not-h" class="card">
-<div class="card__head"><h2 id="w1280-not-h">Not shown yet</h2><span class="meta">what the data can't answer today</span></div>
-<div class="card__body" style="gap: 10px; font-size: 14px">
-<div><strong>DORA's four measures.</strong> Only lead time is measured. How often releases ship, how many fail, and how long a fix takes aren't in the data yet.</div>
-<div><strong>Where the model time goes.</strong> Each story's delivery time is here; the time spent planning it before delivery isn't.</div>
-<div><strong>Time with no session running.</strong> Not recorded yet.</div>
+<section aria-labelledby="w1280-dora-h" class="card">
+<div class="card__head"><h2 id="w1280-dora-h">How releases went</h2><span class="meta">DORA's four measures · placeholders until the package carries values</span></div>
+<div style="padding: 20px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px 16px">
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Releases this sprint</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[RELEASES]</div><div class="meta">release frequency</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Change to release</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[DAYS] d</div><div class="meta">lead time for changes</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Releases that failed</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[COUNT]</div><div class="meta">[RATE]% change failure rate</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Time to recover</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[MIN] min</div><div class="meta">mean time to recovery</div></div>
+</div>
+</section>
+
+<section aria-labelledby="w1280-time-h" class="card">
+<div class="card__head"><h2 id="w1280-time-h">Where the time went</h2><span class="meta">placeholders until the package carries values</span></div>
+<div class="card__body">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 15px">Model time: planning against building</div>
+<div style="height: 14px; border-radius: 4px; background: var(--color-surface-raised); display: flex; overflow: hidden"><div style="width: 50%; background: var(--stage-1)"></div><div style="width: 50%; background: var(--stage-3)"></div></div>
+<div class="meta num" style="display: flex; flex-wrap: wrap; gap: 4px 20px"><span>Planning (refinement): [MIN] min</span><span>Building (delivery): [MIN] min</span></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--color-border)">
+<div style="font-size: 15px">Time with no session running</div>
+<div style="height: 14px; border-radius: 4px; background: var(--color-surface-raised); display: flex; overflow: hidden"><div style="width: 20%; background: var(--color-text-dim)"></div></div>
+<div class="meta num">[IDLE] min of the sprint's [SPRINT] min</div>
+</div>
 </div>
 </section>
 
@@ -302,12 +320,29 @@ h1,h2,h3{font-family:var(--font-display);font-weight:600;margin:0}
 </div>
 </section>
 
-<section aria-labelledby="w375-not-h" class="card">
-<div class="card__head"><h2 id="w375-not-h">Not shown yet</h2><span class="meta">what the data can't answer today</span></div>
-<div class="card__body" style="gap: 10px; font-size: 14px">
-<div><strong>DORA's four measures.</strong> Only lead time is measured. How often releases ship, how many fail, and how long a fix takes aren't in the data yet.</div>
-<div><strong>Where the model time goes.</strong> Each story's delivery time is here; the time spent planning it before delivery isn't.</div>
-<div><strong>Time with no session running.</strong> Not recorded yet.</div>
+<section aria-labelledby="w375-dora-h" class="card">
+<div class="card__head"><h2 id="w375-dora-h">How releases went</h2><span class="meta">DORA's four measures · placeholders until the package carries values</span></div>
+<div style="padding: 20px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px 16px">
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Releases this sprint</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[RELEASES]</div><div class="meta">release frequency</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Change to release</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[DAYS] d</div><div class="meta">lead time for changes</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Releases that failed</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[COUNT]</div><div class="meta">[RATE]% change failure rate</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><div class="meta">Time to recover</div><div class="num" style="font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.1">[MIN] min</div><div class="meta">mean time to recovery</div></div>
+</div>
+</section>
+
+<section aria-labelledby="w375-time-h" class="card">
+<div class="card__head"><h2 id="w375-time-h">Where the time went</h2><span class="meta">placeholders until the package carries values</span></div>
+<div class="card__body">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 15px">Model time: planning against building</div>
+<div style="height: 14px; border-radius: 4px; background: var(--color-surface-raised); display: flex; overflow: hidden"><div style="width: 50%; background: var(--stage-1)"></div><div style="width: 50%; background: var(--stage-3)"></div></div>
+<div class="meta num" style="display: flex; flex-wrap: wrap; gap: 4px 20px"><span>Planning (refinement): [MIN] min</span><span>Building (delivery): [MIN] min</span></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--color-border)">
+<div style="font-size: 15px">Time with no session running</div>
+<div style="height: 14px; border-radius: 4px; background: var(--color-surface-raised); display: flex; overflow: hidden"><div style="width: 20%; background: var(--color-text-dim)"></div></div>
+<div class="meta num">[IDLE] min of the sprint's [SPRINT] min</div>
+</div>
 </div>
 </section>
 
