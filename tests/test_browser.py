@@ -375,9 +375,6 @@ def test_sprint_overview_header_and_stats():
         assert "22" in stats, f"throughput '22' not in stats: {stats[:200]}"
         assert "63" in stats, f"points '63' not in stats: {stats[:200]}"
         assert "12 of 22" in stats, f"'12 of 22' not in stats: {stats[:200]}"
-        assert ">1<" in stats or " 1 " in stats, (
-            f"escalation '1' not in stats: {stats[:200]}"
-        )
         assert "1 hr 42 min" in stats, f"'1 hr 42 min' not in stats: {stats[:200]}"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -404,7 +401,7 @@ def test_stat_value_css_properties():
 
 
 def test_zero_escalation_renders_zero():
-    """AC3: escalation_count 0 renders '0', not 'N/A' or empty."""
+    """AC3: escalation_count is not rendered as a stat; no 'escalations' label in stats."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -426,19 +423,9 @@ def test_zero_escalation_renders_zero():
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
         stats = _stats_section(html)
-        # Find the escalations stat
-        esc_match = re.search(
-            r'<span class="stat__value[^"]*">([^<]*?)</span>\s*<span class="stat__label">escalations</span>',
-            stats,
-            re.DOTALL,
+        assert "escalations" not in stats, (
+            f"escalations stat still present in stats section: {stats[:300]}"
         )
-        assert esc_match, "escalations stat not found in stats section"
-        value = esc_match.group(1).strip()
-        assert value == "0", (
-            f"escalation stat is {value!r}, expected '0'"
-        )
-        assert "N/A" not in value
-        assert value != ""
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -569,7 +556,7 @@ def test_view_nav_aria_current():
 
 
 def test_cycle_time_is_fourth_stat():
-    """AC7: '1 hr 42 min' is the fourth stat, label 'cycle time', after throughput/first-attempt/escalation."""
+    """AC7: '1 hr 42 min' is the third stat, label 'cycle time', after throughput/first-attempt."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -598,21 +585,18 @@ def test_cycle_time_is_fourth_stat():
         labels = re.findall(
             r'<span class="stat__label">(.*?)</span>', stats, re.DOTALL
         )
-        # The fourth stat (index 3) should be cycle time
-        assert len(values) >= 4, f"expected at least 4 stats, got {len(values)}"
-        assert values[3].strip() == "1 hr 42 min", (
-            f"4th stat value is {values[3]!r}, expected '1 hr 42 min'"
+        # The third stat (index 2) should be cycle time
+        assert len(values) >= 3, f"expected at least 3 stats, got {len(values)}"
+        assert values[2].strip() == "1 hr 42 min", (
+            f"3rd stat value is {values[2]!r}, expected '1 hr 42 min'"
         )
-        assert labels[3].strip() == "cycle time", (
-            f"4th stat label is {labels[3].strip()!r}, expected 'cycle time'"
+        assert labels[2].strip() == "cycle time", (
+            f"3rd stat label is {labels[2].strip()!r}, expected 'cycle time'"
         )
-        # Verify the three stats before it
+        # Verify the two stats before it
         assert "22" in values[0], f"1st stat is {values[0]!r}, expected throughput"
         assert "12 of 22" in values[1], (
             f"2nd stat is {values[1]!r}, expected first-attempt"
-        )
-        assert values[2].strip() == "1", (
-            f"3rd stat is {values[2]!r}, expected escalation '1'"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -5898,7 +5882,7 @@ def test_stat_values_not_horizontally_clipped_at_phone_width():
 
 
 def test_stats_single_row_at_desktop_width():
-    """AC3: at a 1440px viewport all five .stat elements share the same top offset,
+    """AC3: at a 1440px viewport all four .stat elements share the same top offset,
     i.e. they sit in a single row, unchanged from the desktop layout."""
     tag = "delivery-history-TEST"
     _make_fake_package(
@@ -5935,7 +5919,7 @@ def test_stats_single_row_at_desktop_width():
                 ).map((el) => el.getBoundingClientRect().top)
                 """
             )
-            assert len(tops) == 5, f"expected 5 .stat elements, got {len(tops)}"
+            assert len(tops) == 4, f"expected 4 .stat elements, got {len(tops)}"
             assert len(set(tops)) == 1, (
                 f"at 1440px the .stat top offsets differ {tops}; the stats are "
                 f"not in a single row"
@@ -5947,7 +5931,7 @@ def test_stats_single_row_at_desktop_width():
 
 
 def test_stat_values_and_order_at_phone_width():
-    """AC4: at a 375px viewport the five .stat__value elements keep their document
+    """AC4: at a 375px viewport the four .stat__value elements keep their document
     order and show the same values as at 1440px for the same package data. The
     reflow changes the layout, not the values or their order.
 
@@ -5995,17 +5979,17 @@ def test_stat_values_and_order_at_phone_width():
 
         phone = read_values({"width": 375, "height": 812})
         desktop = read_values({"width": 1440, "height": 900})
-        assert len(phone) == 5, f"expected 5 .stat__value at 375px, got {phone}"
-        assert len(desktop) == 5, f"expected 5 .stat__value at 1440px, got {desktop}"
+        assert len(phone) == 4, f"expected 4 .stat__value at 375px, got {phone}"
+        assert len(desktop) == 4, f"expected 4 .stat__value at 1440px, got {desktop}"
         assert phone == desktop, (
-            f"the five stat values differ between 375px {phone} and 1440px "
+            f"the four stat values differ between 375px {phone} and 1440px "
             f"{desktop}; reflow must not change the values or their order"
         )
         # The two fixed endpoints (first and last) pin the order and the
         # throughput/points values the criterion names.
         assert phone[0] == "22", f"first stat value is {phone[0]!r}, expected '22'"
-        assert phone[4] == "63", (
-            f"last stat value is {phone[4]!r}, expected '63'"
+        assert phone[3] == "63", (
+            f"last stat value is {phone[3]!r}, expected '63'"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -6055,7 +6039,7 @@ def test_stat_values_at_least_text_xl_at_phone_width():
                 )
                 """
             )
-            assert len(sizes) == 5, f"expected 5 .stat__value, got {len(sizes)}"
+            assert len(sizes) == 4, f"expected 4 .stat__value, got {len(sizes)}"
             under = [
                 (s, i)
                 for i, s in enumerate(sizes)
@@ -6141,7 +6125,7 @@ def test_first_stat_label_visible_under_value_at_phone_width():
 
 
 def test_stats_single_row_height_at_desktop_width():
-    """AC7: at a 1440px viewport all five .stat elements share the same top offset
+    """AC7: at a 1440px viewport all four .stat elements share the same top offset
     and the .stats element's height equals a single .stat's height — a single row,
     unchanged from the desktop layout."""
     tag = "delivery-history-TEST"
@@ -6179,7 +6163,7 @@ def test_stats_single_row_height_at_desktop_width():
                 ).map((el) => el.getBoundingClientRect().top)
                 """
             )
-            assert len(tops) == 5, f"expected 5 .stat elements, got {len(tops)}"
+            assert len(tops) == 4, f"expected 4 .stat elements, got {len(tops)}"
             assert len(set(tops)) == 1, (
                 f"at 1440px the .stat top offsets differ {tops}; not a single row"
             )
@@ -6507,7 +6491,7 @@ def test_changed_trend_first_attempt_rate_label():
 
 
 def test_changed_trend_escalation_count_label():
-    """AC2, AC4: escalation_count renders as 'escalations:' in .changed-trend-values."""
+    """AC2, AC4: escalation_count is not rendered in .changed-trend-values."""
     tag = "delivery-history-TEST"
     _make_package_with_changed(
         tag,
@@ -6531,13 +6515,9 @@ def test_changed_trend_escalation_count_label():
         values_div = re.search(
             r'class="changed-trend-values">(.*?)</div>', html, re.DOTALL
         )
-        assert values_div, "no changed-trend-values div found"
-        values_text = values_div.group(0)
-        assert "escalations:" in values_text, (
-            f"expected 'escalations:' in .changed-trend-values, got: {values_text!r}"
-        )
-        assert "escalation_count" not in values_text, (
-            f"raw field name 'escalation_count' still present in .changed-trend-values"
+        assert values_div is None, (
+            f"escalation entry should not appear in .changed-trend-values, "
+            f"got: {values_div.group(0)!r}"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -6639,8 +6619,9 @@ def test_changed_trend_no_field_name_pattern_in_values():
         values_divs = re.findall(
             r'class="changed-trend-values">(.*?)</div>', html, re.DOTALL
         )
-        assert len(values_divs) == 5, (
-            f"expected 5 .changed-trend-values elements, got {len(values_divs)}"
+        assert len(values_divs) == 4, (
+            f"expected 4 .changed-trend-values elements (escalation filtered out), "
+            f"got {len(values_divs)}"
         )
         field_name_pattern = re.compile(r"[a-z]+_[a-z]+")
         for i, div_text in enumerate(values_divs, 1):
