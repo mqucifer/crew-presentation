@@ -131,6 +131,7 @@ def _render_pages(pkg: Path) -> dict:
         cards_by_key[key] = card
 
     env.globals["crew_repository"] = crew_repository
+    env.globals["static_prefix"] = ""
 
     pages = {}
 

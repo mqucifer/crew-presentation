@@ -279,6 +279,56 @@ def test_sprint_nav_hrefs_resolve():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_view_nav_hrefs_resolve_from_stories():
+    """AC1–AC3: view nav links resolve correctly from story pages and the root."""
+    tag = "delivery-history-TEST"
+    cards = [
+        {
+            "repo": "mqucifer/crew-presentation",
+            "number": 100,
+            "title": "Test story",
+        }
+    ]
+    _make_fake_package(tag, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        story_file = BUILD_DIR / "stories" / "mqucifer-crew-presentation-100.html"
+        assert story_file.is_file(), f"story file not found: {story_file}"
+
+        def _check_view_nav(page: Path, expected_texts: set[str]) -> None:
+            """Verify that named links in the view nav resolve to existing files."""
+            html = page.read_text()
+            nav = _view_nav(html)
+            hrefs = re.findall(r'<a[^>]*href="([^"]*)"[^>]*>([^<]*)</a>', nav)
+            found = set()
+            for href, text in hrefs:
+                if text in expected_texts:
+                    target = (page.parent / href).resolve()
+                    assert target.is_file(), (
+                        f"link '{text}' (href='{href}') in {page.name} "
+                        f"does not resolve to an existing file"
+                    )
+                    found.add(text)
+            assert found == expected_texts, (
+                f"{page.name}: expected links {expected_texts}, found {found}"
+            )
+
+        # AC1 & AC2: from the story page, both links resolve
+        _check_view_nav(
+            story_file, {"A story's journey", "Replay"}
+        )
+
+        # AC3: from the root-level story-journey.html, Replay resolves
+        journey_file = BUILD_DIR / "story-journey.html"
+        assert journey_file.is_file(), f"root story-journey.html not found"
+        _check_view_nav(journey_file, {"Replay"})
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_sprint_nav_shows_start_date():
     """AC1: each sprint nav link includes the sprint's start date alongside its name."""
     sprints = [

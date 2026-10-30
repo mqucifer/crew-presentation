@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- The story pages' "A story's journey" and "Replay" header nav links were relative paths that resolved to non-existent files under stories/; they now use a prefix so they resolve to the root-level pages (mqucifer/crew-presentation#223)
+
+### Fixed
+
 - The story-journey root page scrolls horizontally at phone widths when card titles are long; story list links now wrap with `overflow-wrap: break-word` (mqucifer/crew-presentation#223)
 
 ### Fixed
