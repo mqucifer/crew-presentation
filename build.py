@@ -530,7 +530,7 @@ def _build_board_state(
 
     Returns (columns, board_cards) where columns is an ordered list of column
     names and board_cards maps each column name to a list of card dicts with
-    'link_text' and 'title' keys.
+    'link_text', 'link_url' and 'title' keys.
     """
     events = _load_sprint_events(pkg, sprint_name, index)
     cards = index.get("cards", [])
@@ -583,7 +583,8 @@ def _build_board_state(
             display_repo = card.get("repo", "")
         number = card.get("number", "")
         board[col].append({
-            "link_text": f"[{display_repo}#{number}]({url})",
+            "link_text": f"{display_repo}#{number}",
+            "link_url": url,
             "title": card.get("title", ""),
         })
 
