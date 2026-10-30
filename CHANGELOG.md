@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- The story's journey page now shows a "What happened, in order" timeline of the story's recorded events (timestamps and column moves) and a "What it cost" section with developer calls and wall-clock time, drawn from the package's events and analysis (mqucifer/crew-presentation#223)
+
 ### Fixed
 
 - The story-journey root page scrolls horizontally at phone widths when card titles are long; story list links now wrap with `overflow-wrap: break-word` (mqucifer/crew-presentation#223)
