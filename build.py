@@ -135,6 +135,7 @@ def _render_pages(pkg: Path) -> dict:
     pages = {}
 
     sprint_template = env.get_template("sprint_overview.html")
+    default_sprint_slug = ""
     for sprint in sprints:
         slug = _slug(sprint["name"])
         key = sprint["name"]
@@ -220,6 +221,7 @@ def _render_pages(pkg: Path) -> dict:
             "current_view": "sprint",
         }
         pages[slug] = sprint_template.render(**context)
+        default_sprint_slug = slug
 
     current_view_map = {
         "replay.html": "replay",
@@ -230,7 +232,7 @@ def _render_pages(pkg: Path) -> dict:
         context = {
             "manifest": manifest,
             "package": index,
-            "sprint_slug": "",
+            "sprint_slug": default_sprint_slug,
             "current_view": current_view_map.get(template_name, "sprint"),
         }
         if template_name == "replay.html":
@@ -263,7 +265,7 @@ def _render_pages(pkg: Path) -> dict:
             card=card,
             manifest=manifest,
             package=index,
-            sprint_slug="",
+            sprint_slug=default_sprint_slug,
             current_view="journey",
             static_prefix="../",
         )
@@ -529,7 +531,7 @@ def _build_board_state(
 
     Returns (columns, board_cards) where columns is an ordered list of column
     names and board_cards maps each column name to a list of card dicts with
-    'link_text' and 'title' keys.
+    'link_text', 'link_url' and 'title' keys.
     """
     events = _load_sprint_events(pkg, sprint_name, index)
     cards = index.get("cards", [])
@@ -582,7 +584,8 @@ def _build_board_state(
             display_repo = card.get("repo", "")
         number = card.get("number", "")
         board[col].append({
-            "link_text": f"[{display_repo}#{number}]({url})",
+            "link_text": f"{display_repo}#{number}",
+            "link_url": url,
             "title": card.get("title", ""),
         })
 
