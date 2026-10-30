@@ -426,11 +426,11 @@ def _format_minutes(total_minutes) -> str:
 
     Zero units are omitted and days are never shown (R2), so a sprint that
     ran for a few hundred minutes reads in the reader's terms, not as
-    '0 days'. A missing value (a fixture without cycle_time_minutes) renders
-    empty rather than inventing one.
+    '0 days'. A missing value (JSON null) renders '—', the same mark
+    _stat_value uses for other missing stats.
     """
     if total_minutes is None:
-        return ""
+        return "—"
     hours, minutes = divmod(int(total_minutes), 60)
     if hours == 0:
         return f"{minutes} min"

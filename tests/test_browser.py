@@ -7921,3 +7921,43 @@ def test_zero_sprint_metrics_render_zero_and_fraction():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_null_metrics_cycle_time_renders_em_dash_like_other_stats():
+    """AC2: when sprint-metrics is null for every field, the cycle-time stat's
+    value element contains the em dash '\u2014', the same mark as the other four
+    stat value elements on that .stats row."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 33"],
+        metrics={
+            "Sprint 33": {
+                "throughput": None,
+                "first_attempt_numerator": None,
+                "first_attempt_denominator": None,
+                "escalation_count": None,
+                "points_delivered": None,
+                "cycle_time_minutes": None,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-33.html").read_text()
+        stats = _stats_section(html)
+        values = re.findall(
+            r'<span class="stat__value[^"]*">(.*?)</span>', stats, re.DOTALL
+        )
+        assert len(values) == 5, (
+            f"expected 5 stat values, got {len(values)}: {values}"
+        )
+        for i, value in enumerate(values, 1):
+            assert value.strip() == "\u2014", (
+                f"stat {i} value is {value.strip()!r}, expected em dash '\u2014'"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
