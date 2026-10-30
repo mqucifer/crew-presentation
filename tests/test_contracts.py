@@ -125,7 +125,7 @@ def test_setup_fails_on_missing_release(monkeypatch, tmp_path):
     assert not index, f"index file present after failed setup: {index}"
 
 
-SUPPORTED_MAJOR_VERSIONS = (1,)
+SUPPORTED_MAJOR_VERSIONS = (1, 2)
 
 
 def _package_dir() -> Path:
@@ -210,13 +210,13 @@ def test_non_conforming_file_fails_with_file_name():
 
 def test_unsupported_major_version_fails_with_version():
     """AC3: a package on an unsupported major version fails, naming the version."""
-    manifest = {"schema_version": "2.0.0"}
+    manifest = {"schema_version": "3.0.0"}
 
     with pytest.raises(ValueError) as exc_info:
         _check_schema_version(manifest)
 
     message = str(exc_info.value)
-    assert "2" in message
+    assert "3" in message
     assert "cannot display" in message
 
 
@@ -228,7 +228,7 @@ def test_build_fails_on_unsupported_major_version():
 
     (pkg_dir / "manifest.json").write_text(
         json.dumps(
-            {"schema_version": "2.0.0", "package": "delivery-history", "date": "2026-01-01"}
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-01-01"}
         )
     )
     (pkg_dir / "manifest.schema.json").write_text(
@@ -251,7 +251,7 @@ def test_build_fails_on_unsupported_major_version():
         )
         assert result.returncode != 0, "build.py should fail for unsupported major version"
         output = result.stdout + result.stderr
-        assert "2" in output, f"output should name the major version: {output}"
+        assert "3" in output, f"output should name the major version: {output}"
         assert "cannot display" in output, (
             f"output should say the version is unsupported: {output}"
         )
