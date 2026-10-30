@@ -7965,9 +7965,18 @@ def test_replay_page_scrollwidth_at_phone_width():
                 f"replay page scrollWidth is {scroll_width}, expected <= 375"
             )
 
-            # AC2: verify board structure
+            # The board must be laid out as a grid (the bug: no CSS rules
+            # for .replay-board meant the columns were not laid out).
             board = page.query_selector('[aria-label="Board"]')
             assert board is not None, "no Board section found"
+            display = page.evaluate(
+                "el => getComputedStyle(el).display", board
+            )
+            assert display == "grid", (
+                f".replay-board computed display is {display!r}, expected 'grid'"
+            )
+
+            # AC2: verify board structure
             cols = board.query_selector_all(".replay-col")
             assert len(cols) == 9, f"Board has {len(cols)} columns, expected 9"
             expected_names = [
