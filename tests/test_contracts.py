@@ -220,6 +220,11 @@ def test_unsupported_major_version_fails_with_version():
     assert "cannot display" in message
 
 
+def test_check_schema_version_accepts_major_2():
+    """AC1: a manifest on schema major 2 passes the version gate without raising."""
+    _check_schema_version({"schema_version": "2.0.0"})
+
+
 def test_build_fails_on_unsupported_major_version():
     """AC2: build.py exits non-zero and names the major version as unsupported."""
     tag = "delivery-history-TEST"
@@ -254,6 +259,166 @@ def test_build_fails_on_unsupported_major_version():
         assert "3" in output, f"output should name the major version: {output}"
         assert "cannot display" in output, (
             f"output should say the version is unsupported: {output}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_build_succeeds_on_well_formed_major_2_package():
+    """AC3: a well-formed 2.0.0 package completes the build and writes the expected pages."""
+    tag = "delivery-history-TEST-2"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "2.0.0", "package": "delivery-history", "date": "2026-11-06"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+
+    index = {
+        "package": "delivery-history",
+        "schema_version": "2.0.0",
+        "date": "2026-11-06",
+        "timezone": "America/Chicago",
+        "crew_repository": "crew",
+        "repositories": ["crew-presentation"],
+        "sprints": [
+            {"name": "Sprint 1", "start": "2026-11-06", "end": "2026-11-06"}
+        ],
+        "cards": [
+            {
+                "repo": "crew-presentation",
+                "number": 1,
+                "type": "Story",
+                "title": "A test story",
+                "url": "https://github.com/mqucifer/crew-presentation/issues/1",
+                "parent": None,
+                "points": 1,
+                "sprint": "Sprint 1",
+                "status": "Done",
+                "status_set": "2026-11-06T12:00:00Z",
+                "created": "2026-11-06T09:00:00Z",
+                "closed": "2026-11-06T12:00:00Z",
+                "technical": False,
+                "closed_as": "completed",
+                "superseded_because": None,
+            }
+        ],
+        "periods": [
+            {
+                "sprint": "Sprint 1",
+                "start": "2026-11-06",
+                "end": "2026-11-06",
+                "file": "events/2026-11-06.json",
+                "events": 1,
+            }
+        ],
+        "analysis": {
+            "sprints": [
+                {
+                    "sprint": "Sprint 1",
+                    "as_of": "2026-11-06T23:59:59.999999-05:00",
+                    "changed": [],
+                    "attention": [],
+                    "decided": [],
+                }
+            ],
+            "stories": [
+                {
+                    "card": {"repo": "crew-presentation", "number": 1},
+                    "pattern": "first_try",
+                    "misses": 0,
+                    "blocks": 0,
+                    "escalations": 0,
+                    "crew_fixes": [],
+                    "repeated": None,
+                    "delivered": "2026-11-06T12:00:00Z",
+                    "wall_clock_seconds": 300,
+                    "cost": None,
+                    "text": "Merged.",
+                }
+            ],
+            "deliveries": [],
+        },
+        "sprint_metrics": {
+            "release": "2.0.0",
+            "answers": {
+                "Sprint 1": {
+                    "cycle_time_days": 0,
+                    "lead_time_days": 0,
+                    "throughput": 1,
+                    "wip_violations": 0,
+                    "blocked_aging_days": 0,
+                    "escalation_rate_percent": 0,
+                    "points_delivered": 1,
+                    "first_attempt_numerator": 1,
+                    "first_attempt_denominator": 1,
+                    "escalation_count": 0,
+                    "superseded_count": 0,
+                    "superseded_points": 0,
+                    "first_attempt_rate_percent": 100,
+                    "failure_breakdown": [],
+                    "top_failure_causes": {},
+                    "superseded_breakdown": None,
+                    "flags": None,
+                    "prior": None,
+                    "delta": None,
+                    "cycle_time_minutes": 30,
+                    "lead_time_minutes": 30,
+                }
+            },
+        },
+    }
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(parents=True, exist_ok=True)
+    (events_dir / "2026-11-06.json").write_text(
+        json.dumps(
+            {
+                "events": [
+                    {
+                        "at": "2026-11-06T09:00:00Z",
+                        "card": {"repo": "crew-presentation", "number": 1},
+                        "from_column": "Inbox (Goals)",
+                        "to_column": "Sprint Backlog",
+                    }
+                ]
+            }
+        )
+    )
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"build.py should succeed for a well-formed 2.0.0 package:\n"
+            f"{result.stdout}\n{result.stderr}"
+        )
+        build_dir = REPO_ROOT / "build"
+        assert (build_dir / "sprint-1.html").is_file(), (
+            "sprint-overview page not written for 2.0.0 package"
+        )
+        assert (build_dir / "stories" / "crew-presentation-1.html").is_file(), (
+            "story page not written for 2.0.0 package"
+        )
+        assert (build_dir / "replay.html").is_file(), (
+            "replay page not written for 2.0.0 package"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original_tag)
