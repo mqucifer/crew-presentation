@@ -2649,7 +2649,7 @@ def test_sprint_page_scrollwidth_at_phone_width():
 
 
 def test_story_journey_scrollwidth_at_phone_width():
-    """AC3: story-journey page at 390px viewport has documentElement.scrollWidth <= 390."""
+    """AC1-AC2: story-journey page at 375px viewport has scrollWidth <= 375 with long titles."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -2665,6 +2665,17 @@ def test_story_journey_scrollwidth_at_phone_width():
             }
         },
     )
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["cards"] = [
+        {"repo": "mqucifer/crew", "number": 1, "title": "Fix typo"},
+        {
+            "repo": "mqucifer/crew",
+            "number": 127,
+            "title": "Extract the threshold logic into a separate module with proper type annotations and full docstrings",
+        },
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
     original = DELIVERY_HISTORY_TAG.read_text()
     DELIVERY_HISTORY_TAG.write_text(tag + "\n")
     try:
@@ -2675,15 +2686,51 @@ def test_story_journey_scrollwidth_at_phone_width():
 
         with sync_playwright() as pw:
             browser = pw.chromium.launch()
-            context = browser.new_context(viewport={"width": 390, "height": 844})
+            context = browser.new_context(viewport={"width": 375, "height": 812})
             page = context.new_page()
             _intercept_design_system(page)
             page.goto(f"file://{page_path}")
             page.wait_for_load_state("domcontentloaded")
 
             scroll_width = page.evaluate("document.documentElement.scrollWidth")
-            assert scroll_width <= 390, (
-                f"story-journey page scrollWidth is {scroll_width}, expected <= 390"
+            assert scroll_width <= 375, (
+                f"story-journey page scrollWidth is {scroll_width}, expected <= 375"
+            )
+
+            # AC2: the section contains exactly 2 li elements with correct link text
+            li_texts = page.eval_on_selector_all(
+                "section ul li a", "els => els.map(el => el.textContent)"
+            )
+            assert len(li_texts) == 2, f"expected 2 li elements, found {len(li_texts)}"
+            assert li_texts[0] == "mqucifer/crew#1 — Fix typo", (
+                f"first link text is {li_texts[0]!r}, expected 'mqucifer/crew#1 — Fix typo'"
+            )
+            assert (
+                li_texts[1]
+                == "mqucifer/crew#127 — Extract the threshold logic into a separate module with proper type annotations and full docstrings"
+            ), (
+                f"second link text is {li_texts[1]!r}, expected full long title"
+            )
+
+            # A card title containing a very long unbreakable segment (no spaces)
+            # must not force horizontal scroll: overflow-wrap: break-word breaks it.
+            unbreakable = "a" * 200
+            data["cards"] = [
+                {
+                    "repo": "mqucifer/crew",
+                    "number": 999,
+                    "title": unbreakable,
+                },
+            ]
+            (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+            _build()
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            scroll_width = page.evaluate("document.documentElement.scrollWidth")
+            assert scroll_width <= 375, (
+                f"story-journey page scrollWidth is {scroll_width} with a long "
+                f"unbreakable title, expected <= 375"
             )
 
             browser.close()
@@ -7921,6 +7968,80 @@ def test_zero_sprint_metrics_render_zero_and_fraction():
         assert first_try_match.group(1) == "0 of 4", (
             f"first-try stat is {first_try_match.group(1)!r}, expected '0 of 4'"
         )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_page_scrollwidth_at_phone_width():
+    """AC1: replay page at 375px viewport has documentElement.scrollWidth <= 375."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"at": "2026-10-07T08:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Needs Refinement", "to_column": "Ready"},
+        {"at": "2026-10-07T09:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Ready", "to_column": "Sprint Backlog"},
+        {"at": "2026-10-07T10:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress"},
+        {"at": "2026-10-07T11:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "Reviewing"},
+        {"at": "2026-10-07T12:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Reviewing", "to_column": "QAing"},
+        {"at": "2026-10-07T13:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "QAing", "to_column": "Merging"},
+        {"at": "2026-10-07T14:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Merging", "to_column": "Done"},
+        {"at": "2026-10-08T08:00:00Z", "card": {"number": 2, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "Blocked"},
+    ]
+    cards = [
+        {"number": 1, "repo": "mqucifer/crew", "title": "card one", "url": "https://github.com/mqucifer/crew/issues/1"},
+        {"number": 2, "repo": "mqucifer/crew", "title": "card two", "url": "https://github.com/mqucifer/crew/issues/2"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            scroll_width = page.evaluate("document.documentElement.scrollWidth")
+            assert scroll_width <= 375, (
+                f"replay page scrollWidth is {scroll_width}, expected <= 375"
+            )
+
+            # The board must be laid out as a grid (the bug: no CSS rules
+            # for .replay-board meant the columns were not laid out).
+            board = page.query_selector('[aria-label="Board"]')
+            assert board is not None, "no Board section found"
+            display = page.evaluate(
+                "el => getComputedStyle(el).display", board
+            )
+            assert display == "grid", (
+                f".replay-board computed display is {display!r}, expected 'grid'"
+            )
+
+            # AC2: verify board structure
+            cols = board.query_selector_all(".replay-col")
+            assert len(cols) == 9, f"Board has {len(cols)} columns, expected 9"
+            expected_names = [
+                "Needs Refinement", "Ready", "Sprint Backlog",
+                "In Progress", "Reviewing", "QAing",
+                "Merging", "Done", "Blocked",
+            ]
+            for col, name in zip(cols, expected_names):
+                header = col.query_selector(".replay-col__header")
+                assert header is not None, f"column {name!r} has no .replay-col__header"
+                assert header.text_content() == name, (
+                    f"column header is {header.text_content()!r}, expected {name!r}"
+                )
+
+            browser.close()
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)

@@ -210,6 +210,45 @@
   color: var(--color-feature-dim);
 }
 
+/* Replay board: the columns of work as they stand */
+.replay-board {
+  grid-column: span 9;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.replay-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.replay-col__header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-dim);
+}
+
+.replay-col__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.replay-card {
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
 /* Phone layout: stack the main content sections in DOM order. */
 @media (max-width: 767px) {
   .sprint-grid {
@@ -217,8 +256,12 @@
   }
   .sprint-chart,
   .sprint-side,
-  .sprint-decided {
+  .sprint-decided,
+  .replay-board {
     grid-column: 1 / -1;
+  }
+  .replay-board {
+    grid-template-columns: 1fr;
   }
   .attempt-row {
     display: flex;
@@ -256,6 +299,11 @@
     display: inline-flex;
     align-items: center;
   }
+}
+
+/* Story list: long titles must wrap without forcing horizontal scroll. */
+section ul li a {
+  overflow-wrap: break-word;
 }
 
 /* Attempt-row link: journey-page navigation */
