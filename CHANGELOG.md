@@ -6,6 +6,10 @@
 
 - The "Why work didn't land first time" chart now reads a 2.0.0 package's top_failure_causes (a list of {class, role, count}) and shows each entry's class and count, instead of rendering every row as "Cause not recorded"; 1.x map shapes and empty/absent causes still build unchanged (mqucifer/crew-presentation#211)
 
+### Fixed
+
+- The replay page's board cards now render their reference as a real hyperlink (repo#number as the visible label, the issue URL as the href) instead of printing the literal markdown link text (mqucifer/crew-presentation#223)
+
 ## [0.2.0] - 2026-10-30
 
 ### Added
