@@ -8,6 +8,10 @@
 
 ### Fixed
 
+- The replay page's board columns rendered at unconstrained width on a phone, causing sideways scroll; the board now reflows to the viewport width (mqucifer/crew-presentation#223)
+
+### Fixed
+
 - The replay page's board cards now render their reference as a real hyperlink (repo#number as the visible label, the issue URL as the href) instead of printing the literal markdown link text (mqucifer/crew-presentation#223)
 
 ## [0.2.0] - 2026-10-30
