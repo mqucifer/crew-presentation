@@ -70,7 +70,13 @@
             <span class="attempt-block attempt-block--crew-fix"></span>
             {% endif %}
           </div>
+          {% if story.pattern %}
           <span class="attempt-status attempt-status--{{ story.pattern | replace('_', '-') }}">{{ story.status }}</span>
+          {% elif story.status == 'first try' %}
+          <span class="attempt-status attempt-status--first-try">first try</span>
+          {% else %}
+          <span class="attempt-status attempt-status--merged">{{ story.status }}</span>
+          {% endif %}
         </div>
         {% endfor %}
       </div>

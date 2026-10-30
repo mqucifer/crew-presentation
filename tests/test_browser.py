@@ -951,7 +951,7 @@ def test_attempt_legend_exactly_four_items():
 
 
 def test_attempt_row_empty_blocks_in_progress():
-    """AC4: a story with empty blocks and delivered=false shows a single dashed-border block and 'in progress' in dim text."""
+    """AC4: a delivered story with empty blocks shows a single dashed-border block and its pattern as status."""
     tag = "delivery-history-TEST"
     _make_package_with_stories(
         tag,
@@ -960,7 +960,8 @@ def test_attempt_row_empty_blocks_in_progress():
                 "card": {"number": 199, "repo": "mqucifer/crew"},
                 "blocks": [],
                 "crew_fixes": [],
-                "delivered": False,
+                "delivered": True,
+                "pattern": "first_try",
             }
         ],
         cards=[
@@ -985,11 +986,11 @@ def test_attempt_row_empty_blocks_in_progress():
         assert 'attempt-block--refused' not in html
         assert 'attempt-block--landed' not in html
         assert 'attempt-block--blocked' not in html
-        # Status is 'in progress' with the progress class (dim text colour)
-        assert 'class="attempt-status attempt-status--progress"' in html, (
-            "in-progress status class not found"
+        # Status is 'first try' with the first-try class
+        assert 'class="attempt-status attempt-status--first-try"' in html, (
+            "first-try status class not found"
         )
-        assert ">in progress<" in html, "status text 'in progress' not found"
+        assert ">first try<" in html, "status text 'first try' not found"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -4091,6 +4092,7 @@ def test_attempt_status_first_try_no_truncation_phone():
             "blocks": ["landed"],
             "crew_fixes": [],
             "delivered": True,
+            "pattern": "first_try",
         }
     ]
     cards = [
@@ -5146,14 +5148,14 @@ def test_non_first_try_count_matches_stat_ac1():
     """AC1: attempt-chart rows match the stat: exactly denominator rows,
     numerator 'first try' badges, and the remainder 'merged'."""
     tag = "delivery-history-TEST"
-    # 5 stories: blocks=["landed"], delivered=True, all with matching cards.
-    # The stat says only 3 are first-try, so exactly 3 get the badge and 2 are 'merged'.
+    # 5 stories: 3 with pattern first_try, 2 with pattern retried.
     stories = [
         {
             "card": {"number": i, "repo": "mqucifer/crew"},
             "blocks": ["landed"],
             "crew_fixes": [],
             "delivered": True,
+            "pattern": "first_try" if i <= 3 else "retried",
         }
         for i in range(1, 6)
     ]
@@ -5198,17 +5200,17 @@ def test_non_first_try_count_matches_stat_ac1():
                         return status && status.textContent.trim() === 'first try';
                     }).length
             """)
-            merged_count = page.evaluate("""
+            retried_count = page.evaluate("""
                 () => Array.from(document.querySelectorAll('.attempt-chart .attempt-row'))
                     .filter(row => {
                         const status = row.querySelector('.attempt-status');
-                        return status && status.textContent.trim() === 'merged';
+                        return status && status.textContent.trim() === 'retried';
                     }).length
             """)
 
             assert row_count == 5, f"expected 5 rows, found {row_count}"
             assert first_try_count == 3, f"expected 3 'first try', found {first_try_count}"
-            assert merged_count == 2, f"expected 2 'merged', found {merged_count}"
+            assert retried_count == 2, f"expected 2 'retried', found {retried_count}"
             browser.close()
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -5226,6 +5228,7 @@ def test_non_first_try_count_mismatch_names_both_values():
             "blocks": ["landed"],
             "crew_fixes": [],
             "delivered": True,
+            "pattern": "first_try",
         }
         for i in range(1, 13)
     ]
@@ -5236,6 +5239,7 @@ def test_non_first_try_count_mismatch_names_both_values():
             "blocks": ["refused", "landed"],
             "crew_fixes": [],
             "delivered": True,
+            "pattern": "retried",
         }
         for i in range(13, 23)
     ]
@@ -5324,6 +5328,7 @@ def test_non_first_try_count_all_first_try():
             "blocks": ["landed"],
             "crew_fixes": [],
             "delivered": True,
+            "pattern": "first_try",
         }
         for i in range(1, 6)
     ]
