@@ -14,7 +14,7 @@
       <div class="replay-col__cards">
       {% for card in board_cards.get(col, []) %}
         <div class="replay-card">
-          <span class="num meta">{{ card.link_text }}</span>
+          <a href="{{ card.link_url }}" class="num meta">{{ card.link_text }}</a>
           {{ card.title }}
         </div>
       {% endfor %}

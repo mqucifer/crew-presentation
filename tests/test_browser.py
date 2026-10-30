@@ -7210,13 +7210,13 @@ def test_replay_card_initial_column_is_earliest_from_column():
             r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
         )
         assert board_match, "no Board section"
-        card_text = "[mqucifer/crew-presentation#127](https://github.com/mqucifer/crew-presentation/issues/127)"
+        expected_href = "https://github.com/mqucifer/crew-presentation/issues/127"
         sb_col_match = re.search(
             r'class="replay-col__header">Sprint Backlog</div>\s*<div class="replay-col__cards">(.*?)</div>\s*</div>',
             board_match.group(1), re.DOTALL
         )
         assert sb_col_match, "Sprint Backlog column not found"
-        assert card_text in sb_col_match.group(1), (
+        assert expected_href in sb_col_match.group(1), (
             f"Card 127 not in Sprint Backlog column"
         )
         ip_col_match = re.search(
@@ -7224,7 +7224,7 @@ def test_replay_card_initial_column_is_earliest_from_column():
             board_match.group(1), re.DOTALL
         )
         if ip_col_match:
-            assert card_text not in ip_col_match.group(1), (
+            assert expected_href not in ip_col_match.group(1), (
                 "Card 127 incorrectly in In Progress column"
             )
         done_col_match = re.search(
@@ -7232,7 +7232,7 @@ def test_replay_card_initial_column_is_earliest_from_column():
             board_match.group(1), re.DOTALL
         )
         if done_col_match:
-            assert card_text not in done_col_match.group(1), (
+            assert expected_href not in done_col_match.group(1), (
                 "Card 127 incorrectly in Done column"
             )
     finally:
@@ -7241,7 +7241,7 @@ def test_replay_card_initial_column_is_earliest_from_column():
 
 
 def test_replay_card_text_includes_link_and_title():
-    """AC3: card's visible text includes the exact link string and the card's title."""
+    """AC3: card's visible text includes the link as an <a> element and the card's title."""
     tag = "delivery-history-TEST"
     sprints = [
         {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
@@ -7262,17 +7262,34 @@ def test_replay_card_text_includes_link_and_title():
             r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
         )
         assert board_match, "no Board section"
-        card_text = "[mqucifer/crew-presentation#127](https://github.com/mqucifer/crew-presentation/issues/127)"
+        # The card must contain an <a> with the issue URL as href and the
+        # visible label "mqucifer/crew-presentation#127".
+        expected_href = "https://github.com/mqucifer/crew-presentation/issues/127"
+        expected_label = "mqucifer/crew-presentation#127"
         found = False
         for m in re.finditer(r'<div class="replay-card">(.*?)</div>', board_match.group(1), re.DOTALL):
             content = m.group(1)
-            if card_text in content:
+            if expected_href in content:
                 found = True
+                a_match = re.search(
+                    r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', content
+                )
+                assert a_match, f"No <a> element found in card: {content!r}"
+                assert a_match.group(1) == expected_href, (
+                    f"href is {a_match.group(1)!r}, expected {expected_href!r}"
+                )
+                assert a_match.group(2) == expected_label, (
+                    f"visible text is {a_match.group(2)!r}, expected {expected_label!r}"
+                )
                 assert "thresholds.py" in content, (
                     f"Card title 'thresholds.py' not found in card element: {content!r}"
                 )
+                # Ensure the literal markdown is not present
+                assert f"[{expected_label}]({expected_href})" not in content, (
+                    "Card still contains literal markdown link text"
+                )
                 break
-        assert found, f"Card with link {card_text!r} not found in board"
+        assert found, f"Card with href {expected_href!r} not found in board"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -7407,25 +7424,34 @@ def test_replay_single_event_card_in_from_column_with_num_class():
             r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
         )
         assert board_match, "no Board section"
-        card_text = "[mqucifer/crew-presentation#130](https://github.com/mqucifer/crew-presentation/issues/130)"
+        expected_href = "https://github.com/mqucifer/crew-presentation/issues/130"
+        expected_label = "mqucifer/crew-presentation#130"
         sb_col_match = re.search(
             r'class="replay-col__header">Sprint Backlog</div>\s*<div class="replay-col__cards">(.*?)</div>\s*</div>',
             board_match.group(1), re.DOTALL
         )
         assert sb_col_match, "Sprint Backlog column not found"
-        assert card_text in sb_col_match.group(1), (
-            "Card 130 not in Sprint Backlog column"
+        assert expected_href in sb_col_match.group(1), (
+            "Card 130 link not in Sprint Backlog column"
         )
         assert "serve.py" in sb_col_match.group(1), (
             "Card title 'serve.py' not found"
         )
+        # The link must be in an <a> element with class 'num'
         num_match = re.search(
-            r'<(\w+)[^>]*class="[^"]*num[^"]*"[^>]*>([^<]*)</\1>',
+            r'<a[^>]*href="([^"]*)"[^>]*class="[^"]*num[^"]*"[^>]*>([^<]*)</a>',
             sb_col_match.group(1)
         )
-        assert num_match, "No element with class 'num' found in Sprint Backlog column"
-        assert card_text in num_match.group(2), (
-            f"Link text not inside .num element: {num_match.group(2)!r}"
+        assert num_match, "No <a> element with class 'num' found in Sprint Backlog column"
+        assert num_match.group(1) == expected_href, (
+            f"Link href is {num_match.group(1)!r}, expected {expected_href!r}"
+        )
+        assert num_match.group(2) == expected_label, (
+            f"Link text is {num_match.group(2)!r}, expected {expected_label!r}"
+        )
+        # Ensure the literal markdown is not present
+        assert f"[{expected_label}]({expected_href})" not in sb_col_match.group(1), (
+            "Card still contains literal markdown link text"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
