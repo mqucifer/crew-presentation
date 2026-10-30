@@ -7163,13 +7163,13 @@ def test_replay_card_initial_column_is_earliest_from_column():
             r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
         )
         assert board_match, "no Board section"
-        card_text = "[mqucifer/crew-presentation#127](https://github.com/mqucifer/crew-presentation/issues/127)"
+        expected_href = "https://github.com/mqucifer/crew-presentation/issues/127"
         sb_col_match = re.search(
             r'class="replay-col__header">Sprint Backlog</div>\s*<div class="replay-col__cards">(.*?)</div>\s*</div>',
             board_match.group(1), re.DOTALL
         )
         assert sb_col_match, "Sprint Backlog column not found"
-        assert card_text in sb_col_match.group(1), (
+        assert expected_href in sb_col_match.group(1), (
             f"Card 127 not in Sprint Backlog column"
         )
         ip_col_match = re.search(
@@ -7177,7 +7177,7 @@ def test_replay_card_initial_column_is_earliest_from_column():
             board_match.group(1), re.DOTALL
         )
         if ip_col_match:
-            assert card_text not in ip_col_match.group(1), (
+            assert expected_href not in ip_col_match.group(1), (
                 "Card 127 incorrectly in In Progress column"
             )
         done_col_match = re.search(
@@ -7185,7 +7185,7 @@ def test_replay_card_initial_column_is_earliest_from_column():
             board_match.group(1), re.DOTALL
         )
         if done_col_match:
-            assert card_text not in done_col_match.group(1), (
+            assert expected_href not in done_col_match.group(1), (
                 "Card 127 incorrectly in Done column"
             )
     finally:
