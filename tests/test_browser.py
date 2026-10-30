@@ -42,6 +42,7 @@ def _make_fake_package(
     sprint_names: list[str] | None = None,
     metrics: dict | None = None,
     sprints: list[dict] | None = None,
+    schema_version: str = "1.0.0",
 ) -> Path:
     """Create a minimal fake package directory with the given sprint names."""
     if sprints is None:
@@ -68,7 +69,11 @@ def _make_fake_package(
     pkg_dir.mkdir(parents=True, exist_ok=True)
     (pkg_dir / "manifest.json").write_text(
         json.dumps(
-            {"schema_version": "1.0.0", "package": "delivery-history", "date": "2026-01-01"}
+            {
+                "schema_version": schema_version,
+                "package": "delivery-history",
+                "date": "2026-01-01",
+            }
         )
     )
     (pkg_dir / "manifest.schema.json").write_text(
@@ -1484,6 +1489,165 @@ def test_failure_causes_empty_renders_no_failures():
         assert "No failures recorded" in html, "'No failures recorded' not found"
         # No bar elements
         assert 'class="cause-bar' not in html, "bar elements found for empty causes"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_failure_causes_2_0_list_shape_renders_class_rows():
+    """AC1: 2.0.0 {class, role, count} entries render one row each, the class as the
+    label, each count preserved, and no row is the 'Cause not recorded' placeholder."""
+    tag = "delivery-history-TEST"
+    causes = [
+        {"class": "VERIFY", "role": "Developer", "count": 7},
+        {"class": "EDIT", "role": "Developer", "count": 1},
+    ]
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+        schema_version="2.0.0",
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # one row per entry
+        assert section.count('class="cause-row"') == 2, (
+            f"expected 2 cause rows, got {section.count('class=\"cause-row\"')}"
+        )
+        # the class is shown as the label, not the placeholder
+        assert ">VERIFY</span>" in section, "2.0.0 class 'VERIFY' not shown as a label"
+        assert ">EDIT</span>" in section, "2.0.0 class 'EDIT' not shown as a label"
+        # each row's count equals the entry's count
+        assert ">7</span>" in section, "VERIFY count 7 not shown"
+        assert ">1</span>" in section, "EDIT count 1 not shown"
+        # a class-carrying entry is not the 'Cause not recorded' placeholder
+        assert "Cause not recorded" not in section, (
+            "a class-carrying entry must not render as 'Cause not recorded'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_failure_causes_1x_map_shape_renders_rows():
+    """AC2: a 1.x {class: count} map still renders one row per entry with those counts."""
+    tag = "delivery-history-TEST"
+    causes = {"VERIFY": 7, "EDIT": 1}
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": causes,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # one row per entry
+        assert section.count('class="cause-row"') == 2, (
+            f"expected 2 cause rows, got {section.count('class=\"cause-row\"')}"
+        )
+        # the counts are preserved
+        assert ">7</span>" in section, "VERIFY count 7 not shown"
+        assert ">1</span>" in section, "EDIT count 1 not shown"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_failure_causes_2_0_empty_list_renders_no_failures():
+    """AC3: a 2.0.0 package with an empty top_failure_causes list renders 'No failures
+    recorded' and the build does not fail."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": [],
+            }
+        },
+        schema_version="2.0.0",
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()  # asserts the build did not fail
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        assert "No failures recorded" in section, "'No failures recorded' not found"
+        assert 'class="cause-row"' not in section, "cause rows found for empty causes"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_failure_causes_2_0_absent_renders_no_failures():
+    """AC3: a 2.0.0 package with no top_failure_causes renders 'No failures recorded'
+    and the build does not fail."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+            }
+        },
+        schema_version="2.0.0",
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()  # asserts the build did not fail
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_start = html.index('class="cause-chart"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        assert "No failures recorded" in section, "'No failures recorded' not found"
+        assert 'class="cause-row"' not in section, "cause rows found for absent causes"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
