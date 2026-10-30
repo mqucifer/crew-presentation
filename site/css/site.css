@@ -140,6 +140,30 @@
   color: var(--tone-done-text);
 }
 
+.attempt-status--retried {
+  color: var(--color-text);
+}
+
+.attempt-status--crew-fix {
+  color: var(--color-text);
+}
+
+.attempt-status--escalated {
+  color: var(--color-text);
+}
+
+.attempt-status--superseded {
+  color: var(--color-text-dim);
+}
+
+.attempt-status--blocked {
+  color: var(--tone-blocked-text);
+}
+
+.attempt-status--open {
+  color: var(--color-text-dim);
+}
+
 .attempt-status--progress {
   color: var(--color-text-dim);
 }

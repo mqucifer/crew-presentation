@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- The sprint overview's story rows now show each story's own pattern from the package (first try, retried, crew fix, etc.) instead of assigning badges by position to match the first-attempt stat; stories are listed by their delivery date within the sprint's days, not cut to the stat's denominator (mqucifer/crew-presentation#193)
 - The sprint overview's stats row rendered the programming literal "None" when sprint-metrics reports null for a sprint with no delivered stories; it now renders an em dash (—) for missing values (mqucifer/crew-presentation#176)
 - The story-journey root page rendered two h1 headings and an empty content area; it now renders a single h1 in the header and a list of story links in the content (mqucifer/crew-presentation#176)
 

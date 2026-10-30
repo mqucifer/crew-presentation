@@ -951,7 +951,7 @@ def test_attempt_legend_exactly_four_items():
 
 
 def test_attempt_row_empty_blocks_in_progress():
-    """AC4: a story with empty blocks and delivered=false shows a single dashed-border block and 'in progress' in dim text."""
+    """AC4: a delivered story with empty blocks shows a single dashed-border block and its pattern as status."""
     tag = "delivery-history-TEST"
     _make_package_with_stories(
         tag,
@@ -960,7 +960,8 @@ def test_attempt_row_empty_blocks_in_progress():
                 "card": {"number": 199, "repo": "mqucifer/crew"},
                 "blocks": [],
                 "crew_fixes": [],
-                "delivered": False,
+                "delivered": True,
+                "pattern": "first_try",
             }
         ],
         cards=[
@@ -985,11 +986,11 @@ def test_attempt_row_empty_blocks_in_progress():
         assert 'attempt-block--refused' not in html
         assert 'attempt-block--landed' not in html
         assert 'attempt-block--blocked' not in html
-        # Status is 'in progress' with the progress class (dim text colour)
-        assert 'class="attempt-status attempt-status--progress"' in html, (
-            "in-progress status class not found"
+        # Status is 'first try' with the first-try class
+        assert 'class="attempt-status attempt-status--first-try"' in html, (
+            "first-try status class not found"
         )
-        assert ">in progress<" in html, "status text 'in progress' not found"
+        assert ">first try<" in html, "status text 'first try' not found"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -4091,6 +4092,7 @@ def test_attempt_status_first_try_no_truncation_phone():
             "blocks": ["landed"],
             "crew_fixes": [],
             "delivered": True,
+            "pattern": "first_try",
         }
     ]
     cards = [
@@ -5146,14 +5148,14 @@ def test_non_first_try_count_matches_stat_ac1():
     """AC1: attempt-chart rows match the stat: exactly denominator rows,
     numerator 'first try' badges, and the remainder 'merged'."""
     tag = "delivery-history-TEST"
-    # 5 stories: blocks=["landed"], delivered=True, all with matching cards.
-    # The stat says only 3 are first-try, so exactly 3 get the badge and 2 are 'merged'.
+    # 5 stories: 3 with pattern first_try, 2 with pattern retried.
     stories = [
         {
             "card": {"number": i, "repo": "mqucifer/crew"},
             "blocks": ["landed"],
             "crew_fixes": [],
             "delivered": True,
+            "pattern": "first_try" if i <= 3 else "retried",
         }
         for i in range(1, 6)
     ]
@@ -5198,17 +5200,17 @@ def test_non_first_try_count_matches_stat_ac1():
                         return status && status.textContent.trim() === 'first try';
                     }).length
             """)
-            merged_count = page.evaluate("""
+            retried_count = page.evaluate("""
                 () => Array.from(document.querySelectorAll('.attempt-chart .attempt-row'))
                     .filter(row => {
                         const status = row.querySelector('.attempt-status');
-                        return status && status.textContent.trim() === 'merged';
+                        return status && status.textContent.trim() === 'retried';
                     }).length
             """)
 
             assert row_count == 5, f"expected 5 rows, found {row_count}"
             assert first_try_count == 3, f"expected 3 'first try', found {first_try_count}"
-            assert merged_count == 2, f"expected 2 'merged', found {merged_count}"
+            assert retried_count == 2, f"expected 2 'retried', found {retried_count}"
             browser.close()
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -5226,6 +5228,7 @@ def test_non_first_try_count_mismatch_names_both_values():
             "blocks": ["landed"],
             "crew_fixes": [],
             "delivered": True,
+            "pattern": "first_try",
         }
         for i in range(1, 13)
     ]
@@ -5236,6 +5239,7 @@ def test_non_first_try_count_mismatch_names_both_values():
             "blocks": ["refused", "landed"],
             "crew_fixes": [],
             "delivered": True,
+            "pattern": "retried",
         }
         for i in range(13, 23)
     ]
@@ -5324,6 +5328,7 @@ def test_non_first_try_count_all_first_try():
             "blocks": ["landed"],
             "crew_fixes": [],
             "delivered": True,
+            "pattern": "first_try",
         }
         for i in range(1, 6)
     ]
@@ -5464,6 +5469,165 @@ def test_attempt_chart_rows_match_stat_when_cards_missing_ac2():
                 f"expected exactly 3 attempt-row elements, found {row_count}"
             )
             browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_pattern_retried_not_labeled_first_try():
+    """AC1: a story with pattern 'retried' does not display 'first try' even when
+    first_attempt_numerator equals the total story count."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+            "pattern": "first_try",
+        },
+        {
+            "card": {"number": 2, "repo": "mqucifer/crew"},
+            "blocks": ["refused", "landed"],
+            "crew_fixes": [],
+            "delivered": True,
+            "pattern": "retried",
+        },
+    ]
+    cards = [
+        {
+            "number": i,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": f"story-{i}.py",
+        }
+        for i in range(1, 3)
+    ]
+    _make_package_first_attempt(
+        tag,
+        numerator=2,
+        denominator=2,
+        stories=stories,
+        cards=cards,
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The retried story's row must not show 'first try'
+        row_2 = re.search(
+            r'row.*?#2.*?attempt-status.*?>(.*?)</span>', html, re.DOTALL
+        )
+        assert row_2, "row for story #2 not found"
+        status_text = row_2.group(1)
+        assert "first try" not in status_text, (
+            f"retried story shows 'first try', expected a different badge; got {status_text!r}"
+        )
+        assert "retried" in status_text, (
+            f"retried story should show 'retried', got {status_text!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_no_cutting_to_denominator():
+    """AC2: 5 stories with events in a sprint render 5 attempt-row elements
+    even when first_attempt_denominator is 3."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": i, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+            "pattern": "first_try",
+        }
+        for i in range(1, 6)
+    ]
+    cards = [
+        {
+            "number": i,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": f"story-{i}.py",
+        }
+        for i in range(1, 6)
+    ]
+    _make_package_first_attempt(
+        tag,
+        numerator=3,
+        denominator=3,
+        stories=stories,
+        cards=cards,
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        row_count = html.count('class="attempt-row"')
+        assert row_count == 5, (
+            f"expected exactly 5 attempt-row elements, found {row_count}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_first_try_pattern_shows_first_try_regardless_of_position():
+    """AC3: a story with pattern 'first_try' that appears after position
+    first_attempt_numerator still displays 'first try'."""
+    tag = "delivery-history-TEST"
+    # Story 1: retried (position 1, within numerator)
+    # Story 2: first_try (position 2, beyond numerator=1)
+    stories = [
+        {
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "blocks": ["refused", "landed"],
+            "crew_fixes": [],
+            "delivered": True,
+            "pattern": "retried",
+        },
+        {
+            "card": {"number": 2, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "crew_fixes": [],
+            "delivered": True,
+            "pattern": "first_try",
+        },
+    ]
+    cards = [
+        {
+            "number": i,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": f"story-{i}.py",
+        }
+        for i in range(1, 3)
+    ]
+    _make_package_first_attempt(
+        tag,
+        numerator=1,
+        denominator=2,
+        stories=stories,
+        cards=cards,
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Story #2 has pattern first_try and must show 'first try'
+        row_2 = re.search(
+            r'row.*?#2.*?attempt-status.*?>(.*?)</span>', html, re.DOTALL
+        )
+        assert row_2, "row for story #2 not found"
+        status_text = row_2.group(1)
+        assert status_text == "first try", (
+            f"story with pattern first_try should show 'first try', got {status_text!r}"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
