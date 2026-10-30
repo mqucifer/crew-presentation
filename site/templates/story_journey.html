@@ -1,39 +1,77 @@
-{% extends "base.html" %}
-{% block title %}{% if card %}{{ card.number }} — {{ card.title }}{% else %}A story's journey{% endif %}{% endblock %}
-{% block h1 %}<h1>{% if card %}{{ card.repo }}#{{ card.number }}{% else %}A story's journey{% endif %}</h1>{% endblock %}
-{% block content %}
-{% if card %}
-{% set story = namespace(found=None) %}
-{% for s in package.get('analysis', {}).get('stories', []) %}
-  {% if s.card.number == card.number and s.card.repo == card.repo %}
-    {% set story.found = s %}
-  {% endif %}
-{% endfor %}
-{% set is_delivered = story.found is not none and story.found.delivered %}
-<section class="card card--padded" aria-labelledby="journey-h">
-  <div class="card__head">
-    <h2 id="journey-h">{{ card.title }}</h2>
-  </div>
-  <div class="card__body">
-    <p class="meta">{{ card.repo }} · #{{ card.number }}</p>
-    {% if story.found and story.found.text %}
-    <p>{{ story.found.text }}</p>
-    {% endif %}
-    <div class="path" role="img" aria-label="Path: {% if is_delivered %}refined, built, reviewed, QA, merged — all reached{% else %}in progress{% endif %}">
-      {% for name, num in [("Refined", "1"), ("Built", "2"), ("Reviewed", "3"), ("QA", "4"), ("Merged", "5")] %}
-      <div class="path__step"{% if is_delivered %} data-stage="{{ num }}"{% endif %}>{{ name }}</div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-{% else %}
-<section>
-  <h2>Stories</h2>
-  <ul>
-  {% for c in package.cards %}
-  <li><a href="stories/{{ c.repo | replace('/', '-') }}-{{ c.number }}.html">{{ c.repo }}#{{ c.number }} — {{ c.title }}</a></li>
-  {% endfor %}
-  </ul>
-</section>
-{% endif %}
-{% endblock %}
+ {% extends "base.html" %}
+ {% block title %}{% if card %}{{ card.number }} — {{ card.title }}{% else %}A story's journey{% endif %}{% endblock %}
+ {% block h1 %}<h1>{% if card %}{{ card.repo }}#{{ card.number }}{% else %}A story's journey{% endif %}</h1>{% endblock %}
+ {% block content %}
+ {% if card %}
+ {% set story = namespace(found=None) %}
+ {% for s in package.get('analysis', {}).get('stories', []) %}
+   {% if s.card.number == card.number and s.card.repo == card.repo %}
+     {% set story.found = s %}
+   {% endif %}
+ {% endfor %}
+ {% set is_delivered = story.found is not none and story.found.delivered %}
+ <section class="card card--padded" aria-labelledby="journey-h">
+   <div class="card__head">
+     <h2 id="journey-h">{{ card.title }}</h2>
+   </div>
+   <div class="card__body">
+     <p class="meta">{{ card.repo }} · #{{ card.number }}</p>
+     {% if story.found and story.found.text %}
+     <p>{{ story.found.text }}</p>
+     {% endif %}
+     <div class="path" role="img" aria-label="Path: {% if is_delivered %}refined, built, reviewed, QA, merged — all reached{% else %}in progress{% endif %}">
+       {% for name, num in [("Refined", "1"), ("Built", "2"), ("Reviewed", "3"), ("QA", "4"), ("Merged", "5")] %}
+       <div class="path__step"{% if is_delivered %} data-stage="{{ num }}"{% endif %}>{{ name }}</div>
+       {% endfor %}
+     </div>
+   </div>
+ </section>
+ {% if events %}
+ <section class="card card--padded" aria-labelledby="timeline-h">
+   <div class="card__head">
+     <h2 id="timeline-h">What happened, in order</h2>
+   </div>
+   <div class="card__body">
+     <ol class="timeline">
+       {% for event in events %}
+       <li class="timeline__item">
+         <span class="timeline__time">{{ event.time }}</span>
+         <span class="timeline__text">{{ event.text }}</span>
+       </li>
+       {% endfor %}
+     </ol>
+   </div>
+ </section>
+ {% endif %}
+ {% if wall_clock %}
+ <section class="card card--padded" aria-labelledby="cost-h">
+   <div class="card__head">
+     <h2 id="cost-h">What it cost</h2>
+   </div>
+   <div class="card__body">
+     <div class="cost-grid">
+       {% if model_calls is not none %}
+       <div class="cost-grid__item">
+         <span class="cost-grid__label">Developer calls</span>
+         <span class="cost-grid__value stat__value">{{ model_calls }}</span>
+       </div>
+       {% endif %}
+       <div class="cost-grid__item">
+         <span class="cost-grid__label">Wall-clock</span>
+         <span class="cost-grid__value stat__value">{{ wall_clock }}</span>
+       </div>
+     </div>
+   </div>
+ </section>
+ {% endif %}
+ {% else %}
+ <section>
+   <h2>Stories</h2>
+   <ul>
+   {% for c in package.cards %}
+   <li><a href="stories/{{ c.repo | replace('/', '-') }}-{{ c.number }}.html">{{ c.repo }}#{{ c.number }} — {{ c.title }}</a></li>
+   {% endfor %}
+   </ul>
+ </section>
+ {% endif %}
+ {% endblock %}

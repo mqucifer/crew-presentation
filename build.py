@@ -255,12 +255,38 @@ def _render_pages(pkg: Path) -> dict:
         pages[output_name] = template.render(**context)
 
     story_journey_template = env.get_template("story_journey.html")
+    all_events = _load_all_events(pkg, index)
     for card in cards:
         repo = card.get("repo", "")
         number = card.get("number")
         if not repo or number is None:
             continue
         slug = f"{repo.replace('/', '-')}-{number}.html"
+        # Find the analysis story for this card
+        story_entry = None
+        for s in analysis_stories:
+            if s.get("card", {}).get("number") == number and s.get("card", {}).get("repo") == repo:
+                story_entry = s
+                break
+        # Load and format events for this card
+        card_events = _filter_events_by_card(all_events, number, repo)
+        formatted_events = [
+            {
+                "time": _format_event_time(e.get("at", "")),
+                "text": _format_event_description(e),
+            }
+            for e in card_events
+        ]
+        # Cost data
+        wall_clock = None
+        model_calls = None
+        if story_entry:
+            wcs = story_entry.get("wall_clock_seconds")
+            if wcs is not None:
+                wall_clock = _format_minutes(round(wcs / 60))
+            cost = story_entry.get("cost")
+            if cost:
+                model_calls = cost.get("model_calls")
         pages[f"stories/{slug}"] = story_journey_template.render(
             card=card,
             manifest=manifest,
@@ -268,6 +294,9 @@ def _render_pages(pkg: Path) -> dict:
             sprint_slug=default_sprint_slug,
             current_view="journey",
             static_prefix="../",
+            events=formatted_events,
+            wall_clock=wall_clock,
+            model_calls=model_calls,
         )
 
     return pages
@@ -521,6 +550,54 @@ def _load_sprint_events(pkg: Path, sprint_name: str, index: dict) -> list[dict]:
                 data = _load_json(events_file)
                 return data.get("events", [])
     return []
+
+
+def _load_all_events(pkg: Path, index: dict) -> list[dict]:
+    """Load all events from all period files in the package."""
+    periods = index.get("periods", [])
+    events: list[dict] = []
+    for period in periods:
+        events_file = pkg / period["file"]
+        if events_file.is_file():
+            data = _load_json(events_file)
+            events.extend(data.get("events", []))
+    return events
+
+
+def _filter_events_by_card(
+    events: list[dict], card_number, card_repo: str
+) -> list[dict]:
+    """Filter events to those for a specific card, sorted by timestamp."""
+    card_events = [
+        e
+        for e in events
+        if e.get("card", {}).get("number") == card_number
+        and e.get("card", {}).get("repo") == card_repo
+    ]
+    card_events.sort(key=lambda e: e.get("at", ""))
+    return card_events
+
+
+def _format_event_time(at: str) -> str:
+    """Extract HH:MM from an ISO timestamp like '2026-10-01T09:15:00+00:00'."""
+    match = re.search(r"T(\d{2}):(\d{2})", at)
+    if match:
+        return f"{match.group(1)}:{match.group(2)}"
+    return at
+
+
+def _format_event_description(event: dict) -> str:
+    """A human-readable description of an event for the timeline."""
+    kind = event.get("kind", "")
+    to_column = event.get("to_column")
+    from_column = event.get("from_column")
+    if to_column and (kind == "move" or kind == "card_moved"):
+        return f"Moved to {to_column}"
+    if kind == "work_started":
+        return "Work started"
+    if kind == "model_call":
+        return "Model call"
+    return kind or "Event"
 
 
 def _build_board_state(

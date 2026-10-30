@@ -3590,6 +3590,210 @@ def test_journey_page_path_step_without_data_stage_when_not_delivered():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_journey_timeline_shows_events_in_order():
+    """AC1: delivered story with a move event shows 'What happened, in order' with timestamp and destination column."""
+    tag = "delivery-history-TEST"
+    pkg_dir = _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 861, "repo": "sprint-metrics"},
+                "blocks": ["refused", "refused", "landed"],
+                "crew_fixes": [],
+                "delivered": True,
+                "text": "Missed twice, then landed.",
+            }
+        ],
+        cards=[
+            {
+                "number": 861,
+                "repo": "sprint-metrics",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+            }
+        ],
+    )
+    events = [
+        {
+            "kind": "move",
+            "at": "2026-10-01T09:15:00+00:00",
+            "card": {"number": 861, "repo": "sprint-metrics"},
+            "from_column": "In Progress",
+            "to_column": "Reviewing",
+        }
+    ]
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(exist_ok=True)
+    (events_dir / "2026-10-01.json").write_text(json.dumps({"events": events}))
+    index = json.loads((pkg_dir / "delivery-history.json").read_text())
+    index["periods"] = [
+        {
+            "sprint": "Sprint 6",
+            "start": "2026-10-01",
+            "end": "2026-10-01",
+            "file": "events/2026-10-01.json",
+            "events": 1,
+        }
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "sprint-metrics-861.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        assert "What happened, in order" in html, (
+            "heading 'What happened, in order' not found"
+        )
+        # An element containing both the timestamp and the destination column
+        item_match = re.search(
+            r'<li class="timeline__item">(.*?)</li>', html, re.DOTALL
+        )
+        assert item_match, "no timeline item found"
+        item_text = item_match.group(1)
+        assert "09:15" in item_text, (
+            f"timestamp '09:15' not in timeline item: {item_text!r}"
+        )
+        assert "Reviewing" in item_text, (
+            f"destination 'Reviewing' not in timeline item: {item_text!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_cost_section_shows_wall_clock_and_model_calls():
+    """AC2: story with wall_clock_seconds 1740 and cost.model_calls 6 shows 'What it cost' with '29 min' and '6'."""
+    tag = "delivery-history-TEST"
+    pkg_dir = _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 861, "repo": "sprint-metrics"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+                "text": "Landed first try.",
+                "wall_clock_seconds": 1740,
+                "cost": {"model_calls": 6},
+            }
+        ],
+        cards=[
+            {
+                "number": 861,
+                "repo": "sprint-metrics",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "sprint-metrics-861.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        assert "What it cost" in html, "heading 'What it cost' not found"
+        # Find the cost section
+        cost_section = re.search(
+            r'<section[^>]*aria-labelledby="cost-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert cost_section, "cost section not found"
+        cost_html = cost_section.group(1)
+        assert "29 min" in cost_html, (
+            f"'29 min' not in cost section: {cost_html!r}"
+        )
+        assert ">6<" in cost_html, (
+            f"'6' for model calls not in cost section: {cost_html!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_no_cost_section_when_not_delivered():
+    """AC3: undelivered story with wall_clock_seconds null shows timeline but NOT 'What it cost'."""
+    tag = "delivery-history-TEST"
+    pkg_dir = _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 861, "repo": "sprint-metrics"},
+                "blocks": [],
+                "crew_fixes": [],
+                "delivered": False,
+                "text": "Still in progress.",
+                "wall_clock_seconds": None,
+                "cost": None,
+            }
+        ],
+        cards=[
+            {
+                "number": 861,
+                "repo": "sprint-metrics",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+            }
+        ],
+    )
+    events = [
+        {
+            "kind": "move",
+            "at": "2026-10-01T08:00:00+00:00",
+            "card": {"number": 861, "repo": "sprint-metrics"},
+            "from_column": "Ready",
+            "to_column": "In Progress",
+        }
+    ]
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(exist_ok=True)
+    (events_dir / "2026-10-01.json").write_text(json.dumps({"events": events}))
+    index = json.loads((pkg_dir / "delivery-history.json").read_text())
+    index["periods"] = [
+        {
+            "sprint": "Sprint 6",
+            "start": "2026-10-01",
+            "end": "2026-10-01",
+            "file": "events/2026-10-01.json",
+            "events": 1,
+        }
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "sprint-metrics-861.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        assert "What happened, in order" in html, (
+            "heading 'What happened, in order' not found"
+        )
+        item_match = re.search(
+            r'<li class="timeline__item">(.*?)</li>', html, re.DOTALL
+        )
+        assert item_match, "no timeline item found"
+        item_text = item_match.group(1)
+        assert "08:00" in item_text, (
+            f"timestamp '08:00' not in timeline item: {item_text!r}"
+        )
+        assert "In Progress" in item_text, (
+            f"destination 'In Progress' not in timeline item: {item_text!r}"
+        )
+        assert "What it cost" not in html, (
+            "heading 'What it cost' should not be present for undelivered story"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_attempt_row_first_child_is_anchor_not_div():
     """AC5: every .attempt-row first child is an <a>, and no <a> has class 'attempt-row'."""
     tag = "delivery-history-TEST"
