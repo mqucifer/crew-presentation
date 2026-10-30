@@ -258,6 +258,11 @@
   }
 }
 
+/* Story list: long titles must wrap without forcing horizontal scroll. */
+section ul li a {
+  overflow-wrap: break-word;
+}
+
 /* Attempt-row link: journey-page navigation */
 .attempt-row > a {
   color: var(--color-link);
