@@ -149,6 +149,62 @@ C4Component
   pipeline: it moves the cards this repository's own board holds that no
   crew role moves, which the crew's recorded events - and so the site - see.
 
+## delivery-history 2.0.0 (announced 2026-10-29)
+
+The crew announced `delivery-history` 2.0.0 on 2026-10-29: it replaces 1.x on
+2026-11-06, whether this project has moved to it or not. This project pins
+`delivery-history-2026-10-29`, schema 1.11.0, in `delivery-history.tag`. The
+ruling below is against the crew's announced changelog for 2.0.0; the 2.0.0
+schemas and mock are not in this repository and the site has no network, so
+the field-shape rulings rest on that changelog, while the version-gate
+refusal is verifiable from this repository's own code.
+
+**The site cannot read a 2.0.0 package today.** `SUPPORTED_MAJOR_VERSIONS` is
+`(1,)` in `build.py`, and it keeps its own copy in `test_contracts.py`.
+`_check_schema_version` in `build.py` exits non-zero when the manifest's
+`schema_version` major is not in that set, and `test_contracts.py` carries the
+same gate. The contract tests pin the refusal: both
+`test_build_fails_on_unsupported_major_version` and
+`test_unsupported_major_version_fails_with_version` feed `schema_version`
+`"2.0.0"` and assert the build and the check fail, naming major 2. So a 2.0.0
+package (schema major 2) is stopped at the pre-merge gate, before a single
+field is read.
+
+**What build.py must change to adopt 2.0.0:**
+
+- Support schema major 2: add `2` to `SUPPORTED_MAJOR_VERSIONS` in `build.py`
+  and mirror it in `test_contracts.py`.
+- Read `top_failure_causes` in its new shape. 1.x carries it as a map of
+  cause-code to count (for example `{"EDIT": 1, "VERIFY": 1}`); 2.0.0
+  reshapes it to a list of `{class, role, count}`, the same list-of-objects
+  shape `failure_breakdown` already uses in 1.x. `_normalize_failure_causes`
+  in `build.py` reads the 1.x map via `items()` and reads list items by
+  `item.get("reason", item.get("cause", ""))` and `item.get("count", 0)`.
+  The 2.0.0 entries carry `class`, `role` and `count`, not `reason` or
+  `cause`, so `_normalize_failure_causes` would emit an empty reason for
+  every entry and `_build_failure_causes` would render each as "Cause not
+  recorded". It must read the `{class, role, count}` fields instead;
+  `CAUSE_LABELS`, which maps the old reason codes to display strings, no
+  longer applies.
+- Stop reading the removed escalation fields. 2.0.0 removes
+  `escalation_count` and `escalation_rate_percent` from each answer and its
+  `prior`, `delta` and `flags`, and drops `escalation_count` as a measure from
+  the "what changed" list. `build.py` surfaces `escalation_count` in two
+  places that must stop reading it: the sprint stat
+  (`metrics.get("escalation_count")` in `_render_pages`, rendered as the
+  "escalations" stat in `site/templates/sprint_overview.html`) and the
+  `_changed_label` map (`"escalation_count": "escalations"`).
+  `escalation_rate_percent` is not surfaced by `build.py` today; it leaves the
+  contract with the rest.
+
+**What the site loses by staying on 1.11.0.** 1.11.0 carries
+sprint-metrics 1.3.1's answers; 2.0.0 carries 4.2.1's. A site that keeps its
+pin on 1.11.0 and does not adopt 2.0.0 does not display the 4.x measures the
+contract adds: the costs, rework, roster, working and idle time, and DORA
+measures. The crew's own escalation record is untouched by this: the
+`escalated` events and pattern, and each story's `escalations`, stay. Only
+sprint-metrics' `escalation_count` and `escalation_rate_percent` leave.
+
 ## What is not there yet
 
 As of 2026-10-28 the code does not yet have:
