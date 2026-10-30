@@ -568,12 +568,13 @@ def _filter_events_by_card(
     events: list[dict], card_number, card_repo: str
 ) -> list[dict]:
     """Filter events to those for a specific card, sorted by timestamp."""
-    card_events = [
-        e
-        for e in events
-        if e.get("card", {}).get("number") == card_number
-        and e.get("card", {}).get("repo") == card_repo
-    ]
+    card_events = []
+    for e in events:
+        card_ref = e.get("card")
+        if not card_ref:
+            continue
+        if card_ref.get("number") == card_number and card_ref.get("repo") == card_repo:
+            card_events.append(e)
     card_events.sort(key=lambda e: e.get("at", ""))
     return card_events
 
