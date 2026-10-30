@@ -152,21 +152,28 @@ def _render_pages(pkg: Path) -> dict:
 
         stories = []
         for story in analysis_stories:
+            delivered = story.get("delivered")
+            if not delivered:
+                continue
+            if isinstance(delivered, str):
+                delivered_date = delivered[:10]
+                if not (sprint["start"] <= delivered_date <= sprint["end"]):
+                    continue
+
             card_key = (story["card"]["number"], story["card"]["repo"])
             card = cards_by_key.get(card_key)
-            if card is not None and card.get("sprint") != sprint["name"]:
-                continue
             raw_blocks = story.get("blocks", [])
-            delivered = story.get("delivered", False)
             if isinstance(raw_blocks, int):
-                if delivered:
-                    blocks = ["refused"] * (raw_blocks - 1) + ["landed"]
-                else:
-                    blocks = ["refused"] * raw_blocks
+                blocks = ["refused"] * (raw_blocks - 1) + ["landed"]
             elif raw_blocks:
                 blocks = list(raw_blocks)
             else:
                 blocks = []
+            pattern = story.get("pattern", "")
+            if pattern:
+                status = pattern.replace("_", " ")
+            else:
+                status = "merged"
             stories.append(
                 {
                     "number": story["card"]["number"],
@@ -174,29 +181,11 @@ def _render_pages(pkg: Path) -> dict:
                     "title": card.get("title", "") if card else "",
                     "blocks": blocks,
                     "crew_fixes": story.get("crew_fixes", []),
-                    "delivered": delivered,
+                    "delivered": bool(delivered),
+                    "pattern": pattern,
+                    "status": status,
                 }
             )
-
-        if len(stories) > denominator:
-            stories = stories[:denominator]
-
-        first_try_assigned = 0
-        for s in stories:
-            if s["delivered"] and len(s["blocks"]) == 1 and first_try_assigned < numerator:
-                s["status"] = "first try"
-                first_try_assigned += 1
-            elif s["delivered"]:
-                s["status"] = "merged"
-            else:
-                s["status"] = "in progress"
-        if first_try_assigned < numerator:
-            for s in stories:
-                if first_try_assigned >= numerator:
-                    break
-                if s["status"] == "merged":
-                    s["status"] = "first try"
-                    first_try_assigned += 1
 
         changed = [
             {
