@@ -1527,9 +1527,8 @@ def test_failure_causes_2_0_list_shape_renders_class_rows():
         section_end = html.index("</section>", section_start)
         section = html[section_start:section_end]
         # one row per entry
-        assert section.count('class="cause-row"') == 2, (
-            f"expected 2 cause rows, got {section.count('class=\"cause-row\"')}"
-        )
+        rows = section.count('class="cause-row"')
+        assert rows == 2, f"expected 2 cause rows, got {rows}"
         # the class is shown as the label, not the placeholder
         assert ">VERIFY</span>" in section, "2.0.0 class 'VERIFY' not shown as a label"
         assert ">EDIT</span>" in section, "2.0.0 class 'EDIT' not shown as a label"
@@ -1573,9 +1572,8 @@ def test_failure_causes_1x_map_shape_renders_rows():
         section_end = html.index("</section>", section_start)
         section = html[section_start:section_end]
         # one row per entry
-        assert section.count('class="cause-row"') == 2, (
-            f"expected 2 cause rows, got {section.count('class=\"cause-row\"')}"
-        )
+        rows = section.count('class="cause-row"')
+        assert rows == 2, f"expected 2 cause rows, got {rows}"
         # the counts are preserved
         assert ">7</span>" in section, "VERIFY count 7 not shown"
         assert ">1</span>" in section, "EDIT count 1 not shown"
