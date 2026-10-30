@@ -7921,3 +7921,77 @@ def test_zero_sprint_metrics_render_zero_and_fraction():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_page_scrollwidth_at_phone_width():
+    """AC1: replay page at 375px viewport has documentElement.scrollWidth <= 375."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"at": "2026-10-07T08:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Needs Refinement", "to_column": "Ready"},
+        {"at": "2026-10-07T09:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Ready", "to_column": "Sprint Backlog"},
+        {"at": "2026-10-07T10:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress"},
+        {"at": "2026-10-07T11:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "Reviewing"},
+        {"at": "2026-10-07T12:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Reviewing", "to_column": "QAing"},
+        {"at": "2026-10-07T13:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "QAing", "to_column": "Merging"},
+        {"at": "2026-10-07T14:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Merging", "to_column": "Done"},
+        {"at": "2026-10-08T08:00:00Z", "card": {"number": 2, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "Blocked"},
+    ]
+    cards = [
+        {"number": 1, "repo": "mqucifer/crew", "title": "card one", "url": "https://github.com/mqucifer/crew/issues/1"},
+        {"number": 2, "repo": "mqucifer/crew", "title": "card two", "url": "https://github.com/mqucifer/crew/issues/2"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            scroll_width = page.evaluate("document.documentElement.scrollWidth")
+            assert scroll_width <= 375, (
+                f"replay page scrollWidth is {scroll_width}, expected <= 375"
+            )
+
+            # The board must be laid out as a grid (the bug: no CSS rules
+            # for .replay-board meant the columns were not laid out).
+            board = page.query_selector('[aria-label="Board"]')
+            assert board is not None, "no Board section found"
+            display = page.evaluate(
+                "el => getComputedStyle(el).display", board
+            )
+            assert display == "grid", (
+                f".replay-board computed display is {display!r}, expected 'grid'"
+            )
+
+            # AC2: verify board structure
+            cols = board.query_selector_all(".replay-col")
+            assert len(cols) == 9, f"Board has {len(cols)} columns, expected 9"
+            expected_names = [
+                "Needs Refinement", "Ready", "Sprint Backlog",
+                "In Progress", "Reviewing", "QAing",
+                "Merging", "Done", "Blocked",
+            ]
+            for col, name in zip(cols, expected_names):
+                header = col.query_selector(".replay-col__header")
+                assert header is not None, f"column {name!r} has no .replay-col__header"
+                assert header.text_content() == name, (
+                    f"column header is {header.text_content()!r}, expected {name!r}"
+                )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
