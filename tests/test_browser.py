@@ -43,6 +43,7 @@ def _make_fake_package(
     metrics: dict | None = None,
     sprints: list[dict] | None = None,
     schema_version: str = "1.0.0",
+    cards: list[dict] | None = None,
 ) -> Path:
     """Create a minimal fake package directory with the given sprint names."""
     if sprints is None:
@@ -65,6 +66,8 @@ def _make_fake_package(
             }
             for name in names
         }
+    if cards is None:
+        cards = []
     pkg_dir = PACKAGE_DIR / tag
     pkg_dir.mkdir(parents=True, exist_ok=True)
     (pkg_dir / "manifest.json").write_text(
@@ -93,7 +96,7 @@ def _make_fake_package(
         json.dumps(
             {
                 "sprints": sprints,
-                "cards": [],
+                "cards": cards,
                 "crew_repository": "mqucifer/crew",
                 "sprint_metrics": {"answers": metrics},
             }
@@ -7917,6 +7920,64 @@ def test_zero_sprint_metrics_render_zero_and_fraction():
         assert first_try_match, "no 'landed first try' stat found"
         assert first_try_match.group(1) == "0 of 4", (
             f"first-try stat is {first_try_match.group(1)!r}, expected '0 of 4'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_sprint_link_href_resolves_to_existing_file():
+    """AC1: the Sprint link in nav[aria-label='Views'] on replay.html has a non-empty href
+    whose value names a file that exists in the build directory."""
+    tag = "delivery-history-TEST"
+    names = ["Sprint 6", "Sprint 7"]
+    _make_fake_package(tag, names)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        view_nav = _view_nav(html)
+        m = re.search(r'<a[^>]*href="([^"]*)"[^>]*>Sprint</a>', view_nav)
+        assert m, "Sprint link not found in view nav on replay.html"
+        href = m.group(1)
+        assert href, "Sprint link href is empty on replay.html"
+        target = BUILD_DIR / href
+        assert target.is_file(), (
+            f"Sprint link href '{href}' does not resolve to an existing file in build/"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_story_page_sprint_link_href_resolves_to_existing_file():
+    """AC2: the Sprint link in nav[aria-label='Views'] on a story page has a non-empty href
+    whose value, resolved relative to the story page's directory, names a file that exists
+    in the build directory."""
+    tag = "delivery-history-TEST"
+    names = ["Sprint 6", "Sprint 7"]
+    cards = [
+        {"number": 42, "repo": "mqucifer/crew", "title": "Fix the thing"},
+    ]
+    _make_fake_package(tag, names, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        # The story page is at build/stories/mqucifer-crew-42.html
+        story_path = BUILD_DIR / "stories" / "mqucifer-crew-42.html"
+        assert story_path.is_file(), "story page not found in build output"
+        html = story_path.read_text()
+        view_nav = _view_nav(html)
+        m = re.search(r'<a[^>]*href="([^"]*)"[^>]*>Sprint</a>', view_nav)
+        assert m, "Sprint link not found in view nav on story page"
+        href = m.group(1)
+        assert href, "Sprint link href is empty on story page"
+        # Resolve relative to the story page's directory
+        target = (story_path.parent / href).resolve()
+        assert target.is_file(), (
+            f"Sprint link href '{href}' on story page does not resolve to an existing file"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
