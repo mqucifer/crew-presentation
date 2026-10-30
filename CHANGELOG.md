@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- The "Why work didn't land first time" chart now reads a 2.0.0 package's top_failure_causes (a list of {class, role, count}) and shows each entry's class and count, instead of rendering every row as "Cause not recorded"; 1.x map shapes and empty/absent causes still build unchanged (mqucifer/crew-presentation#211)
+
 ## [0.2.0] - 2026-10-30
 
 ### Added
