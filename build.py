@@ -135,6 +135,7 @@ def _render_pages(pkg: Path) -> dict:
     pages = {}
 
     sprint_template = env.get_template("sprint_overview.html")
+    default_sprint_slug = ""
     for sprint in sprints:
         slug = _slug(sprint["name"])
         key = sprint["name"]
@@ -220,6 +221,7 @@ def _render_pages(pkg: Path) -> dict:
             "current_view": "sprint",
         }
         pages[slug] = sprint_template.render(**context)
+        default_sprint_slug = slug
 
     current_view_map = {
         "replay.html": "replay",
@@ -230,7 +232,7 @@ def _render_pages(pkg: Path) -> dict:
         context = {
             "manifest": manifest,
             "package": index,
-            "sprint_slug": "",
+            "sprint_slug": default_sprint_slug,
             "current_view": current_view_map.get(template_name, "sprint"),
         }
         if template_name == "replay.html":
@@ -263,7 +265,7 @@ def _render_pages(pkg: Path) -> dict:
             card=card,
             manifest=manifest,
             package=index,
-            sprint_slug="",
+            sprint_slug=default_sprint_slug,
             current_view="journey",
             static_prefix="../",
         )

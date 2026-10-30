@@ -6,6 +6,10 @@
 
 - The story-journey root page scrolls horizontally at phone widths when card titles are long; story list links now wrap with `overflow-wrap: break-word` (mqucifer/crew-presentation#223)
 
+### Fixed
+
+- The "Sprint" nav link on non-sprint pages (replay, story-journey, and every story under stories/) had an empty href, so it only reloaded the current page; it now links to the newest sprint's overview page (mqucifer/crew-presentation#223)
+
 ### Changed
 
 - The "Why work didn't land first time" chart now reads a 2.0.0 package's top_failure_causes (a list of {class, role, count}) and shows each entry's class and count, instead of rendering every row as "Cause not recorded"; 1.x map shapes and empty/absent causes still build unchanged (mqucifer/crew-presentation#211)
