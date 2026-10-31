@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- The site accepts delivery-history packages on schema major 3 (e.g. 3.0.0); major 3 is now in SUPPORTED_MAJOR_VERSIONS (mqucifer/crew-presentation#266)
+
 ## [0.3.2] - 2026-10-31
 
 ### Fixed
