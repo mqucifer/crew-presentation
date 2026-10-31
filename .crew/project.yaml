@@ -4,6 +4,8 @@
 version: 3
 intent:
   scope:
+    # Who it serves, not what it does (crew ADR 0035), from the mock's three parts
+    # (mqucifer/project-print ADR 0003). What it does today is the design's `built`.
     purpose: Show how the crew works as visuals anyone can read, on a public site
       that someone who has never seen the crew understands. How each sprint went,
       and a story's path from a Goal to merged, played back.
@@ -112,6 +114,7 @@ design:
     asserts the site root and each page return HTTP 200. A rerun of the release completes
     whatever the version is missing (its tag, its Release, its image and the image's
     tags) and changes nothing already published (§19.9).
+  # History, not scope (crew ADR 0035): the record's former in_scope.
   built:
   - A static site on GitHub Pages, built and deployed by GitHub Actions.
   - 'Its views: a sprint overview, a replay of work from a Goal to merged, and a story''s
@@ -164,8 +167,7 @@ design:
     line: the release tag of the delivery-history package the site displays; read
     by setup and the build; agents must not change it. CHANGELOG.md — the release
     log, append-only: each story adds its entries under the [Unreleased] section.
-    A shared file that parallel stories in the same sprint will collide in; the Business
-    Analyst sequences stories that touch it to minimise rebuilds.'
+    A shared file that parallel stories in the same sprint will collide in.'
   docs:
   - README.md
   - CHANGELOG.md
