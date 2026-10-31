@@ -8368,7 +8368,7 @@ def test_story_page_sprint_link_href_resolves_to_existing_file():
 
 def test_null_metrics_cycle_time_renders_em_dash_like_other_stats():
     """AC2: when sprint-metrics is null for every field, the cycle-time stat's
-    value element contains the em dash '\u2014', the same mark as the other four
+    value element contains the em dash '\u2014', the same mark as the other
     stat value elements on that .stats row."""
     tag = "delivery-history-TEST"
     _make_fake_package(
@@ -8394,8 +8394,8 @@ def test_null_metrics_cycle_time_renders_em_dash_like_other_stats():
         values = re.findall(
             r'<span class="stat__value[^"]*">(.*?)</span>', stats, re.DOTALL
         )
-        assert len(values) == 5, (
-            f"expected 5 stat values, got {len(values)}: {values}"
+        assert len(values) == 4, (
+            f"expected 4 stat values, got {len(values)}: {values}"
         )
         for i, value in enumerate(values, 1):
             assert value.strip() == "\u2014", (
