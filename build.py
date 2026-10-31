@@ -19,6 +19,8 @@ JS_DIR = REPO_ROOT / "site" / "js"
 
 SUPPORTED_MAJOR_VERSIONS = (1, 2)
 
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
 TEMPLATE_MAP = {
     "replay.html": "replay.html",
     "story_journey.html": "story-journey.html",
@@ -271,9 +273,11 @@ def _render_pages(pkg: Path) -> dict:
                 break
         # Load and format events for this card
         card_events = _filter_events_by_card(all_events, number, repo)
+        event_dates = {e.get("at", "")[:10] for e in card_events if e.get("at")}
+        include_date = len(event_dates) > 1
         formatted_events = [
             {
-                "time": _format_event_time(e.get("at", "")),
+                "time": _format_event_time(e.get("at", ""), include_date),
                 "text": _format_event_description(e),
             }
             for e in card_events
@@ -579,11 +583,19 @@ def _filter_events_by_card(
     return card_events
 
 
-def _format_event_time(at: str) -> str:
-    """Extract HH:MM from an ISO timestamp like '2026-10-01T09:15:00+00:00'."""
-    match = re.search(r"T(\d{2}):(\d{2})", at)
+def _format_event_time(at: str, include_date: bool = False) -> str:
+    """Format an ISO timestamp like '2026-10-01T09:15:00+00:00' for the timeline.
+
+    Returns 'HH:MM', or 'Mon D, HH:MM' when include_date is True.
+    """
+    match = re.search(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})", at)
     if match:
-        return f"{match.group(1)}:{match.group(2)}"
+        month = _MONTHS[int(match.group(2)) - 1]
+        day = int(match.group(3))
+        clock = f"{match.group(4)}:{match.group(5)}"
+        if include_date:
+            return f"{month} {day}, {clock}"
+        return clock
     return at
 
 
