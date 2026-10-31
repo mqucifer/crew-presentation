@@ -4,8 +4,10 @@
 
 ### Fixed
 
+- The story's journey timeline printed raw internal event kind codes (e.g. `gate_checked`, `tool_call`, `session_turn`) verbatim and showed one row per model call, making it unreadable at ~150 rows; per-tool-call and per-turn internals (`model_call`, `tool_call`, `session_turn`, `session_compacted`) are now omitted, and every remaining event kind is mapped to a readable sentence (mqucifer/crew-presentation#252)
 - The sprint overview's "The Architect's split, story by story" section now shows "No stories were delivered this sprint" instead of an orphaned legend when a sprint delivered zero stories (mqucifer/crew-presentation#252)
 - Story-detail pages and sprint pages overflow past 375px at phone width when a card title is a long unbreakable string or the sprint carries wide data; card titles, analysis text, timeline text, failure-cause labels, decision text and trend text now wrap with `overflow-wrap: break-word`, and the phone grid columns use `minmax(0, 1fr)` so they can shrink below their content's minimum width (mqucifer/crew-presentation#248)
+- The sprint overview's "Sprint totals" row rendered four stats in a five-column grid, leaving an empty track to the right of the last stat after the escalations stat was dropped in v0.3.0; the desktop grid now uses four equal columns so the stats span the content width (mqucifer/crew-presentation#252)
 
 ## [0.3.1] - 2026-10-30
 

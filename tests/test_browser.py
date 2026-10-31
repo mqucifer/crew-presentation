@@ -3936,6 +3936,158 @@ def test_journey_no_cost_section_when_not_delivered():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_journey_timeline_no_raw_gate_checked_kind():
+    """AC1: a gate_checked event does not appear as raw kind code in the timeline text."""
+    tag = "delivery-history-TEST"
+    pkg_dir = _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 100, "repo": "crew-presentation"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+                "text": "A story with a gate check.",
+            }
+        ],
+        cards=[
+            {
+                "number": 100,
+                "repo": "crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "Gate check story",
+            }
+        ],
+    )
+    events = [
+        {
+            "kind": "gate_checked",
+            "at": "2026-10-01T10:00:00+00:00",
+            "card": {"number": 100, "repo": "crew-presentation"},
+            "passed": True,
+            "rules": [],
+            "already_done": False,
+        }
+    ]
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(exist_ok=True)
+    (events_dir / "2026-10-01.json").write_text(json.dumps({"events": events}))
+    index = json.loads((pkg_dir / "delivery-history.json").read_text())
+    index["periods"] = [
+        {
+            "sprint": "Sprint 6",
+            "start": "2026-10-01",
+            "end": "2026-10-01",
+            "file": "events/2026-10-01.json",
+            "events": 1,
+        }
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "crew-presentation-100.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        # No element with class timeline__text should contain the raw kind code
+        timeline_texts = re.findall(
+            r'<span class="timeline__text">(.*?)</span>', html, re.DOTALL
+        )
+        for text in timeline_texts:
+            assert "gate_checked" not in text, (
+                f"raw kind code 'gate_checked' found in timeline text: {text!r}"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_timeline_no_model_call_rows():
+    """AC2: model_call events are omitted; no timeline item has text exactly 'Model call'."""
+    tag = "delivery-history-TEST"
+    pkg_dir = _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 200, "repo": "crew-presentation"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+                "text": "A story with model calls.",
+            }
+        ],
+        cards=[
+            {
+                "number": 200,
+                "repo": "crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "Model call story",
+            }
+        ],
+    )
+    events = [
+        {
+            "kind": "model_call",
+            "at": "2026-10-01T11:00:00+00:00",
+            "card": {"number": 200, "repo": "crew-presentation"},
+            "failed": False,
+        },
+        {
+            "kind": "model_call",
+            "at": "2026-10-01T11:01:00+00:00",
+            "card": {"number": 200, "repo": "crew-presentation"},
+            "failed": False,
+        },
+        {
+            "kind": "model_call",
+            "at": "2026-10-01T11:02:00+00:00",
+            "card": {"number": 200, "repo": "crew-presentation"},
+            "failed": False,
+        },
+    ]
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(exist_ok=True)
+    (events_dir / "2026-10-01.json").write_text(json.dumps({"events": events}))
+    index = json.loads((pkg_dir / "delivery-history.json").read_text())
+    index["periods"] = [
+        {
+            "sprint": "Sprint 6",
+            "start": "2026-10-01",
+            "end": "2026-10-01",
+            "file": "events/2026-10-01.json",
+            "events": 3,
+        }
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "crew-presentation-200.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        # Count timeline items whose text is exactly "Model call"
+        items = re.findall(
+            r'<li class="timeline__item">(.*?)</li>', html, re.DOTALL
+        )
+        model_call_count = 0
+        for item in items:
+            text_match = re.search(
+                r'<span class="timeline__text">(.*?)</span>', item, re.DOTALL
+            )
+            if text_match and text_match.group(1).strip() == "Model call":
+                model_call_count += 1
+        assert model_call_count == 0, (
+            f"expected 0 'Model call' timeline items, found {model_call_count}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_attempt_row_first_child_is_anchor_not_div():
     """AC5: every .attempt-row first child is an <a>, and no <a> has class 'attempt-row'."""
     tag = "delivery-history-TEST"
@@ -8531,6 +8683,158 @@ def test_null_metrics_cycle_time_renders_em_dash_like_other_stats():
             assert value.strip() == "\u2014", (
                 f"stat {i} value is {value.strip()!r}, expected em dash '\u2014'"
             )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_stats_grid_four_equal_columns_at_1280px():
+    """AC1: at a 1280px viewport the .stats element's computed
+    grid-template-columns resolves to four equal fractional tracks (not five),
+    and the fourth .stat element's right edge coincides with the .stats
+    element's right content edge, leaving no empty grid track to its right."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 720,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".stats")
+
+            # The computed grid-template-columns must be four equal 1fr tracks.
+            grid_cols = page.evaluate(
+                "getComputedStyle(document.querySelector('.stats')).gridTemplateColumns"
+            )
+            # Browsers report repeat(4, 1fr) as four space-separated lengths.
+            tracks = grid_cols.split(" ")
+            assert len(tracks) == 4, (
+                f"at 1280px .stats grid-template-columns has {len(tracks)} tracks "
+                f"({grid_cols!r}); expected 4"
+            )
+            # All tracks must be equal (the same length).
+            assert len(set(tracks)) == 1, (
+                f"at 1280px .stats tracks are not equal: {tracks}"
+            )
+
+            # The fourth .stat's right edge must coincide with .stats' right
+            # content edge — no empty fifth track to the right.
+            fourth_right = page.evaluate(
+                "document.querySelectorAll('.stat')[3].getBoundingClientRect().right"
+            )
+            stats_right = page.evaluate(
+                "document.querySelector('.stats').getBoundingClientRect().right"
+            )
+            assert abs(fourth_right - stats_right) < 1, (
+                f"at 1280px the fourth .stat right edge {fourth_right} does not "
+                f"coincide with the .stats right edge {stats_right}; an empty "
+                f"grid track remains to the right"
+            )
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_stats_grid_two_columns_at_767px():
+    """AC2: at a 767px viewport the .stats element's computed
+    grid-template-columns is repeat(2, minmax(0, 1fr)) and all four .stat
+    elements are visible in two rows of two, unchanged from current phone
+    behaviour."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 720,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 767, "height": 900})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector(".stats")
+
+            # The computed grid-template-columns must be two equal tracks.
+            grid_cols = page.evaluate(
+                "getComputedStyle(document.querySelector('.stats')).gridTemplateColumns"
+            )
+            tracks = grid_cols.split(" ")
+            assert len(tracks) == 2, (
+                f"at 767px .stats grid-template-columns has {len(tracks)} tracks "
+                f"({grid_cols!r}); expected 2"
+            )
+            assert len(set(tracks)) == 1, (
+                f"at 767px .stats tracks are not equal: {tracks}"
+            )
+
+            # All four .stat elements must be visible in two rows of two.
+            stats = page.evaluate(
+                """
+                () => Array.from(document.querySelectorAll('.stat')).map(
+                    el => {
+                        const r = el.getBoundingClientRect();
+                        return {top: r.top, left: r.left, visible: r.width > 0 && r.height > 0};
+                    }
+                )
+                """
+            )
+            assert len(stats) == 4, (
+                f"expected 4 .stat elements, got {len(stats)}"
+            )
+            for i, s in enumerate(stats):
+                assert s["visible"], (
+                    f".stat {i + 1} is not visible at 767px"
+                )
+            # Two rows: the first two share a top, the last two share another.
+            assert stats[0]["top"] == stats[1]["top"], (
+                f"at 767px stats 0 and 1 do not share a row: "
+                f"{stats[0]['top']} vs {stats[1]['top']}"
+            )
+            assert stats[2]["top"] == stats[3]["top"], (
+                f"at 767px stats 2 and 3 do not share a row: "
+                f"{stats[2]['top']} vs {stats[3]['top']}"
+            )
+            assert stats[0]["top"] != stats[2]["top"], (
+                f"at 767px all four .stat elements share the same row; "
+                f"expected two rows"
+            )
+            browser.close()
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
