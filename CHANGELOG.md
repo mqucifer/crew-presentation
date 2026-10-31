@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- The sprint overview's "The Architect's split, story by story" section now shows "No stories were delivered this sprint" instead of an orphaned legend when a sprint delivered zero stories (mqucifer/crew-presentation#252)
 - Story-detail pages and sprint pages overflow past 375px at phone width when a card title is a long unbreakable string or the sprint carries wide data; card titles, analysis text, timeline text, failure-cause labels, decision text and trend text now wrap with `overflow-wrap: break-word`, and the phone grid columns use `minmax(0, 1fr)` so they can shrink below their content's minimum width (mqucifer/crew-presentation#248)
 
 ## [0.3.1] - 2026-10-30
