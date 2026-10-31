@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- The replay page's board overflows past 375px at phone width when a card title contains a long unbreakable word; the board column now uses `minmax(0, 1fr)` and cards wrap long words with `overflow-wrap: anywhere` (mqucifer/crew-presentation#246)
+
 ## [0.3.0] - 2026-10-30
 
 ### Added
