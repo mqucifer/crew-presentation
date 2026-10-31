@@ -18,6 +18,10 @@
 
 - The "Sprint" nav link on non-sprint pages (replay, story-journey, and every story under stories/) had an empty href, so it only reloaded the current page; it now links to the newest sprint's overview page (mqucifer/crew-presentation#223)
 
+### Fixed
+
+- The sprint overview's cycle-time stat now renders an em dash (—) when sprint-metrics reports no value, consistent with the other four stats on that row (mqucifer/crew-presentation#223)
+
 ### Changed
 
 - The sprint overview no longer shows an escalations stat or an escalation entry in the "What changed" card; sprint-metrics' escalation_count and escalation_rate_percent are dropped from the displayed figures (mqucifer/crew-presentation#211)
