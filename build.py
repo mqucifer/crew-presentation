@@ -196,6 +196,7 @@ def _render_pages(pkg: Path) -> dict:
                 "now": _format_changed_value(e["measure"], e["now"]),
             }
             for e in analysis_by_sprint.get(sprint["name"], {}).get("changed", [])
+            if e["measure"] != "escalation_count"
         ]
         decided = analysis_by_sprint.get(sprint["name"], {}).get("decided", [])
 
@@ -209,7 +210,6 @@ def _render_pages(pkg: Path) -> dict:
                     metrics.get("first_attempt_numerator"),
                     metrics.get("first_attempt_denominator"),
                 ),
-                "escalation_count": _stat_value(metrics.get("escalation_count")),
                 "points_delivered": _stat_value(metrics.get("points_delivered")),
             },
             "cycle_time": _format_minutes(metrics.get("cycle_time_minutes")),
@@ -471,7 +471,6 @@ def _changed_label(measure: str) -> str:
         "lead_time_minutes": "lead time",
         "lead_time_days": "lead time",
         "first_attempt_rate_percent": "first-attempt rate",
-        "escalation_count": "escalations",
         "points_delivered": "points delivered",
         "throughput": "stories delivered",
         "blocked_aging_days": "days blocked",
