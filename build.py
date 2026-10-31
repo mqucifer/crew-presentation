@@ -131,10 +131,12 @@ def _render_pages(pkg: Path) -> dict:
         cards_by_key[key] = card
 
     env.globals["crew_repository"] = crew_repository
+    env.globals["static_prefix"] = ""
 
     pages = {}
 
     sprint_template = env.get_template("sprint_overview.html")
+    default_sprint_slug = ""
     for sprint in sprints:
         slug = _slug(sprint["name"])
         key = sprint["name"]
@@ -195,6 +197,7 @@ def _render_pages(pkg: Path) -> dict:
                 "now": _format_changed_value(e["measure"], e["now"]),
             }
             for e in analysis_by_sprint.get(sprint["name"], {}).get("changed", [])
+            if e["measure"] != "escalation_count"
         ]
         decided = analysis_by_sprint.get(sprint["name"], {}).get("decided", [])
 
@@ -208,7 +211,6 @@ def _render_pages(pkg: Path) -> dict:
                     metrics.get("first_attempt_numerator"),
                     metrics.get("first_attempt_denominator"),
                 ),
-                "escalation_count": _stat_value(metrics.get("escalation_count")),
                 "points_delivered": _stat_value(metrics.get("points_delivered")),
             },
             "cycle_time": _format_minutes(metrics.get("cycle_time_minutes")),
@@ -220,6 +222,7 @@ def _render_pages(pkg: Path) -> dict:
             "current_view": "sprint",
         }
         pages[slug] = sprint_template.render(**context)
+        default_sprint_slug = slug
 
     current_view_map = {
         "replay.html": "replay",
@@ -230,7 +233,7 @@ def _render_pages(pkg: Path) -> dict:
         context = {
             "manifest": manifest,
             "package": index,
-            "sprint_slug": "",
+            "sprint_slug": default_sprint_slug,
             "current_view": current_view_map.get(template_name, "sprint"),
         }
         if template_name == "replay.html":
@@ -253,19 +256,48 @@ def _render_pages(pkg: Path) -> dict:
         pages[output_name] = template.render(**context)
 
     story_journey_template = env.get_template("story_journey.html")
+    all_events = _load_all_events(pkg, index)
     for card in cards:
         repo = card.get("repo", "")
         number = card.get("number")
         if not repo or number is None:
             continue
         slug = f"{repo.replace('/', '-')}-{number}.html"
+        # Find the analysis story for this card
+        story_entry = None
+        for s in analysis_stories:
+            if s.get("card", {}).get("number") == number and s.get("card", {}).get("repo") == repo:
+                story_entry = s
+                break
+        # Load and format events for this card
+        card_events = _filter_events_by_card(all_events, number, repo)
+        formatted_events = [
+            {
+                "time": _format_event_time(e.get("at", "")),
+                "text": _format_event_description(e),
+            }
+            for e in card_events
+        ]
+        # Cost data
+        wall_clock = None
+        model_calls = None
+        if story_entry:
+            wcs = story_entry.get("wall_clock_seconds")
+            if wcs is not None:
+                wall_clock = _format_minutes(round(wcs / 60))
+            cost = story_entry.get("cost")
+            if cost:
+                model_calls = cost.get("model_calls")
         pages[f"stories/{slug}"] = story_journey_template.render(
             card=card,
             manifest=manifest,
             package=index,
-            sprint_slug="",
+            sprint_slug=default_sprint_slug,
             current_view="journey",
             static_prefix="../",
+            events=formatted_events,
+            wall_clock=wall_clock,
+            model_calls=model_calls,
         )
 
     return pages
@@ -469,7 +501,6 @@ def _changed_label(measure: str) -> str:
         "lead_time_minutes": "lead time",
         "lead_time_days": "lead time",
         "first_attempt_rate_percent": "first-attempt rate",
-        "escalation_count": "escalations",
         "points_delivered": "points delivered",
         "throughput": "stories delivered",
         "blocked_aging_days": "days blocked",
@@ -521,6 +552,55 @@ def _load_sprint_events(pkg: Path, sprint_name: str, index: dict) -> list[dict]:
     return []
 
 
+def _load_all_events(pkg: Path, index: dict) -> list[dict]:
+    """Load all events from all period files in the package."""
+    periods = index.get("periods", [])
+    events: list[dict] = []
+    for period in periods:
+        events_file = pkg / period["file"]
+        if events_file.is_file():
+            data = _load_json(events_file)
+            events.extend(data.get("events", []))
+    return events
+
+
+def _filter_events_by_card(
+    events: list[dict], card_number, card_repo: str
+) -> list[dict]:
+    """Filter events to those for a specific card, sorted by timestamp."""
+    card_events = []
+    for e in events:
+        card_ref = e.get("card")
+        if not card_ref:
+            continue
+        if card_ref.get("number") == card_number and card_ref.get("repo") == card_repo:
+            card_events.append(e)
+    card_events.sort(key=lambda e: e.get("at", ""))
+    return card_events
+
+
+def _format_event_time(at: str) -> str:
+    """Extract HH:MM from an ISO timestamp like '2026-10-01T09:15:00+00:00'."""
+    match = re.search(r"T(\d{2}):(\d{2})", at)
+    if match:
+        return f"{match.group(1)}:{match.group(2)}"
+    return at
+
+
+def _format_event_description(event: dict) -> str:
+    """A human-readable description of an event for the timeline."""
+    kind = event.get("kind", "")
+    to_column = event.get("to_column")
+    from_column = event.get("from_column")
+    if to_column and (kind == "move" or kind == "card_moved"):
+        return f"Moved to {to_column}"
+    if kind == "work_started":
+        return "Work started"
+    if kind == "model_call":
+        return "Model call"
+    return kind or "Event"
+
+
 def _build_board_state(
     pkg: Path,
     index: dict,
@@ -530,7 +610,7 @@ def _build_board_state(
 
     Returns (columns, board_cards) where columns is an ordered list of column
     names and board_cards maps each column name to a list of card dicts with
-    'link_text' and 'title' keys.
+    'link_text', 'link_url' and 'title' keys.
     """
     events = _load_sprint_events(pkg, sprint_name, index)
     cards = index.get("cards", [])
@@ -583,7 +663,8 @@ def _build_board_state(
             display_repo = card.get("repo", "")
         number = card.get("number", "")
         board[col].append({
-            "link_text": f"[{display_repo}#{number}]({url})",
+            "link_text": f"{display_repo}#{number}",
+            "link_url": url,
             "title": card.get("title", ""),
         })
 

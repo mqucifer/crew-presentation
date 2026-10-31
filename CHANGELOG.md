@@ -2,13 +2,38 @@
 
 ## [Unreleased]
 
+### Added
+
+- The story's journey page now shows a "What happened, in order" timeline of the story's recorded events (timestamps and column moves) and a "What it cost" section with developer calls and wall-clock time, drawn from the package's events and analysis (mqucifer/crew-presentation#223)
+
+### Fixed
+
+- The story pages' "A story's journey" and "Replay" header nav links were relative paths that resolved to non-existent files under stories/; they now use a prefix so they resolve to the root-level pages (mqucifer/crew-presentation#223)
+
+### Fixed
+
+- The story-journey root page scrolls horizontally at phone widths when card titles are long; story list links now wrap with `overflow-wrap: break-word` (mqucifer/crew-presentation#223)
+
+### Fixed
+
+- The "Sprint" nav link on non-sprint pages (replay, story-journey, and every story under stories/) had an empty href, so it only reloaded the current page; it now links to the newest sprint's overview page (mqucifer/crew-presentation#223)
+
 ### Fixed
 
 - The sprint overview's cycle-time stat now renders an em dash (—) when sprint-metrics reports no value, consistent with the other four stats on that row (mqucifer/crew-presentation#223)
 
 ### Changed
 
+- The sprint overview no longer shows an escalations stat or an escalation entry in the "What changed" card; sprint-metrics' escalation_count and escalation_rate_percent are dropped from the displayed figures (mqucifer/crew-presentation#211)
 - The "Why work didn't land first time" chart now reads a 2.0.0 package's top_failure_causes (a list of {class, role, count}) and shows each entry's class and count, instead of rendering every row as "Cause not recorded"; 1.x map shapes and empty/absent causes still build unchanged (mqucifer/crew-presentation#211)
+
+### Fixed
+
+- The replay page's board columns rendered at unconstrained width on a phone, causing sideways scroll; the board now reflows to the viewport width (mqucifer/crew-presentation#223)
+
+### Fixed
+
+- The replay page's board cards now render their reference as a real hyperlink (repo#number as the visible label, the issue URL as the href) instead of printing the literal markdown link text (mqucifer/crew-presentation#223)
 
 ## [0.2.0] - 2026-10-30
 

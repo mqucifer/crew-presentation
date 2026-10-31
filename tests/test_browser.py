@@ -43,6 +43,7 @@ def _make_fake_package(
     metrics: dict | None = None,
     sprints: list[dict] | None = None,
     schema_version: str = "1.0.0",
+    cards: list[dict] | None = None,
 ) -> Path:
     """Create a minimal fake package directory with the given sprint names."""
     if sprints is None:
@@ -65,6 +66,8 @@ def _make_fake_package(
             }
             for name in names
         }
+    if cards is None:
+        cards = []
     pkg_dir = PACKAGE_DIR / tag
     pkg_dir.mkdir(parents=True, exist_ok=True)
     (pkg_dir / "manifest.json").write_text(
@@ -93,7 +96,7 @@ def _make_fake_package(
         json.dumps(
             {
                 "sprints": sprints,
-                "cards": [],
+                "cards": cards,
                 "crew_repository": "mqucifer/crew",
                 "sprint_metrics": {"answers": metrics},
             }
@@ -276,6 +279,56 @@ def test_sprint_nav_hrefs_resolve():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_view_nav_hrefs_resolve_from_stories():
+    """AC1–AC3: view nav links resolve correctly from story pages and the root."""
+    tag = "delivery-history-TEST"
+    cards = [
+        {
+            "repo": "mqucifer/crew-presentation",
+            "number": 100,
+            "title": "Test story",
+        }
+    ]
+    _make_fake_package(tag, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        story_file = BUILD_DIR / "stories" / "mqucifer-crew-presentation-100.html"
+        assert story_file.is_file(), f"story file not found: {story_file}"
+
+        def _check_view_nav(page: Path, expected_texts: set[str]) -> None:
+            """Verify that named links in the view nav resolve to existing files."""
+            html = page.read_text()
+            nav = _view_nav(html)
+            hrefs = re.findall(r'<a[^>]*href="([^"]*)"[^>]*>([^<]*)</a>', nav)
+            found = set()
+            for href, text in hrefs:
+                if text in expected_texts:
+                    target = (page.parent / href).resolve()
+                    assert target.is_file(), (
+                        f"link '{text}' (href='{href}') in {page.name} "
+                        f"does not resolve to an existing file"
+                    )
+                    found.add(text)
+            assert found == expected_texts, (
+                f"{page.name}: expected links {expected_texts}, found {found}"
+            )
+
+        # AC1 & AC2: from the story page, both links resolve
+        _check_view_nav(
+            story_file, {"A story's journey", "Replay"}
+        )
+
+        # AC3: from the root-level story-journey.html, Replay resolves
+        journey_file = BUILD_DIR / "story-journey.html"
+        assert journey_file.is_file(), f"root story-journey.html not found"
+        _check_view_nav(journey_file, {"Replay"})
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_sprint_nav_shows_start_date():
     """AC1: each sprint nav link includes the sprint's start date alongside its name."""
     sprints = [
@@ -375,9 +428,6 @@ def test_sprint_overview_header_and_stats():
         assert "22" in stats, f"throughput '22' not in stats: {stats[:200]}"
         assert "63" in stats, f"points '63' not in stats: {stats[:200]}"
         assert "12 of 22" in stats, f"'12 of 22' not in stats: {stats[:200]}"
-        assert ">1<" in stats or " 1 " in stats, (
-            f"escalation '1' not in stats: {stats[:200]}"
-        )
         assert "1 hr 42 min" in stats, f"'1 hr 42 min' not in stats: {stats[:200]}"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -404,7 +454,7 @@ def test_stat_value_css_properties():
 
 
 def test_zero_escalation_renders_zero():
-    """AC3: escalation_count 0 renders '0', not 'N/A' or empty."""
+    """AC3: escalation_count is not rendered as a stat; no 'escalations' label in stats."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -426,19 +476,9 @@ def test_zero_escalation_renders_zero():
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
         stats = _stats_section(html)
-        # Find the escalations stat
-        esc_match = re.search(
-            r'<span class="stat__value[^"]*">([^<]*?)</span>\s*<span class="stat__label">escalations</span>',
-            stats,
-            re.DOTALL,
+        assert "escalations" not in stats, (
+            f"escalations stat still present in stats section: {stats[:300]}"
         )
-        assert esc_match, "escalations stat not found in stats section"
-        value = esc_match.group(1).strip()
-        assert value == "0", (
-            f"escalation stat is {value!r}, expected '0'"
-        )
-        assert "N/A" not in value
-        assert value != ""
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -569,7 +609,7 @@ def test_view_nav_aria_current():
 
 
 def test_cycle_time_is_fourth_stat():
-    """AC7: '1 hr 42 min' is the fourth stat, label 'cycle time', after throughput/first-attempt/escalation."""
+    """AC7: '1 hr 42 min' is the third stat, label 'cycle time', after throughput/first-attempt."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -598,21 +638,18 @@ def test_cycle_time_is_fourth_stat():
         labels = re.findall(
             r'<span class="stat__label">(.*?)</span>', stats, re.DOTALL
         )
-        # The fourth stat (index 3) should be cycle time
-        assert len(values) >= 4, f"expected at least 4 stats, got {len(values)}"
-        assert values[3].strip() == "1 hr 42 min", (
-            f"4th stat value is {values[3]!r}, expected '1 hr 42 min'"
+        # The third stat (index 2) should be cycle time
+        assert len(values) >= 3, f"expected at least 3 stats, got {len(values)}"
+        assert values[2].strip() == "1 hr 42 min", (
+            f"3rd stat value is {values[2]!r}, expected '1 hr 42 min'"
         )
-        assert labels[3].strip() == "cycle time", (
-            f"4th stat label is {labels[3].strip()!r}, expected 'cycle time'"
+        assert labels[2].strip() == "cycle time", (
+            f"3rd stat label is {labels[2].strip()!r}, expected 'cycle time'"
         )
-        # Verify the three stats before it
+        # Verify the two stats before it
         assert "22" in values[0], f"1st stat is {values[0]!r}, expected throughput"
         assert "12 of 22" in values[1], (
             f"2nd stat is {values[1]!r}, expected first-attempt"
-        )
-        assert values[2].strip() == "1", (
-            f"3rd stat is {values[2]!r}, expected escalation '1'"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -2646,7 +2683,7 @@ def test_sprint_page_scrollwidth_at_phone_width():
 
 
 def test_story_journey_scrollwidth_at_phone_width():
-    """AC3: story-journey page at 390px viewport has documentElement.scrollWidth <= 390."""
+    """AC1-AC2: story-journey page at 375px viewport has scrollWidth <= 375 with long titles."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -2662,6 +2699,17 @@ def test_story_journey_scrollwidth_at_phone_width():
             }
         },
     )
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["cards"] = [
+        {"repo": "mqucifer/crew", "number": 1, "title": "Fix typo"},
+        {
+            "repo": "mqucifer/crew",
+            "number": 127,
+            "title": "Extract the threshold logic into a separate module with proper type annotations and full docstrings",
+        },
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
     original = DELIVERY_HISTORY_TAG.read_text()
     DELIVERY_HISTORY_TAG.write_text(tag + "\n")
     try:
@@ -2672,15 +2720,51 @@ def test_story_journey_scrollwidth_at_phone_width():
 
         with sync_playwright() as pw:
             browser = pw.chromium.launch()
-            context = browser.new_context(viewport={"width": 390, "height": 844})
+            context = browser.new_context(viewport={"width": 375, "height": 812})
             page = context.new_page()
             _intercept_design_system(page)
             page.goto(f"file://{page_path}")
             page.wait_for_load_state("domcontentloaded")
 
             scroll_width = page.evaluate("document.documentElement.scrollWidth")
-            assert scroll_width <= 390, (
-                f"story-journey page scrollWidth is {scroll_width}, expected <= 390"
+            assert scroll_width <= 375, (
+                f"story-journey page scrollWidth is {scroll_width}, expected <= 375"
+            )
+
+            # AC2: the section contains exactly 2 li elements with correct link text
+            li_texts = page.eval_on_selector_all(
+                "section ul li a", "els => els.map(el => el.textContent)"
+            )
+            assert len(li_texts) == 2, f"expected 2 li elements, found {len(li_texts)}"
+            assert li_texts[0] == "mqucifer/crew#1 — Fix typo", (
+                f"first link text is {li_texts[0]!r}, expected 'mqucifer/crew#1 — Fix typo'"
+            )
+            assert (
+                li_texts[1]
+                == "mqucifer/crew#127 — Extract the threshold logic into a separate module with proper type annotations and full docstrings"
+            ), (
+                f"second link text is {li_texts[1]!r}, expected full long title"
+            )
+
+            # A card title containing a very long unbreakable segment (no spaces)
+            # must not force horizontal scroll: overflow-wrap: break-word breaks it.
+            unbreakable = "a" * 200
+            data["cards"] = [
+                {
+                    "repo": "mqucifer/crew",
+                    "number": 999,
+                    "title": unbreakable,
+                },
+            ]
+            (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+            _build()
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            scroll_width = page.evaluate("document.documentElement.scrollWidth")
+            assert scroll_width <= 375, (
+                f"story-journey page scrollWidth is {scroll_width} with a long "
+                f"unbreakable title, expected <= 375"
             )
 
             browser.close()
@@ -3534,6 +3618,210 @@ def test_journey_page_path_step_without_data_stage_when_not_delivered():
         assert has_no_data_stage, (
             "all .path__step elements have a data-stage attribute; "
             "expected at least one without it"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_timeline_shows_events_in_order():
+    """AC1: delivered story with a move event shows 'What happened, in order' with timestamp and destination column."""
+    tag = "delivery-history-TEST"
+    pkg_dir = _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 861, "repo": "sprint-metrics"},
+                "blocks": ["refused", "refused", "landed"],
+                "crew_fixes": [],
+                "delivered": True,
+                "text": "Missed twice, then landed.",
+            }
+        ],
+        cards=[
+            {
+                "number": 861,
+                "repo": "sprint-metrics",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+            }
+        ],
+    )
+    events = [
+        {
+            "kind": "move",
+            "at": "2026-10-01T09:15:00+00:00",
+            "card": {"number": 861, "repo": "sprint-metrics"},
+            "from_column": "In Progress",
+            "to_column": "Reviewing",
+        }
+    ]
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(exist_ok=True)
+    (events_dir / "2026-10-01.json").write_text(json.dumps({"events": events}))
+    index = json.loads((pkg_dir / "delivery-history.json").read_text())
+    index["periods"] = [
+        {
+            "sprint": "Sprint 6",
+            "start": "2026-10-01",
+            "end": "2026-10-01",
+            "file": "events/2026-10-01.json",
+            "events": 1,
+        }
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "sprint-metrics-861.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        assert "What happened, in order" in html, (
+            "heading 'What happened, in order' not found"
+        )
+        # An element containing both the timestamp and the destination column
+        item_match = re.search(
+            r'<li class="timeline__item">(.*?)</li>', html, re.DOTALL
+        )
+        assert item_match, "no timeline item found"
+        item_text = item_match.group(1)
+        assert "09:15" in item_text, (
+            f"timestamp '09:15' not in timeline item: {item_text!r}"
+        )
+        assert "Reviewing" in item_text, (
+            f"destination 'Reviewing' not in timeline item: {item_text!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_cost_section_shows_wall_clock_and_model_calls():
+    """AC2: story with wall_clock_seconds 1740 and cost.model_calls 6 shows 'What it cost' with '29 min' and '6'."""
+    tag = "delivery-history-TEST"
+    pkg_dir = _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 861, "repo": "sprint-metrics"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+                "text": "Landed first try.",
+                "wall_clock_seconds": 1740,
+                "cost": {"model_calls": 6},
+            }
+        ],
+        cards=[
+            {
+                "number": 861,
+                "repo": "sprint-metrics",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "sprint-metrics-861.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        assert "What it cost" in html, "heading 'What it cost' not found"
+        # Find the cost section
+        cost_section = re.search(
+            r'<section[^>]*aria-labelledby="cost-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert cost_section, "cost section not found"
+        cost_html = cost_section.group(1)
+        assert "29 min" in cost_html, (
+            f"'29 min' not in cost section: {cost_html!r}"
+        )
+        assert ">6<" in cost_html, (
+            f"'6' for model calls not in cost section: {cost_html!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_no_cost_section_when_not_delivered():
+    """AC3: undelivered story with wall_clock_seconds null shows timeline but NOT 'What it cost'."""
+    tag = "delivery-history-TEST"
+    pkg_dir = _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 861, "repo": "sprint-metrics"},
+                "blocks": [],
+                "crew_fixes": [],
+                "delivered": False,
+                "text": "Still in progress.",
+                "wall_clock_seconds": None,
+                "cost": None,
+            }
+        ],
+        cards=[
+            {
+                "number": 861,
+                "repo": "sprint-metrics",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+            }
+        ],
+    )
+    events = [
+        {
+            "kind": "move",
+            "at": "2026-10-01T08:00:00+00:00",
+            "card": {"number": 861, "repo": "sprint-metrics"},
+            "from_column": "Ready",
+            "to_column": "In Progress",
+        }
+    ]
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(exist_ok=True)
+    (events_dir / "2026-10-01.json").write_text(json.dumps({"events": events}))
+    index = json.loads((pkg_dir / "delivery-history.json").read_text())
+    index["periods"] = [
+        {
+            "sprint": "Sprint 6",
+            "start": "2026-10-01",
+            "end": "2026-10-01",
+            "file": "events/2026-10-01.json",
+            "events": 1,
+        }
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "sprint-metrics-861.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        assert "What happened, in order" in html, (
+            "heading 'What happened, in order' not found"
+        )
+        item_match = re.search(
+            r'<li class="timeline__item">(.*?)</li>', html, re.DOTALL
+        )
+        assert item_match, "no timeline item found"
+        item_text = item_match.group(1)
+        assert "08:00" in item_text, (
+            f"timestamp '08:00' not in timeline item: {item_text!r}"
+        )
+        assert "In Progress" in item_text, (
+            f"destination 'In Progress' not in timeline item: {item_text!r}"
+        )
+        assert "What it cost" not in html, (
+            "heading 'What it cost' should not be present for undelivered story"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -5898,7 +6186,7 @@ def test_stat_values_not_horizontally_clipped_at_phone_width():
 
 
 def test_stats_single_row_at_desktop_width():
-    """AC3: at a 1440px viewport all five .stat elements share the same top offset,
+    """AC3: at a 1440px viewport all four .stat elements share the same top offset,
     i.e. they sit in a single row, unchanged from the desktop layout."""
     tag = "delivery-history-TEST"
     _make_fake_package(
@@ -5935,7 +6223,7 @@ def test_stats_single_row_at_desktop_width():
                 ).map((el) => el.getBoundingClientRect().top)
                 """
             )
-            assert len(tops) == 5, f"expected 5 .stat elements, got {len(tops)}"
+            assert len(tops) == 4, f"expected 4 .stat elements, got {len(tops)}"
             assert len(set(tops)) == 1, (
                 f"at 1440px the .stat top offsets differ {tops}; the stats are "
                 f"not in a single row"
@@ -5947,7 +6235,7 @@ def test_stats_single_row_at_desktop_width():
 
 
 def test_stat_values_and_order_at_phone_width():
-    """AC4: at a 375px viewport the five .stat__value elements keep their document
+    """AC4: at a 375px viewport the four .stat__value elements keep their document
     order and show the same values as at 1440px for the same package data. The
     reflow changes the layout, not the values or their order.
 
@@ -5995,17 +6283,17 @@ def test_stat_values_and_order_at_phone_width():
 
         phone = read_values({"width": 375, "height": 812})
         desktop = read_values({"width": 1440, "height": 900})
-        assert len(phone) == 5, f"expected 5 .stat__value at 375px, got {phone}"
-        assert len(desktop) == 5, f"expected 5 .stat__value at 1440px, got {desktop}"
+        assert len(phone) == 4, f"expected 4 .stat__value at 375px, got {phone}"
+        assert len(desktop) == 4, f"expected 4 .stat__value at 1440px, got {desktop}"
         assert phone == desktop, (
-            f"the five stat values differ between 375px {phone} and 1440px "
+            f"the four stat values differ between 375px {phone} and 1440px "
             f"{desktop}; reflow must not change the values or their order"
         )
         # The two fixed endpoints (first and last) pin the order and the
         # throughput/points values the criterion names.
         assert phone[0] == "22", f"first stat value is {phone[0]!r}, expected '22'"
-        assert phone[4] == "63", (
-            f"last stat value is {phone[4]!r}, expected '63'"
+        assert phone[3] == "63", (
+            f"last stat value is {phone[3]!r}, expected '63'"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -6055,7 +6343,7 @@ def test_stat_values_at_least_text_xl_at_phone_width():
                 )
                 """
             )
-            assert len(sizes) == 5, f"expected 5 .stat__value, got {len(sizes)}"
+            assert len(sizes) == 4, f"expected 4 .stat__value, got {len(sizes)}"
             under = [
                 (s, i)
                 for i, s in enumerate(sizes)
@@ -6141,7 +6429,7 @@ def test_first_stat_label_visible_under_value_at_phone_width():
 
 
 def test_stats_single_row_height_at_desktop_width():
-    """AC7: at a 1440px viewport all five .stat elements share the same top offset
+    """AC7: at a 1440px viewport all four .stat elements share the same top offset
     and the .stats element's height equals a single .stat's height — a single row,
     unchanged from the desktop layout."""
     tag = "delivery-history-TEST"
@@ -6179,7 +6467,7 @@ def test_stats_single_row_height_at_desktop_width():
                 ).map((el) => el.getBoundingClientRect().top)
                 """
             )
-            assert len(tops) == 5, f"expected 5 .stat elements, got {len(tops)}"
+            assert len(tops) == 4, f"expected 4 .stat elements, got {len(tops)}"
             assert len(set(tops)) == 1, (
                 f"at 1440px the .stat top offsets differ {tops}; not a single row"
             )
@@ -6507,7 +6795,7 @@ def test_changed_trend_first_attempt_rate_label():
 
 
 def test_changed_trend_escalation_count_label():
-    """AC2, AC4: escalation_count renders as 'escalations:' in .changed-trend-values."""
+    """AC2, AC4: escalation_count is not rendered in .changed-trend-values."""
     tag = "delivery-history-TEST"
     _make_package_with_changed(
         tag,
@@ -6531,13 +6819,9 @@ def test_changed_trend_escalation_count_label():
         values_div = re.search(
             r'class="changed-trend-values">(.*?)</div>', html, re.DOTALL
         )
-        assert values_div, "no changed-trend-values div found"
-        values_text = values_div.group(0)
-        assert "escalations:" in values_text, (
-            f"expected 'escalations:' in .changed-trend-values, got: {values_text!r}"
-        )
-        assert "escalation_count" not in values_text, (
-            f"raw field name 'escalation_count' still present in .changed-trend-values"
+        assert values_div is None, (
+            f"escalation entry should not appear in .changed-trend-values, "
+            f"got: {values_div.group(0)!r}"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -6639,8 +6923,9 @@ def test_changed_trend_no_field_name_pattern_in_values():
         values_divs = re.findall(
             r'class="changed-trend-values">(.*?)</div>', html, re.DOTALL
         )
-        assert len(values_divs) == 5, (
-            f"expected 5 .changed-trend-values elements, got {len(values_divs)}"
+        assert len(values_divs) == 4, (
+            f"expected 4 .changed-trend-values elements (escalation filtered out), "
+            f"got {len(values_divs)}"
         )
         field_name_pattern = re.compile(r"[a-z]+_[a-z]+")
         for i, div_text in enumerate(values_divs, 1):
@@ -7163,13 +7448,13 @@ def test_replay_card_initial_column_is_earliest_from_column():
             r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
         )
         assert board_match, "no Board section"
-        card_text = "[mqucifer/crew-presentation#127](https://github.com/mqucifer/crew-presentation/issues/127)"
+        expected_href = "https://github.com/mqucifer/crew-presentation/issues/127"
         sb_col_match = re.search(
             r'class="replay-col__header">Sprint Backlog</div>\s*<div class="replay-col__cards">(.*?)</div>\s*</div>',
             board_match.group(1), re.DOTALL
         )
         assert sb_col_match, "Sprint Backlog column not found"
-        assert card_text in sb_col_match.group(1), (
+        assert expected_href in sb_col_match.group(1), (
             f"Card 127 not in Sprint Backlog column"
         )
         ip_col_match = re.search(
@@ -7177,7 +7462,7 @@ def test_replay_card_initial_column_is_earliest_from_column():
             board_match.group(1), re.DOTALL
         )
         if ip_col_match:
-            assert card_text not in ip_col_match.group(1), (
+            assert expected_href not in ip_col_match.group(1), (
                 "Card 127 incorrectly in In Progress column"
             )
         done_col_match = re.search(
@@ -7185,7 +7470,7 @@ def test_replay_card_initial_column_is_earliest_from_column():
             board_match.group(1), re.DOTALL
         )
         if done_col_match:
-            assert card_text not in done_col_match.group(1), (
+            assert expected_href not in done_col_match.group(1), (
                 "Card 127 incorrectly in Done column"
             )
     finally:
@@ -7194,7 +7479,7 @@ def test_replay_card_initial_column_is_earliest_from_column():
 
 
 def test_replay_card_text_includes_link_and_title():
-    """AC3: card's visible text includes the exact link string and the card's title."""
+    """AC3: card's visible text includes the link as an <a> element and the card's title."""
     tag = "delivery-history-TEST"
     sprints = [
         {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
@@ -7215,17 +7500,34 @@ def test_replay_card_text_includes_link_and_title():
             r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
         )
         assert board_match, "no Board section"
-        card_text = "[mqucifer/crew-presentation#127](https://github.com/mqucifer/crew-presentation/issues/127)"
+        # The card must contain an <a> with the issue URL as href and the
+        # visible label "mqucifer/crew-presentation#127".
+        expected_href = "https://github.com/mqucifer/crew-presentation/issues/127"
+        expected_label = "mqucifer/crew-presentation#127"
         found = False
         for m in re.finditer(r'<div class="replay-card">(.*?)</div>', board_match.group(1), re.DOTALL):
             content = m.group(1)
-            if card_text in content:
+            if expected_href in content:
                 found = True
+                a_match = re.search(
+                    r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', content
+                )
+                assert a_match, f"No <a> element found in card: {content!r}"
+                assert a_match.group(1) == expected_href, (
+                    f"href is {a_match.group(1)!r}, expected {expected_href!r}"
+                )
+                assert a_match.group(2) == expected_label, (
+                    f"visible text is {a_match.group(2)!r}, expected {expected_label!r}"
+                )
                 assert "thresholds.py" in content, (
                     f"Card title 'thresholds.py' not found in card element: {content!r}"
                 )
+                # Ensure the literal markdown is not present
+                assert f"[{expected_label}]({expected_href})" not in content, (
+                    "Card still contains literal markdown link text"
+                )
                 break
-        assert found, f"Card with link {card_text!r} not found in board"
+        assert found, f"Card with href {expected_href!r} not found in board"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -7360,25 +7662,34 @@ def test_replay_single_event_card_in_from_column_with_num_class():
             r'<section[^>]*aria-label="Board"[^>]*>(.*?)</section>', html, re.DOTALL
         )
         assert board_match, "no Board section"
-        card_text = "[mqucifer/crew-presentation#130](https://github.com/mqucifer/crew-presentation/issues/130)"
+        expected_href = "https://github.com/mqucifer/crew-presentation/issues/130"
+        expected_label = "mqucifer/crew-presentation#130"
         sb_col_match = re.search(
             r'class="replay-col__header">Sprint Backlog</div>\s*<div class="replay-col__cards">(.*?)</div>\s*</div>',
             board_match.group(1), re.DOTALL
         )
         assert sb_col_match, "Sprint Backlog column not found"
-        assert card_text in sb_col_match.group(1), (
-            "Card 130 not in Sprint Backlog column"
+        assert expected_href in sb_col_match.group(1), (
+            "Card 130 link not in Sprint Backlog column"
         )
         assert "serve.py" in sb_col_match.group(1), (
             "Card title 'serve.py' not found"
         )
+        # The link must be in an <a> element with class 'num'
         num_match = re.search(
-            r'<(\w+)[^>]*class="[^"]*num[^"]*"[^>]*>([^<]*)</\1>',
+            r'<a[^>]*href="([^"]*)"[^>]*class="[^"]*num[^"]*"[^>]*>([^<]*)</a>',
             sb_col_match.group(1)
         )
-        assert num_match, "No element with class 'num' found in Sprint Backlog column"
-        assert card_text in num_match.group(2), (
-            f"Link text not inside .num element: {num_match.group(2)!r}"
+        assert num_match, "No <a> element with class 'num' found in Sprint Backlog column"
+        assert num_match.group(1) == expected_href, (
+            f"Link href is {num_match.group(1)!r}, expected {expected_href!r}"
+        )
+        assert num_match.group(2) == expected_label, (
+            f"Link text is {num_match.group(2)!r}, expected {expected_label!r}"
+        )
+        # Ensure the literal markdown is not present
+        assert f"[{expected_label}]({expected_href})" not in sb_col_match.group(1), (
+            "Card still contains literal markdown link text"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -7917,6 +8228,138 @@ def test_zero_sprint_metrics_render_zero_and_fraction():
         assert first_try_match, "no 'landed first try' stat found"
         assert first_try_match.group(1) == "0 of 4", (
             f"first-try stat is {first_try_match.group(1)!r}, expected '0 of 4'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_page_scrollwidth_at_phone_width():
+    """AC1: replay page at 375px viewport has documentElement.scrollWidth <= 375."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"at": "2026-10-07T08:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Needs Refinement", "to_column": "Ready"},
+        {"at": "2026-10-07T09:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Ready", "to_column": "Sprint Backlog"},
+        {"at": "2026-10-07T10:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress"},
+        {"at": "2026-10-07T11:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "Reviewing"},
+        {"at": "2026-10-07T12:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Reviewing", "to_column": "QAing"},
+        {"at": "2026-10-07T13:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "QAing", "to_column": "Merging"},
+        {"at": "2026-10-07T14:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Merging", "to_column": "Done"},
+        {"at": "2026-10-08T08:00:00Z", "card": {"number": 2, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "Blocked"},
+    ]
+    cards = [
+        {"number": 1, "repo": "mqucifer/crew", "title": "card one", "url": "https://github.com/mqucifer/crew/issues/1"},
+        {"number": 2, "repo": "mqucifer/crew", "title": "card two", "url": "https://github.com/mqucifer/crew/issues/2"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            scroll_width = page.evaluate("document.documentElement.scrollWidth")
+            assert scroll_width <= 375, (
+                f"replay page scrollWidth is {scroll_width}, expected <= 375"
+            )
+
+            # The board must be laid out as a grid (the bug: no CSS rules
+            # for .replay-board meant the columns were not laid out).
+            board = page.query_selector('[aria-label="Board"]')
+            assert board is not None, "no Board section found"
+            display = page.evaluate(
+                "el => getComputedStyle(el).display", board
+            )
+            assert display == "grid", (
+                f".replay-board computed display is {display!r}, expected 'grid'"
+            )
+
+            # AC2: verify board structure
+            cols = board.query_selector_all(".replay-col")
+            assert len(cols) == 9, f"Board has {len(cols)} columns, expected 9"
+            expected_names = [
+                "Needs Refinement", "Ready", "Sprint Backlog",
+                "In Progress", "Reviewing", "QAing",
+                "Merging", "Done", "Blocked",
+            ]
+            for col, name in zip(cols, expected_names):
+                header = col.query_selector(".replay-col__header")
+                assert header is not None, f"column {name!r} has no .replay-col__header"
+                assert header.text_content() == name, (
+                    f"column header is {header.text_content()!r}, expected {name!r}"
+                )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_sprint_link_href_resolves_to_existing_file():
+    """AC1: the Sprint link in nav[aria-label='Views'] on replay.html has a non-empty href
+    whose value names a file that exists in the build directory."""
+    tag = "delivery-history-TEST"
+    names = ["Sprint 6", "Sprint 7"]
+    _make_fake_package(tag, names)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        view_nav = _view_nav(html)
+        m = re.search(r'<a[^>]*href="([^"]*)"[^>]*>Sprint</a>', view_nav)
+        assert m, "Sprint link not found in view nav on replay.html"
+        href = m.group(1)
+        assert href, "Sprint link href is empty on replay.html"
+        target = BUILD_DIR / href
+        assert target.is_file(), (
+            f"Sprint link href '{href}' does not resolve to an existing file in build/"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_story_page_sprint_link_href_resolves_to_existing_file():
+    """AC2: the Sprint link in nav[aria-label='Views'] on a story page has a non-empty href
+    whose value, resolved relative to the story page's directory, names a file that exists
+    in the build directory."""
+    tag = "delivery-history-TEST"
+    names = ["Sprint 6", "Sprint 7"]
+    cards = [
+        {"number": 42, "repo": "mqucifer/crew", "title": "Fix the thing"},
+    ]
+    _make_fake_package(tag, names, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        # The story page is at build/stories/mqucifer-crew-42.html
+        story_path = BUILD_DIR / "stories" / "mqucifer-crew-42.html"
+        assert story_path.is_file(), "story page not found in build output"
+        html = story_path.read_text()
+        view_nav = _view_nav(html)
+        m = re.search(r'<a[^>]*href="([^"]*)"[^>]*>Sprint</a>', view_nav)
+        assert m, "Sprint link not found in view nav on story page"
+        href = m.group(1)
+        assert href, "Sprint link href is empty on story page"
+        # Resolve relative to the story page's directory
+        target = (story_path.parent / href).resolve()
+        assert target.is_file(), (
+            f"Sprint link href '{href}' on story page does not resolve to an existing file"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)

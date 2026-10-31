@@ -24,9 +24,9 @@
       {% block h1 %}{% endblock %}
     </div>
     <nav class="nav" aria-label="Views">
-      <a href="{{ sprint_slug }}" {% if current_view == 'sprint' %}aria-current="page"{% endif %}>Sprint</a>
-      <a href="story-journey.html" {% if current_view == 'journey' %}aria-current="page"{% endif %}>A story's journey</a>
-      <a href="replay.html" {% if current_view == 'replay' %}aria-current="page"{% endif %}>Replay</a>
+      <a href="{{ static_prefix }}{{ sprint_slug }}" {% if current_view == 'sprint' %}aria-current="page"{% endif %}>Sprint</a>
+      <a href="{{ static_prefix }}story-journey.html" {% if current_view == 'journey' %}aria-current="page"{% endif %}>A story's journey</a>
+      <a href="{{ static_prefix }}replay.html" {% if current_view == 'replay' %}aria-current="page"{% endif %}>Replay</a>
     </nav>
   </header>
   {% block content %}{% endblock %}
