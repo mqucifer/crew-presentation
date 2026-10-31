@@ -8235,7 +8235,8 @@ def test_zero_sprint_metrics_render_zero_and_fraction():
 
 
 def test_replay_page_scrollwidth_at_phone_width():
-    """AC1: replay page at 375px viewport has documentElement.scrollWidth <= 375."""
+    """AC1: replay page at 375px viewport has documentElement.scrollWidth <= 375,
+    even when a card title contains a long unbreakable word."""
     tag = "delivery-history-TEST"
     sprints = [
         {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
@@ -8250,8 +8251,9 @@ def test_replay_page_scrollwidth_at_phone_width():
         {"at": "2026-10-07T14:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Merging", "to_column": "Done"},
         {"at": "2026-10-08T08:00:00Z", "card": {"number": 2, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "Blocked"},
     ]
+    long_title = "crew-presentation/test_reads_crew.py::test_a_sprints_page_shows_its_throughput"
     cards = [
-        {"number": 1, "repo": "mqucifer/crew", "title": "card one", "url": "https://github.com/mqucifer/crew/issues/1"},
+        {"number": 1, "repo": "mqucifer/crew", "title": long_title, "url": "https://github.com/mqucifer/crew/issues/1"},
         {"number": 2, "repo": "mqucifer/crew", "title": "card two", "url": "https://github.com/mqucifer/crew/issues/2"},
     ]
     _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
@@ -8301,6 +8303,26 @@ def test_replay_page_scrollwidth_at_phone_width():
                 assert header.text_content() == name, (
                     f"column header is {header.text_content()!r}, expected {name!r}"
                 )
+
+            # AC2: the long unbreakable title must be fully rendered (wrapped, not
+            # clipped or ellipsized) inside the .replay-card that holds it.
+            card_with_long_title = page.evaluate_handle(
+                """(title) => {
+                    const cards = document.querySelectorAll('.replay-card');
+                    for (const c of cards) {
+                        if (c.textContent.includes(title)) return c;
+                    }
+                    return null;
+                }""",
+                long_title,
+            )
+            assert card_with_long_title is not None, (
+                "no .replay-card contains the long title text"
+            )
+            card_text = card_with_long_title.evaluate("el => el.textContent")
+            assert long_title in card_text, (
+                f"card text {card_text!r} does not contain the full long title"
+            )
 
             browser.close()
     finally:

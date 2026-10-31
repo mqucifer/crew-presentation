@@ -247,6 +247,7 @@
   border: 1px solid var(--color-border);
   font-size: 14px;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 /* Phone layout: stack the main content sections in DOM order. */
@@ -261,7 +262,7 @@
     grid-column: 1 / -1;
   }
   .replay-board {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .attempt-row {
     display: flex;
