@@ -8534,3 +8534,76 @@ def test_null_metrics_cycle_time_renders_em_dash_like_other_stats():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_section_empty_renders_no_stories():
+    """AC1: when a sprint delivered zero stories, the attempt section says so in plain language."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 0,
+                "points_delivered": 0,
+                "first_attempt_numerator": 0,
+                "first_attempt_denominator": 0,
+                "escalation_count": 0,
+                "cycle_time_days": 0,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The section contains the exact empty-state message
+        assert "No stories were delivered this sprint" in html, (
+            "'No stories were delivered this sprint' not found in attempt section"
+        )
+        # No attempt-row elements
+        assert 'class="attempt-row"' not in html, (
+            "attempt-row elements found for empty stories"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_attempt_section_single_story_renders_one_row():
+    """AC2: when exactly one story is delivered, the section shows one attempt-row and no empty-state message."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 1, "repo": "mqucifer/crew"},
+                "blocks": ["landed"],
+                "delivered": "2026-09-25T10:00:00Z",
+            }
+        ],
+        cards=[
+            {
+                "number": 1,
+                "repo": "mqucifer/crew",
+                "sprint": "Sprint 6",
+                "title": "test-story",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Exactly one attempt-row element
+        count = html.count('class="attempt-row"')
+        assert count == 1, f"expected 1 attempt-row, got {count}"
+        # No empty-state message
+        assert "No stories were delivered this sprint" not in html, (
+            "empty-state message found when a story was delivered"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
