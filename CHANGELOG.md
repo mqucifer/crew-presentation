@@ -18,7 +18,7 @@
 - The story-journey root page scrolls horizontally at phone widths when card titles are long; story list links now wrap with `overflow-wrap: break-word` (mqucifer/crew-presentation#223)
 - The "Sprint" nav link on non-sprint pages (replay, story-journey, and every story under stories/) had an empty href, so it only reloaded the current page; it now links to the newest sprint's overview page (mqucifer/crew-presentation#223)
 - The sprint overview's cycle-time stat now renders an em dash (—) when sprint-metrics reports no value, consistent with the other four stats on that row (mqucifer/crew-presentation#223)
-- The replay page's board columns rendered at unconstrained width on a phone, causing sideways scroll; the board now reflows to the viewport width (mqucifer/crew-presentation#223)
+- The replay page's board columns rendered at unconstrained width on a phone, causing sideways scroll; the board now stacks in one column (mqucifer/crew-presentation#223). A long unbroken word in a card title can still overflow (mqucifer/crew-presentation#246)
 - The replay page's board cards now render their reference as a real hyperlink (repo#number as the visible label, the issue URL as the href) instead of printing the literal markdown link text (mqucifer/crew-presentation#223)
 
 ## [0.2.0] - 2026-10-30
@@ -26,10 +26,6 @@
 ### Added
 
 - The story's journey page shows the path through the board's stages: a strip of five steps (Refined, Built, Reviewed, QA, Merged) with the stage colours when the story was delivered (mqucifer/crew-presentation#100)
-
-### Added
-
-- The site accepts delivery-history packages on schema major 2 (e.g. 2.0.0); major 2 is now in SUPPORTED_MAJOR_VERSIONS (mqucifer/crew-presentation#212)
 
 ### Fixed
 
