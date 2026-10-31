@@ -3806,6 +3806,107 @@ def test_journey_timeline_shows_events_in_order():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_journey_timeline_shows_date_for_multiday_events():
+    """AC1: a story with events on two different days shows the calendar date in the later event's row."""
+    tag = "delivery-history-TEST"
+    pkg_dir = _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 861, "repo": "sprint-metrics"},
+                "blocks": ["refused", "refused", "landed"],
+                "crew_fixes": [],
+                "delivered": True,
+                "text": "Missed twice, then landed.",
+            }
+        ],
+        cards=[
+            {
+                "number": 861,
+                "repo": "sprint-metrics",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+            }
+        ],
+    )
+    events_day1 = [
+        {
+            "kind": "move",
+            "at": "2026-10-01T23:51:00+00:00",
+            "card": {"number": 861, "repo": "sprint-metrics"},
+            "from_column": "In Progress",
+            "to_column": "Reviewing",
+        }
+    ]
+    events_day2 = [
+        {
+            "kind": "move",
+            "at": "2026-10-02T02:58:00+00:00",
+            "card": {"number": 861, "repo": "sprint-metrics"},
+            "from_column": "Reviewing",
+            "to_column": "Done",
+        }
+    ]
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(exist_ok=True)
+    (events_dir / "2026-10-01.json").write_text(json.dumps({"events": events_day1}))
+    (events_dir / "2026-10-02.json").write_text(json.dumps({"events": events_day2}))
+    index = json.loads((pkg_dir / "delivery-history.json").read_text())
+    index["periods"] = [
+        {
+            "sprint": "Sprint 6",
+            "start": "2026-10-01",
+            "end": "2026-10-02",
+            "file": "events/2026-10-01.json",
+            "events": 1,
+        },
+        {
+            "sprint": "Sprint 6",
+            "start": "2026-10-02",
+            "end": "2026-10-02",
+            "file": "events/2026-10-02.json",
+            "events": 1,
+        },
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "sprint-metrics-861.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        assert "What happened, in order" in html
+        # Find the timeline item for the Oct 2 event (02:58)
+        items = re.findall(
+            r'<li class="timeline__item">(.*?)</li>', html, re.DOTALL
+        )
+        assert len(items) == 2, f"expected 2 timeline items, got {len(items)}"
+        # The later event (02:58) must show its calendar date: "Oct" and day "2"
+        oct2_item = items[1]
+        assert "02:58" in oct2_item, (
+            f"clock time '02:58' not in later timeline item: {oct2_item!r}"
+        )
+        assert "Oct" in oct2_item, (
+            f"month 'Oct' not in later timeline item: {oct2_item!r}"
+        )
+        assert "2" in oct2_item, (
+            f"day '2' not in later timeline item: {oct2_item!r}"
+        )
+        # The earlier event (23:51) must also show its calendar date
+        oct1_item = items[0]
+        assert "23:51" in oct1_item, (
+            f"clock time '23:51' not in earlier timeline item: {oct1_item!r}"
+        )
+        assert "Oct" in oct1_item, (
+            f"month 'Oct' not in earlier timeline item: {oct1_item!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_journey_cost_section_shows_wall_clock_and_model_calls():
     """AC2: story with wall_clock_seconds 1740 and cost.model_calls 6 shows 'What it cost' with '29 min' and '6'."""
     tag = "delivery-history-TEST"
