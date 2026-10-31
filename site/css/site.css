@@ -9,10 +9,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Stats row: five equal columns on desktop so all five totals sit in one row.
+/* Stats row: four equal columns on desktop so all four totals sit in one row.
    The phone media query below overrides this to two columns. */
 .stats {
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
 }
 
 /* Sprint grid: 12-column layout for the two-column body */

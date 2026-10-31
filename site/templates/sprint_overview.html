@@ -47,6 +47,7 @@
       <h2 id="split-h">The Architect's split, story by story</h2>
     </div>
     <div class="card__body">
+      {% if stories %}
       <div class="attempt-legend">
         <span><i class="swatch swatch--landed"></i> attempt that landed</span>
         <span><i class="swatch swatch--refused"></i> refused, repaired</span>
@@ -76,6 +77,9 @@
         </div>
         {% endfor %}
       </div>
+      {% else %}
+      <p>No stories were delivered this sprint</p>
+      {% endif %}
     </div>
   </section>
   <section class="card sprint-side" aria-labelledby="why-h">
