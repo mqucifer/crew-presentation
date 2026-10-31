@@ -19,6 +19,12 @@ JS_DIR = REPO_ROOT / "site" / "js"
 
 SUPPORTED_MAJOR_VERSIONS = (1, 2)
 
+# Event kinds that are per-tool or per-turn internals, omitted from the
+# journey timeline so it stays a readable life cycle, not a machine log.
+_OMITTED_EVENT_KINDS = frozenset(
+    {"model_call", "tool_call", "session_turn", "session_compacted"}
+)
+
 TEMPLATE_MAP = {
     "replay.html": "replay.html",
     "story_journey.html": "story-journey.html",
@@ -269,15 +275,20 @@ def _render_pages(pkg: Path) -> dict:
             if s.get("card", {}).get("number") == number and s.get("card", {}).get("repo") == repo:
                 story_entry = s
                 break
-        # Load and format events for this card
+        # Load and format events for this card, omitting internal per-tool
+        # and per-turn events that would make the timeline unreadable.
         card_events = _filter_events_by_card(all_events, number, repo)
-        formatted_events = [
-            {
-                "time": _format_event_time(e.get("at", "")),
-                "text": _format_event_description(e),
-            }
-            for e in card_events
-        ]
+        formatted_events = []
+        for e in card_events:
+            text = _format_event_description(e)
+            if text is None:
+                continue
+            formatted_events.append(
+                {
+                    "time": _format_event_time(e.get("at", "")),
+                    "text": text,
+                }
+            )
         # Cost data
         wall_clock = None
         model_calls = None
@@ -587,18 +598,49 @@ def _format_event_time(at: str) -> str:
     return at
 
 
-def _format_event_description(event: dict) -> str:
-    """A human-readable description of an event for the timeline."""
+def _format_event_description(event: dict) -> str | None:
+    """A human-readable description of an event for the timeline.
+
+    Returns None for internal per-tool or per-turn events that are omitted
+    from the journey timeline.
+    """
     kind = event.get("kind", "")
+    if kind in _OMITTED_EVENT_KINDS:
+        return None
     to_column = event.get("to_column")
     from_column = event.get("from_column")
     if to_column and (kind == "move" or kind == "card_moved"):
         return f"Moved to {to_column}"
     if kind == "work_started":
-        return "Work started"
-    if kind == "model_call":
-        return "Model call"
-    return kind or "Event"
+        role = event.get("role", "")
+        return f"Work started by {role}" if role else "Work started"
+    if kind == "work_finished":
+        role = event.get("role", "")
+        verdict = event.get("verdict")
+        if verdict:
+            return f"Work finished by {role}: {verdict.replace('_', ' ')}"
+        return f"Work finished by {role}" if role else "Work finished"
+    if kind == "gate_checked":
+        return "Checks passed" if event.get("passed") else "Checks failed"
+    if kind == "session_started":
+        return "Session started"
+    if kind == "session_ended":
+        return "Session ended"
+    if kind == "attempt":
+        number = event.get("number")
+        return f"Attempt {number}" if number else "Attempt"
+    if kind == "blocked":
+        return "Blocked"
+    if kind == "escalated":
+        return "Escalated"
+    if kind == "returned":
+        reason = event.get("reason")
+        return f"Returned: {reason}" if reason else "Returned"
+    if kind == "sent_back":
+        sent_to = event.get("sent_to")
+        return f"Sent back to {sent_to}" if sent_to else "Sent back"
+    # Fallback: humanize the kind (replace underscores with spaces, capitalise)
+    return kind.replace("_", " ").capitalize() if kind else "Event"
 
 
 def _build_board_state(

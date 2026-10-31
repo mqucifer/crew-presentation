@@ -3936,6 +3936,158 @@ def test_journey_no_cost_section_when_not_delivered():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_journey_timeline_no_raw_gate_checked_kind():
+    """AC1: a gate_checked event does not appear as raw kind code in the timeline text."""
+    tag = "delivery-history-TEST"
+    pkg_dir = _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 100, "repo": "crew-presentation"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+                "text": "A story with a gate check.",
+            }
+        ],
+        cards=[
+            {
+                "number": 100,
+                "repo": "crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "Gate check story",
+            }
+        ],
+    )
+    events = [
+        {
+            "kind": "gate_checked",
+            "at": "2026-10-01T10:00:00+00:00",
+            "card": {"number": 100, "repo": "crew-presentation"},
+            "passed": True,
+            "rules": [],
+            "already_done": False,
+        }
+    ]
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(exist_ok=True)
+    (events_dir / "2026-10-01.json").write_text(json.dumps({"events": events}))
+    index = json.loads((pkg_dir / "delivery-history.json").read_text())
+    index["periods"] = [
+        {
+            "sprint": "Sprint 6",
+            "start": "2026-10-01",
+            "end": "2026-10-01",
+            "file": "events/2026-10-01.json",
+            "events": 1,
+        }
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "crew-presentation-100.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        # No element with class timeline__text should contain the raw kind code
+        timeline_texts = re.findall(
+            r'<span class="timeline__text">(.*?)</span>', html, re.DOTALL
+        )
+        for text in timeline_texts:
+            assert "gate_checked" not in text, (
+                f"raw kind code 'gate_checked' found in timeline text: {text!r}"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_timeline_no_model_call_rows():
+    """AC2: model_call events are omitted; no timeline item has text exactly 'Model call'."""
+    tag = "delivery-history-TEST"
+    pkg_dir = _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 200, "repo": "crew-presentation"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+                "text": "A story with model calls.",
+            }
+        ],
+        cards=[
+            {
+                "number": 200,
+                "repo": "crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "Model call story",
+            }
+        ],
+    )
+    events = [
+        {
+            "kind": "model_call",
+            "at": "2026-10-01T11:00:00+00:00",
+            "card": {"number": 200, "repo": "crew-presentation"},
+            "failed": False,
+        },
+        {
+            "kind": "model_call",
+            "at": "2026-10-01T11:01:00+00:00",
+            "card": {"number": 200, "repo": "crew-presentation"},
+            "failed": False,
+        },
+        {
+            "kind": "model_call",
+            "at": "2026-10-01T11:02:00+00:00",
+            "card": {"number": 200, "repo": "crew-presentation"},
+            "failed": False,
+        },
+    ]
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(exist_ok=True)
+    (events_dir / "2026-10-01.json").write_text(json.dumps({"events": events}))
+    index = json.loads((pkg_dir / "delivery-history.json").read_text())
+    index["periods"] = [
+        {
+            "sprint": "Sprint 6",
+            "start": "2026-10-01",
+            "end": "2026-10-01",
+            "file": "events/2026-10-01.json",
+            "events": 3,
+        }
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "crew-presentation-200.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        # Count timeline items whose text is exactly "Model call"
+        items = re.findall(
+            r'<li class="timeline__item">(.*?)</li>', html, re.DOTALL
+        )
+        model_call_count = 0
+        for item in items:
+            text_match = re.search(
+                r'<span class="timeline__text">(.*?)</span>', item, re.DOTALL
+            )
+            if text_match and text_match.group(1).strip() == "Model call":
+                model_call_count += 1
+        assert model_call_count == 0, (
+            f"expected 0 'Model call' timeline items, found {model_call_count}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_attempt_row_first_child_is_anchor_not_div():
     """AC5: every .attempt-row first child is an <a>, and no <a> has class 'attempt-row'."""
     tag = "delivery-history-TEST"
