@@ -12,11 +12,11 @@ intent:
     serves:
     - who: The Sponsor
       needs:
-      - 'A sprint overview: whether the crew is getting better across sprints and what
-        stands out, what stories, epics and Goals got done, how long the steps took, and
-        DORA''s measures.'
-      - 'The day''s replay: who in the crew did what, and how the board moved over the
-        day.'
+      - 'A sprint overview: whether the crew is getting better across sprints and
+        what stands out, what stories, epics and Goals got done, how long the steps
+        took, and DORA''s measures.'
+      - 'The day''s replay: who in the crew did what, and how the board moved over
+        the day.'
       - A story's life cycle, in detail.
     - who: A public visitor who has never seen the crew
       needs:
@@ -114,6 +114,24 @@ design:
     asserts the site root and each page return HTTP 200. A rerun of the release completes
     whatever the version is missing (its tag, its Release, its image and the image's
     tags) and changes nothing already published (§19.9).
+  # History, not scope (crew ADR 0035): the record's former in_scope.
+  built:
+  - A static site on GitHub Pages, built and deployed by GitHub Actions.
+  - 'Its views: a sprint overview, a replay of work from a Goal to merged, and a story''s
+    journey, built to the design reference in docs/design/mock/.'
+  - The crew's delivery-history package, used as the crew's README says. The one line
+    in delivery-history.tag at the repository's root names the release; CI fetches
+    that package and validates it against the schema the package carries. The package
+    already holds sprint-metrics' answers, so the site depends on the crew alone.
+  - Python that shapes the package into the pages, and JavaScript for the replay player.
+  - 'The look from mqucifer/design-system, used as its README''s "How projects use
+    it" says: pinned once, in the site''s code, and bumped by pull request. (The boards
+    in docs/design/mock/ inline those styles only so each opens on its own.)'
+  - 'A check of which major versions of the package''s schema the site can display:
+    a package on any other major version fails the pull request that brought it. Browser
+    tests on the pages, and the site''s own contrast and token checks against the
+    design system''s rules. The design system''s checks/check_tokens.py checks the
+    design system itself, not a site, so the site writes its own.'
   structure: 'build.py — the build entry point: reads the package fetched by setup
     into ./.package/, validates each data file against the schema the package carries,
     checks the schema''s major version against SUPPORTED_MAJOR_VERSIONS (a constant
@@ -133,39 +151,23 @@ design:
     reads delivery-history.tag for the release name, downloads the delivery-history
     release asset from the crew''s releases, downloads the design-system CSS at the
     version in site/css/design-system.version, extracts both into ./.package/. Called
-    by setup; the only code that touches the network. tests/test_contracts.py — validates
-    every data file in ./.package/ against the schema the package carries; checks
-    the schema''s major version is in the supported set. tests/test_browser.py — Playwright
-    browser tests: loads each page from build/, exercises the replay player (play,
-    pause, speed, skip-idle, scrub), verifies page structure and accessibility; serves
-    the design-system CSS from ./.package/ via Playwright route interception (the
-    sandbox has no network at test time). tests/test_tokens.py — the site''s own contrast
-    and token checks against the design system''s rules, run against the CSS in ./.package/
-    and the rendered pages. pyproject.toml — declares the project''s Python dependencies
-    (jsonschema, jinja2, playwright==1.52.0) and dev dependencies (ruff, pytest);
-    read by uv. uv.lock — the lockfile, written by uv; pins exact versions and hashes;
-    never written by hand (§19.3). delivery-history.tag — one line: the release tag
-    of the delivery-history package the site displays; read by setup and the build;
-    agents must not change it.'
+    by setup; the only code that touches the network. tools/token_check.py — the site''s
+    own contrast and token check logic, imported by tests/test_tokens.py. tests/test_contracts.py
+    — validates every data file in ./.package/ against the schema the package carries;
+    checks the schema''s major version is in the supported set. tests/test_browser.py
+    — Playwright browser tests: loads each page from build/, exercises the replay
+    player (play, pause, speed, skip-idle, scrub), verifies page structure and accessibility;
+    serves the design-system CSS from ./.package/ via Playwright route interception
+    (the sandbox has no network at test time). tests/test_tokens.py — the site''s
+    own contrast and token checks against the design system''s rules, run against
+    the CSS in ./.package/ and the rendered pages. pyproject.toml — declares the project''s
+    Python dependencies (jsonschema, jinja2, playwright==1.52.0) and dev dependencies
+    (ruff, pytest); read by uv. uv.lock — the lockfile, written by uv; pins exact
+    versions and hashes; never written by hand (§19.3). delivery-history.tag — one
+    line: the release tag of the delivery-history package the site displays; read
+    by setup and the build; agents must not change it. CHANGELOG.md — the release
+    log, append-only: each story adds its entries under the [Unreleased] section.
+    A shared file that parallel stories in the same sprint will collide in.'
   docs:
   - README.md
-  # History, not scope (crew ADR 0035): the record's former in_scope.
-  built:
-  - A static site on GitHub Pages, built and deployed by GitHub Actions.
-  - 'Its views: a sprint overview, a replay of work from a Goal to merged, and a
-    story''s journey, built to the design reference in docs/design/mock/.'
-  - The crew's delivery-history package, used as the crew's README says. The one
-    line in delivery-history.tag at the repository's root names the release; CI
-    fetches that package and validates it against the schema the package carries.
-    The package already holds sprint-metrics' answers, so the site depends on the
-    crew alone.
-  - Python that shapes the package into the pages, and JavaScript for the replay
-    player.
-  - 'The look from mqucifer/design-system, used as its README''s "How projects use
-    it" says: pinned once, in the site''s code, and bumped by pull request. (The
-    boards in docs/design/mock/ inline those styles only so each opens on its own.)'
-  - 'A check of which major versions of the package''s schema the site can display:
-    a package on any other major version fails the pull request that brought it.
-    Browser tests on the pages, and the site''s own contrast and token checks against
-    the design system''s rules. The design system''s checks/check_tokens.py checks
-    the design system itself, not a site, so the site writes its own.'
+  - CHANGELOG.md
