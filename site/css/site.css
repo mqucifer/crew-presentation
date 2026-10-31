@@ -253,7 +253,7 @@
 /* Phone layout: stack the main content sections in DOM order. */
 @media (max-width: 767px) {
   .sprint-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .sprint-chart,
   .sprint-side,
@@ -272,7 +272,7 @@
   }
   .attempt-row > a {
     width: 100%;
-    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
   .attempt-row .blocks {
     width: 100%;
@@ -282,13 +282,13 @@
     width: 100%;
   }
   .cause-row {
-    grid-template-columns: 1fr 28px;
+    grid-template-columns: minmax(0, 1fr) 28px;
   }
   .cause-row > span:first-child {
     grid-column: 1 / -1;
   }
   .stats {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   nav.nav,
   nav[aria-label='Sprints'] {
@@ -304,6 +304,18 @@
 
 /* Story list: long titles must wrap without forcing horizontal scroll. */
 section ul li a {
+  overflow-wrap: break-word;
+}
+
+/* Long unbreakable text must wrap, not force horizontal scroll.
+   min-width: 0 allows flex items to shrink below their content's minimum. */
+.card__head h2,
+.card__body p,
+.timeline__text,
+.cause-row > span:first-child,
+.decided-list span:last-child,
+.changed-trend-text {
+  min-width: 0;
   overflow-wrap: break-word;
 }
 
