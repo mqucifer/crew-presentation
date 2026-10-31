@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- The story's journey page now shows a "What happened, in order" timeline of the story's recorded events (timestamps and column moves) and a "What it cost" section with developer calls and wall-clock time, drawn from the package's events and analysis (mqucifer/crew-presentation#223)
+
 ### Fixed
 
 - The story pages' "A story's journey" and "Replay" header nav links were relative paths that resolved to non-existent files under stories/; they now use a prefix so they resolve to the root-level pages (mqucifer/crew-presentation#223)

@@ -316,3 +316,59 @@ section ul li a {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+
+/* Journey timeline */
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.timeline__item {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+}
+
+.timeline__time {
+  font-size: 14px;
+  color: var(--color-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline__text {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+/* Journey cost grid */
+.cost-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.cost-grid__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cost-grid__label {
+  font-size: 13px;
+  color: var(--color-text-dim);
+}
+
+.cost-grid__value {
+  font-size: 32px;
+}
+
+@media (max-width: 767px) {
+  .cost-grid {
+    grid-template-columns: 1fr;
+  }
+}
