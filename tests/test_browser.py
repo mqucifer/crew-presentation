@@ -2773,6 +2773,114 @@ def test_story_journey_scrollwidth_at_phone_width():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_all_pages_scrollwidth_at_phone_width():
+    """AC1: every page the build writes has scrollWidth <= 375 at a 375px viewport,
+    even when a card title is a 200-char unbreakable string and the sprint carries
+    data wide enough to be the widest content on its page.
+
+    AC2: the story-detail page's h2#journey-h textContent equals the full title."""
+    tag = "delivery-history-TEST"
+    unbreakable = "a" * 200
+    long_analysis = "b" * 500
+
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "top_failure_causes": [
+                    {"class": "c" * 200, "role": "primary", "count": 2}
+                ],
+            }
+        },
+        cards=[
+            {"repo": "mqucifer/crew", "number": 1, "title": unbreakable},
+        ],
+    )
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["analysis"] = {
+        "stories": [
+            {
+                "card": {"repo": "mqucifer/crew", "number": 1},
+                "delivered": "2026-09-25",
+                "text": long_analysis,
+                "wall_clock_seconds": 3600,
+                "cost": {"model_calls": 42},
+            }
+        ],
+        "sprints": [
+            {
+                "sprint": "Sprint 6",
+                "decided": [
+                    {
+                        "at": "2026-09-25T10:00:00Z",
+                        "text": "d" * 200,
+                        "kind": "goal_accepted",
+                        "number": 1,
+                    }
+                ],
+                "changed": [
+                    {
+                        "measure": "throughput",
+                        "previous": 3,
+                        "now": 5,
+                        "text": "e" * 200,
+                    }
+                ],
+            }
+        ],
+    }
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+
+            # AC1: check every .html file the build writes
+            html_files = sorted(BUILD_DIR.rglob("*.html"))
+            assert html_files, "no .html files in build/"
+            for html_file in html_files:
+                page.goto(f"file://{html_file.resolve()}")
+                page.wait_for_load_state("domcontentloaded")
+                scroll_width = page.evaluate("document.documentElement.scrollWidth")
+                assert scroll_width <= 375, (
+                    f"{html_file.name} scrollWidth is {scroll_width}, expected <= 375"
+                )
+
+            # AC2: the story-detail page's h2#journey-h shows the full title
+            story_path = (BUILD_DIR / "stories" / "mqucifer-crew-1.html").resolve()
+            assert story_path.is_file(), f"story detail page not found: {story_path}"
+            page.goto(f"file://{story_path}")
+            page.wait_for_load_state("domcontentloaded")
+            heading_text = page.eval_on_selector(
+                "h2#journey-h", "el => el.textContent"
+            )
+            assert heading_text == unbreakable, (
+                f"h2#journey-h textContent is {heading_text[:40]!r}... "
+                f"({len(heading_text)} chars), expected full 200-char title"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_story_journey_root_page_single_h1_and_story_links():
     """AC1-AC2: root story-journey.html has exactly one h1 and story links."""
     tag = "delivery-history-TEST"
