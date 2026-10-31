@@ -125,7 +125,7 @@ def test_setup_fails_on_missing_release(monkeypatch, tmp_path):
     assert not index, f"index file present after failed setup: {index}"
 
 
-SUPPORTED_MAJOR_VERSIONS = (1, 2)
+SUPPORTED_MAJOR_VERSIONS = (1, 2, 3)
 
 
 def _package_dir() -> Path:
@@ -210,13 +210,13 @@ def test_non_conforming_file_fails_with_file_name():
 
 def test_unsupported_major_version_fails_with_version():
     """AC3: a package on an unsupported major version fails, naming the version."""
-    manifest = {"schema_version": "3.0.0"}
+    manifest = {"schema_version": "4.0.0"}
 
     with pytest.raises(ValueError) as exc_info:
         _check_schema_version(manifest)
 
     message = str(exc_info.value)
-    assert "3" in message
+    assert "4" in message
     assert "cannot display" in message
 
 
@@ -233,7 +233,7 @@ def test_build_fails_on_unsupported_major_version():
 
     (pkg_dir / "manifest.json").write_text(
         json.dumps(
-            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-01-01"}
+            {"schema_version": "4.0.0", "package": "delivery-history", "date": "2026-01-01"}
         )
     )
     (pkg_dir / "manifest.schema.json").write_text(
@@ -256,7 +256,7 @@ def test_build_fails_on_unsupported_major_version():
         )
         assert result.returncode != 0, "build.py should fail for unsupported major version"
         output = result.stdout + result.stderr
-        assert "3" in output, f"output should name the major version: {output}"
+        assert "4" in output, f"output should name the major version: {output}"
         assert "cannot display" in output, (
             f"output should say the version is unsupported: {output}"
         )
@@ -265,15 +265,15 @@ def test_build_fails_on_unsupported_major_version():
         shutil.rmtree(pkg_dir, ignore_errors=True)
 
 
-def test_build_succeeds_on_well_formed_major_2_package():
-    """AC3: a well-formed 2.0.0 package completes the build and writes the expected pages."""
-    tag = "delivery-history-TEST-2"
+def test_build_succeeds_on_well_formed_major_3_package():
+    """AC1: a well-formed 3.0.0 package completes the build and writes the expected pages."""
+    tag = "delivery-history-TEST-3"
     pkg_dir = PACKAGE_DIR / tag
     pkg_dir.mkdir(parents=True, exist_ok=True)
 
     (pkg_dir / "manifest.json").write_text(
         json.dumps(
-            {"schema_version": "2.0.0", "package": "delivery-history", "date": "2026-11-06"}
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-11-06"}
         )
     )
     (pkg_dir / "manifest.schema.json").write_text(
@@ -284,7 +284,7 @@ def test_build_succeeds_on_well_formed_major_2_package():
 
     index = {
         "package": "delivery-history",
-        "schema_version": "2.0.0",
+        "schema_version": "3.0.0",
         "date": "2026-11-06",
         "timezone": "America/Chicago",
         "crew_repository": "crew",
@@ -348,7 +348,7 @@ def test_build_succeeds_on_well_formed_major_2_package():
             "deliveries": [],
         },
         "sprint_metrics": {
-            "release": "2.0.0",
+            "release": "3.0.0",
             "answers": {
                 "Sprint 1": {
                     "cycle_time_days": 0,
@@ -407,18 +407,18 @@ def test_build_succeeds_on_well_formed_major_2_package():
             check=False,
         )
         assert result.returncode == 0, (
-            f"build.py should succeed for a well-formed 2.0.0 package:\n"
+            f"build.py should succeed for a well-formed 3.0.0 package:\n"
             f"{result.stdout}\n{result.stderr}"
         )
         build_dir = REPO_ROOT / "build"
         assert (build_dir / "sprint-1.html").is_file(), (
-            "sprint-overview page not written for 2.0.0 package"
+            "sprint-overview page not written for 3.0.0 package"
         )
         assert (build_dir / "stories" / "crew-presentation-1.html").is_file(), (
-            "story page not written for 2.0.0 package"
+            "story page not written for 3.0.0 package"
         )
         assert (build_dir / "replay.html").is_file(), (
-            "replay page not written for 2.0.0 package"
+            "replay page not written for 3.0.0 package"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original_tag)

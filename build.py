@@ -17,7 +17,7 @@ TEMPLATES_DIR = REPO_ROOT / "site" / "templates"
 CSS_DIR = REPO_ROOT / "site" / "css"
 JS_DIR = REPO_ROOT / "site" / "js"
 
-SUPPORTED_MAJOR_VERSIONS = (1, 2)
+SUPPORTED_MAJOR_VERSIONS = (1, 2, 3)
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
