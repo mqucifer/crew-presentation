@@ -18,6 +18,7 @@
 ### Fixed
 
 - The replay page's title and h1 were byte-identical to the sprint overview's (both showed the sprint name alone), making the two pages indistinguishable in a browser tab; the replay page now carries its own identifying title "Sprint N · Replay" (mqucifer/crew-presentation#279)
+- The sprint overview's story list on a package with no analysis disagreed with the "stories delivered" stat: it was computed from card fields (status, sprint, closed_as) rather than from sprint-metrics' answer; it now reads the sprint's `roster.completed_stories` from the sprint-metrics answers, so the list and the stat come from the same source. A roster entry with no matching card still shows a row with its reference; a null or empty roster shows "No stories were delivered this sprint" (mqucifer/crew-presentation#193)
 
 ## [0.3.2] - 2026-10-31
 

@@ -9654,17 +9654,18 @@ def test_decided_from_analysis_preserved():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
-def test_story_list_from_cards_when_no_analysis():
-    """AC1: when the package has no analysis, the story list shows cards with
-    status 'Done' and matching sprint, excluding those closed as 'not_planned'.
+def test_story_list_from_roster_when_no_analysis():
+    """AC1: when the package has no analysis, the story list comes from
+    sprint_metrics' roster.completed_stories, not from card fields.
 
-    Each row links to the story's page and shows its reference and title.
+    The row count equals the throughput stat; cards not in the roster
+    do not appear even if they have status Done.
     """
     tag = "delivery-history-TEST"
     cards = [
         {
-            "repo": "mqucifer/crew",
-            "number": 100,
+            "repo": "sprint-metrics",
+            "number": 110,
             "type": "Story",
             "title": "Story one",
             "sprint": "Sprint 6",
@@ -9672,8 +9673,8 @@ def test_story_list_from_cards_when_no_analysis():
             "closed_as": "completed",
         },
         {
-            "repo": "mqucifer/crew",
-            "number": 101,
+            "repo": "sprint-metrics",
+            "number": 111,
             "type": "Story",
             "title": "Story two",
             "sprint": "Sprint 6",
@@ -9681,41 +9682,92 @@ def test_story_list_from_cards_when_no_analysis():
             "closed_as": "completed",
         },
         {
-            "repo": "mqucifer/crew",
-            "number": 102,
+            "repo": "sprint-metrics",
+            "number": 112,
             "type": "Story",
-            "title": "Story three",
+            "title": "Story three not in roster",
             "sprint": "Sprint 6",
             "status": "Done",
             "closed_as": "completed",
         },
         {
-            "repo": "mqucifer/crew",
-            "number": 103,
+            "repo": "sprint-metrics",
+            "number": 113,
             "type": "Story",
-            "title": "Story not planned",
+            "title": "Story four not in roster",
             "sprint": "Sprint 6",
             "status": "Done",
-            "closed_as": "not_planned",
+            "closed_as": "completed",
         },
     ]
-    _make_fake_package(tag, cards=cards)
+    metrics = {
+        "Sprint 6": {
+            "throughput": 2,
+            "points_delivered": 6,
+            "first_attempt_numerator": 2,
+            "first_attempt_denominator": 2,
+            "cycle_time_days": 1.0,
+            "roster": {
+                "completed_stories": ["sprint-metrics#110", "sprint-metrics#111"],
+                "released_epics": None,
+                "achieved_goals": None,
+            },
+        }
+    }
+    _make_fake_package(tag, metrics=metrics, cards=cards, schema_version="3.0.0")
     original = DELIVERY_HISTORY_TAG.read_text()
     DELIVERY_HISTORY_TAG.write_text(tag + "\n")
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        # Exactly 3 story-row elements (the not_planned card is excluded)
+        # Exactly 2 story-row elements (the roster's two entries)
         row_count = html.count('class="story-row"')
-        assert row_count == 3, f"expected 3 story rows, got {row_count}"
-        # The not_planned card is not shown
-        assert "#103" not in html, "not_planned card should not appear in story list"
-        assert "Story not planned" not in html
-        # Each row links to the story's page and shows its reference and title
-        for num, title in [(100, "Story one"), (101, "Story two"), (102, "Story three")]:
-            link = f'href="stories/mqucifer-crew-{num}.html"'
+        assert row_count == 2, f"expected 2 story rows, got {row_count}"
+        # The stat shows the throughput value
+        assert ">2</span>" in html, "stat value '2' not found"
+        # Cards not in the roster do not appear
+        assert "#112" not in html, "card #112 not in roster should not appear"
+        assert "#113" not in html, "card #113 not in roster should not appear"
+        # Each roster entry links to the story's page and shows its title
+        for num, title in [(110, "Story one"), (111, "Story two")]:
+            link = f'href="stories/sprint-metrics-{num}.html"'
             assert link in html, f"link for card #{num} not found"
             assert title in html, f"title {title!r} not found"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_roster_entry_without_matching_card_shows_reference():
+    """AC2: a roster entry with no matching card still shows a row with
+    its reference, rather than being dropped."""
+    tag = "delivery-history-TEST"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 1,
+            "points_delivered": 3,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": 1,
+            "cycle_time_days": 1.0,
+            "roster": {
+                "completed_stories": ["qa-suite#999"],
+                "released_epics": None,
+                "achieved_goals": None,
+            },
+        }
+    }
+    _make_fake_package(tag, metrics=metrics, cards=[], schema_version="3.0.0")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Exactly 1 story-row element
+        row_count = html.count('class="story-row"')
+        assert row_count == 1, f"expected 1 story row, got {row_count}"
+        # The row shows the reference
+        assert "qa-suite" in html, "repo 'qa-suite' not found in story row"
+        assert "#999" in html, "number '#999' not found in story row"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -9750,38 +9802,58 @@ def test_no_attempt_elements_when_no_analysis():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
-def test_no_delivered_cards_shows_empty_message():
-    """AC3: when no card has status 'Done' for the sprint, the section shows
-    'No stories were delivered this sprint' and no rows."""
+def test_null_roster_shows_empty_message():
+    """AC3: when the roster is null (or missing), the page shows
+    'No stories were delivered this sprint' and zero story rows,
+    even if cards have status Done."""
     tag = "delivery-history-TEST"
     cards = [
         {
-            "repo": "mqucifer/crew",
+            "repo": "sprint-metrics",
             "number": 100,
             "type": "Story",
-            "title": "Story in progress",
+            "title": "Story one",
             "sprint": "Sprint 6",
-            "status": "In Progress",
-            "closed_as": None,
+            "status": "Done",
+            "closed_as": "completed",
         },
         {
-            "repo": "mqucifer/crew",
+            "repo": "sprint-metrics",
             "number": 101,
             "type": "Story",
-            "title": "Story blocked",
+            "title": "Story two",
             "sprint": "Sprint 6",
-            "status": "Blocked",
-            "closed_as": None,
+            "status": "Done",
+            "closed_as": "completed",
+        },
+        {
+            "repo": "sprint-metrics",
+            "number": 102,
+            "type": "Story",
+            "title": "Story three",
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "closed_as": "completed",
         },
     ]
-    _make_fake_package(tag, cards=cards)
+    metrics = {
+        "Sprint 6": {
+            "throughput": 0,
+            "points_delivered": 0,
+            "first_attempt_numerator": 0,
+            "first_attempt_denominator": 0,
+            "cycle_time_days": 0,
+            "roster": None,
+        }
+    }
+    _make_fake_package(tag, metrics=metrics, cards=cards, schema_version="3.0.0")
     original = DELIVERY_HISTORY_TAG.read_text()
     DELIVERY_HISTORY_TAG.write_text(tag + "\n")
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
         assert "No stories were delivered this sprint" in html
-        assert 'class="story-row"' not in html, "no rows expected when nothing delivered"
+        assert 'class="story-row"' not in html, "no rows expected with null roster"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -9789,7 +9861,9 @@ def test_no_delivered_cards_shows_empty_message():
 
 def test_announced_3_0_0_mock_shows_story_rows():
     """AC4: the contract's own mock for 3.0.0 (carried as this project's fixture
-    from .announced/) renders at least one story row when built."""
+    from .announced/) renders story rows from the roster when built. The mock's
+    sprints have roster: null, so the test adds rosters to its own copy, as
+    real packages carry them."""
     base_dir = REPO_ROOT / "tests" / "fixtures" / "delivery-history-3.0.0"
     mock_dir = base_dir / "mock"
     assert mock_dir.is_dir(), "3.0.0 fixture mock not found"
@@ -9799,18 +9873,44 @@ def test_announced_3_0_0_mock_shows_story_rows():
     # Schema files live at the base level, not in mock/
     for schema_file in ("schema.json", "manifest.schema.json", "events.schema.json"):
         shutil.copy2(base_dir / schema_file, pkg_dir / schema_file)
+    # Add rosters to the mock's sprint_metrics.answers, as real packages carry them.
+    # Sprint 5 delivered cards 110, 111, 112; Sprint 6 delivered cards
+    # 125, 126, 127, 128, 133 (card 130 is not_planned, not in the roster).
+    dh_path = pkg_dir / "delivery-history.json"
+    dh = json.loads(dh_path.read_text())
+    answers = dh["sprint_metrics"]["answers"]
+    answers["Sprint 5"]["roster"] = {
+        "completed_stories": [
+            "sprint-metrics#110",
+            "sprint-metrics#111",
+            "sprint-metrics#112",
+        ],
+        "released_epics": None,
+        "achieved_goals": None,
+    }
+    answers["Sprint 6"]["roster"] = {
+        "completed_stories": [
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ],
+        "released_epics": None,
+        "achieved_goals": None,
+    }
+    dh_path.write_text(json.dumps(dh))
     original = DELIVERY_HISTORY_TAG.read_text()
     DELIVERY_HISTORY_TAG.write_text(tag + "\n")
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        # Sprint 6 has cards 125, 126, 127, 128, 133 with status Done and
-        # closed_as completed (card 130 is not_planned)
+        # Sprint 6's roster has 5 entries, matching its throughput of 5
         row_count = html.count('class="story-row"')
-        assert row_count >= 1, (
-            f"expected at least 1 story row from 3.0.0 mock, got {row_count}"
+        assert row_count == 5, (
+            f"expected 5 story rows from 3.0.0 mock roster, got {row_count}"
         )
-        # Verify the not_planned card (130) is excluded
+        # The not_planned card (130) is not in the roster and does not appear
         assert "#130" not in html, "not_planned card should not appear"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)

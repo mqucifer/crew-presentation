@@ -199,7 +199,7 @@ def _render_pages(pkg: Path) -> dict:
                     }
                 )
         else:
-            stories = _stories_from_cards(cards, sprint["name"])
+            stories = _stories_from_roster(metrics, cards)
 
         analysis_changed = analysis_by_sprint.get(sprint["name"], {}).get(
             "changed", []
@@ -391,26 +391,41 @@ def _slug(name: str) -> str:
     return name.lower().replace(" ", "-") + ".html"
 
 
-def _stories_from_cards(cards: list[dict], sprint_name: str) -> list[dict]:
-    """Build the delivered-story list from the cards' own fields.
+def _stories_from_roster(metrics: dict, cards: list[dict]) -> list[dict]:
+    """Build the delivered-story list from the sprint-metrics' roster.
 
-    Used when the package carries no analysis: a card is delivered when its
-    status is 'Done', its sprint matches, and it was not closed as
-    'not_planned' (which sprint-metrics does not count as delivered).
+    Used when the package carries no analysis: the list comes from
+    sprint_metrics.answers.<sprint>.roster.completed_stories, which
+    sprint-metrics computed. Each entry is a 'repo#number' reference;
+    the title is looked up from the card if one matches, otherwise the
+    row shows the reference without a title.
     """
-    stories = []
+    roster = metrics.get("roster")
+    if not isinstance(roster, dict):
+        return []
+    completed = roster.get("completed_stories")
+    if not isinstance(completed, (list, tuple)) or not completed:
+        return []
+    cards_by_key: dict[tuple, dict] = {}
     for card in cards:
-        if card.get("status") != "Done":
+        key = (card.get("number"), card.get("repo"))
+        cards_by_key[key] = card
+    stories = []
+    for ref in completed:
+        if not isinstance(ref, str) or "#" not in ref:
             continue
-        if card.get("sprint") != sprint_name:
-            continue
-        if card.get("closed_as") == "not_planned":
-            continue
+        repo, _, number_str = ref.partition("#")
+        try:
+            number = int(number_str)
+        except ValueError:
+            number = 0
+        card = cards_by_key.get((number, repo))
+        title = card.get("title", "") if card else ""
         stories.append(
             {
-                "number": card.get("number"),
-                "repo": card.get("repo", ""),
-                "title": card.get("title", ""),
+                "number": number,
+                "repo": repo,
+                "title": title,
                 "blocks": [],
                 "crew_fixes": [],
                 "delivered": True,
