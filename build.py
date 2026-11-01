@@ -499,18 +499,35 @@ def _format_minutes(total_minutes) -> str:
 def _format_changed_value(measure: str, value) -> str:
     """Format a changed-trend value for display.
 
-    Time measures (cycle_time, lead_time) are shown as hours and minutes,
-    always including both units (e.g. '0 hr 26 min'); other measures are
-    shown as their raw number.
+    Time measures (cycle_time, lead_time) are shown as hours and minutes;
+    other measures are shown as their raw number.
     """
     if value is None:
         return ""
     if measure in ("cycle_time_days", "lead_time_days"):
         total_minutes = round(value * 24 * 60)
-        hours, minutes = divmod(total_minutes, 60)
-        return f"{hours} hr {minutes} min"
+        return _format_minutes(total_minutes)
+    if measure in ("cycle_time_minutes", "lead_time_minutes"):
+        return _format_minutes(round(value))
+    if isinstance(value, float) and value == int(value):
+        return str(int(value))
+    return str(value)
+
+
+def _format_metrics_value(measure: str, value) -> str:
+    """Format a value for the metrics-derived 'What changed' fallback.
+
+    Time measures always show both hours and minutes (e.g. '0 hr 26 min');
+    other measures are shown as their raw number.
+    """
+    if value is None:
+        return ""
     if measure in ("cycle_time_minutes", "lead_time_minutes"):
         total_minutes = round(value)
+        hours, minutes = divmod(total_minutes, 60)
+        return f"{hours} hr {minutes} min"
+    if measure in ("cycle_time_days", "lead_time_days"):
+        total_minutes = round(value * 24 * 60)
         hours, minutes = divmod(total_minutes, 60)
         return f"{hours} hr {minutes} min"
     if isinstance(value, float) and value == int(value):
@@ -566,8 +583,8 @@ def _changed_from_metrics(metrics: dict, prior: dict) -> list[dict]:
             {
                 "text": "",
                 "label": _changed_label(measure),
-                "previous": _format_changed_value(measure, prev_value),
-                "now": _format_changed_value(measure, now_value),
+                "previous": _format_metrics_value(measure, prev_value),
+                "now": _format_metrics_value(measure, now_value),
             }
         )
     return entries
