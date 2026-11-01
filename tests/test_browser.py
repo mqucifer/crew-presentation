@@ -1971,6 +1971,79 @@ def test_feature_panel_empty_decided():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_sprint_overview_dora_values_shown():
+    """AC1: when the package carries DORA values, the page shows 'How releases went' with those values."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "dora": {
+                    "release_frequency": 14,
+                    "lead_time_days": 2.5,
+                    "change_failure_count": 1,
+                    "change_failure_rate_percent": 7.1,
+                    "mean_time_to_recovery_minutes": 45,
+                },
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The section heading is present
+        assert "How releases went" in html, "DORA heading 'How releases went' not found"
+        # The DORA values are rendered
+        assert "14" in html, "release_frequency value '14' not in page"
+        assert "45" in html, "mean_time_to_recovery_minutes value '45' not in page"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_overview_dora_absent_shows_no_data():
+    """AC2: when dora is null, the DORA card shows 'no release data for this sprint'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "dora": None,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The section heading is still present
+        assert "How releases went" in html, "DORA heading 'How releases went' not found"
+        # The absence message is shown
+        assert "no release data for this sprint" in html, (
+            "absence line 'no release data for this sprint' not found"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_feature_panel_light_theme_colors():
     """AC3+AC5: light-theme feature panel uses feature-bg, feature-text, feature-dim tokens."""
     tag = "delivery-history-TEST"
@@ -7652,7 +7725,7 @@ def test_cause_label_qa_renders_as_cause_not_recorded():
 
 
 def test_replay_header_shows_most_recent_sprint():
-    """AC1: h1 is the most recent sprint name; body contains the date range."""
+    """AC1: h1 is the most recent sprint name with replay suffix; body contains the date range."""
     tag = "delivery-history-TEST"
     sprints = [
         {"name": "Sprint 5", "start": "2026-09-15", "end": "2026-09-29"},
@@ -7667,7 +7740,7 @@ def test_replay_header_shows_most_recent_sprint():
         html = (BUILD_DIR / "replay.html").read_text()
         h1_match = re.search(r"<h1>(.*?)</h1>", html)
         assert h1_match, "no <h1> element found"
-        assert h1_match.group(1) == "Sprint 7", f"h1 is {h1_match.group(1)!r}"
+        assert h1_match.group(1) == "Sprint 7 · Replay", f"h1 is {h1_match.group(1)!r}"
         assert "2026-10-07 – 2026-10-13" in html, "date range not found in page"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -7740,7 +7813,7 @@ def test_replay_nav_aria_current():
 
 
 def test_replay_single_sprint_header():
-    """AC4: single sprint 'Sprint 1' shows correct h1 and date range."""
+    """AC4: single sprint 'Sprint 1' shows correct h1 with replay suffix and date range."""
     tag = "delivery-history-TEST"
     sprints = [{"name": "Sprint 1", "start": "2026-09-01", "end": "2026-09-07"}]
     _make_fake_package(tag, sprints=sprints)
@@ -7751,7 +7824,7 @@ def test_replay_single_sprint_header():
         html = (BUILD_DIR / "replay.html").read_text()
         h1_match = re.search(r"<h1>(.*?)</h1>", html)
         assert h1_match, "no <h1> element found"
-        assert h1_match.group(1) == "Sprint 1", f"h1 is {h1_match.group(1)!r}"
+        assert h1_match.group(1) == "Sprint 1 · Replay", f"h1 is {h1_match.group(1)!r}"
         assert "2026-09-01 – 2026-09-07" in html, "date range not found"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -8449,7 +8522,7 @@ def test_replay_json_only_most_recent_sprint_events():
 
 
 def test_replay_h1_matches_json_sprint_key():
-    """AC6: the h1 text is identical to the sprint key in the embedded JSON."""
+    """AC6: the h1 text begins with the sprint key in the embedded JSON."""
     tag = "delivery-history-TEST"
     sprints = [
         {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
@@ -8468,7 +8541,7 @@ def test_replay_h1_matches_json_sprint_key():
         assert h1_match, "no h1 found"
         h1_text = h1_match.group(1)
         data = _extract_replay_data(html)
-        assert h1_text == data["sprint"], f"h1={h1_text!r} != sprint={data['sprint']!r}"
+        assert h1_text.startswith(data["sprint"]), f"h1={h1_text!r} doesn't start with sprint={data['sprint']!r}"
         assert data["sprint"] == "Sprint 7"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -9797,6 +9870,44 @@ def test_analysis_stories_still_render_attempt_chart():
         # Both stories appear
         assert "#201" in html
         assert "#202" in html
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_page_title_not_sprint_name():
+    """AC1: the replay page's <title> is not the bare sprint name."""
+    tag = "delivery-history-TEST-TITLE"
+    _make_fake_package(tag, sprint_names=["Sprint 38"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        m = re.search(r"<title>(.*?)</title>", html)
+        assert m, "no <title> found in replay.html"
+        assert m.group(1) != "Sprint 38", (
+            f"replay <title> is byte-identical to sprint name: {m.group(1)!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_page_h1_not_sprint_name():
+    """AC2: the replay page's first <h1> is not the bare sprint name."""
+    tag = "delivery-history-TEST-H1"
+    _make_fake_package(tag, sprint_names=["Sprint 38"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        m = re.search(r"<h1[^>]*>(.*?)</h1>", html)
+        assert m, "no <h1> found in replay.html"
+        assert m.group(1) != "Sprint 38", (
+            f"replay <h1> is byte-identical to sprint name: {m.group(1)!r}"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)

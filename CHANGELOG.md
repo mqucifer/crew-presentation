@@ -7,12 +7,17 @@
 - The sprint overview now shows a "What got done" section listing the sprint's released epics and achieved Goals from the package's roster; when a kind has none, it says so explicitly (mqucifer/crew-presentation#279)
 - The site accepts delivery-history packages on schema major 3 (e.g. 3.0.0); major 3 is now in SUPPORTED_MAJOR_VERSIONS (mqucifer/crew-presentation#266)
 - The sprint overview's "Decided by the crew" panel now lists design-revision merges and technical epics filed during the sprint, derived from events and cards, when the package carries no analysis `decided` list for that sprint; when analysis is present the panel shows the analysis entries as before (mqucifer/crew-presentation#266)
+- The sprint overview now shows DORA's four measures (release frequency, lead time for changes, change failure rate, mean time to recovery) in a "How releases went" card; when the package carries no DORA data for the sprint, the card shows "no release data for this sprint" (mqucifer/crew-presentation#279)
 
 ### Changed
 
 - The sprint overview's story list now falls back to the cards' own fields when the package carries no analysis: cards with status "Done" and matching sprint are shown as delivered stories (excluding those closed as "not_planned"), each linking to its story page; the attempt chart's blocks, status and legend are absent in this case, and when no card qualifies the section shows "No stories were delivered this sprint" (mqucifer/crew-presentation#266)
 - The sprint overview's "What changed" section now shows how each measure moved from the prior sprint, derived from the sprint-metrics answers' `prior` field, when the package carries no analysis `changed` list for that sprint; when `prior` is null the section is absent (mqucifer/crew-presentation#266)
 - The story's journey page now shows the path strip's stages as reached when the package carries no analysis for the card and the card's own status is "Done" with closed_as "completed"; when the card is not in that state, no stage is marked reached. The "What it cost" section remains absent without analysis cost data (mqucifer/crew-presentation#266)
+
+### Fixed
+
+- The replay page's title and h1 were byte-identical to the sprint overview's (both showed the sprint name alone), making the two pages indistinguishable in a browser tab; the replay page now carries its own identifying title "Sprint N · Replay" (mqucifer/crew-presentation#279)
 
 ## [0.3.2] - 2026-10-31
 
