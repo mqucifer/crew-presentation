@@ -4,6 +4,7 @@
 
 ### Added
 
+- The sprint overview now shows a "What got done" section listing the sprint's released epics and achieved Goals from the package's roster; when a kind has none, it says so explicitly (mqucifer/crew-presentation#279)
 - The site accepts delivery-history packages on schema major 3 (e.g. 3.0.0); major 3 is now in SUPPORTED_MAJOR_VERSIONS (mqucifer/crew-presentation#266)
 - The sprint overview's "Decided by the crew" panel now lists design-revision merges and technical epics filed during the sprint, derived from events and cards, when the package carries no analysis `decided` list for that sprint; when analysis is present the panel shows the analysis entries as before (mqucifer/crew-presentation#266)
 
