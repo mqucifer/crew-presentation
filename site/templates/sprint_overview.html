@@ -43,6 +43,39 @@
   </div>
 </section>
 {% endif %}
+<section class="card sprint-roster" aria-labelledby="roster-h">
+  <div class="card__head">
+    <h2 id="roster-h">What got done</h2>
+  </div>
+  <div class="card__body">
+    <div class="roster-row">
+      <span class="roster-label">Released epics</span>
+      {% if roster_released_epics %}
+      <span class="roster-items">
+        {% for epic in roster_released_epics %}
+        <span class="num">{{ epic.repo }}#{{ epic.number }}</span> {{ epic.title }}
+        {% if not loop.last %}, {% endif %}
+        {% endfor %}
+      </span>
+      {% else %}
+      <span class="roster-items meta">No epics released</span>
+      {% endif %}
+    </div>
+    <div class="roster-row">
+      <span class="roster-label">Achieved Goals</span>
+      {% if roster_achieved_goals %}
+      <span class="roster-items">
+        {% for goal in roster_achieved_goals %}
+        <span class="num">{{ goal.repo }}#{{ goal.number }}</span> {{ goal.title }}
+        {% if not loop.last %}, {% endif %}
+        {% endfor %}
+      </span>
+      {% else %}
+      <span class="roster-items meta">No Goals achieved</span>
+      {% endif %}
+    </div>
+  </div>
+</section>
 <div class="sprint-grid">
   <section class="card sprint-chart" aria-labelledby="split-h">
     <div class="card__head">

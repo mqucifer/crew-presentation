@@ -15,6 +15,27 @@
   grid-template-columns: repeat(4, 1fr);
 }
 
+/* Roster: what got done across card kinds */
+.roster-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+
+.roster-label {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-text-dim);
+  flex: 0 0 auto;
+}
+
+.roster-items {
+  font-size: 14px;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
 /* Sprint grid: 12-column layout for the two-column body */
 .sprint-grid {
   display: grid;
