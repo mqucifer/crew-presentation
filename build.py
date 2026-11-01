@@ -499,16 +499,20 @@ def _format_minutes(total_minutes) -> str:
 def _format_changed_value(measure: str, value) -> str:
     """Format a changed-trend value for display.
 
-    Time measures (cycle_time, lead_time) are shown as hours and minutes;
-    other measures are shown as their raw number.
+    Time measures (cycle_time, lead_time) are shown as hours and minutes,
+    always including both units (e.g. '0 hr 26 min'); other measures are
+    shown as their raw number.
     """
     if value is None:
         return ""
     if measure in ("cycle_time_days", "lead_time_days"):
         total_minutes = round(value * 24 * 60)
-        return _format_minutes(total_minutes)
+        hours, minutes = divmod(total_minutes, 60)
+        return f"{hours} hr {minutes} min"
     if measure in ("cycle_time_minutes", "lead_time_minutes"):
-        return _format_minutes(round(value))
+        total_minutes = round(value)
+        hours, minutes = divmod(total_minutes, 60)
+        return f"{hours} hr {minutes} min"
     if isinstance(value, float) and value == int(value):
         return str(int(value))
     return str(value)

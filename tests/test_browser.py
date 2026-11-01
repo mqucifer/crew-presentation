@@ -9161,13 +9161,13 @@ def test_changed_from_metrics_cycle_time():
         assert "cycle time" in section_html, (
             f"label 'cycle time' not found in section: {section_html!r}"
         )
-        # AC1: previous value is '26 min'
-        assert "26 min" in section_html, (
-            f"previous value '26 min' not found: {section_html!r}"
+        # AC1: previous value is '0 hr 26 min'
+        assert "0 hr 26 min" in section_html, (
+            f"previous value '0 hr 26 min' not found: {section_html!r}"
         )
-        # AC1: now value is '33 min'
-        assert "33 min" in section_html, (
-            f"now value '33 min' not found: {section_html!r}"
+        # AC1: now value is '0 hr 33 min'
+        assert "0 hr 33 min" in section_html, (
+            f"now value '0 hr 33 min' not found: {section_html!r}"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
