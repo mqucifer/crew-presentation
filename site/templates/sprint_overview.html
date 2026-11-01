@@ -128,4 +128,38 @@
     {% endif %}
   </section>
 </div>
+<section class="card" aria-labelledby="dora-h">
+  <div class="card__head">
+    <h2 id="dora-h">How releases went</h2>
+    <span class="meta">DORA's four measures</span>
+  </div>
+  {% if metrics.dora %}
+  <div class="card__body dora-grid">
+    <div class="dora-metric">
+      <div class="meta">Releases this sprint</div>
+      <div class="num stat__value">{{ metrics.dora.release_frequency if metrics.dora.release_frequency is not none else '–' }}</div>
+      <div class="meta">release frequency</div>
+    </div>
+    <div class="dora-metric">
+      <div class="meta">Change to release</div>
+      <div class="num stat__value">{{ metrics.dora.lead_time_days if metrics.dora.lead_time_days is not none else '–' }}{% if metrics.dora.lead_time_days is not none %}&nbsp;d{% endif %}</div>
+      <div class="meta">lead time for changes</div>
+    </div>
+    <div class="dora-metric">
+      <div class="meta">Releases that failed</div>
+      <div class="num stat__value">{{ metrics.dora.change_failure_count if metrics.dora.change_failure_count is not none else '–' }}</div>
+      <div class="meta">{% if metrics.dora.change_failure_rate_percent is not none %}{{ metrics.dora.change_failure_rate_percent }}% change failure rate{% else %}change failure rate{% endif %}</div>
+    </div>
+    <div class="dora-metric">
+      <div class="meta">Time to recover</div>
+      <div class="num stat__value">{{ metrics.dora.mean_time_to_recovery_minutes if metrics.dora.mean_time_to_recovery_minutes is not none else '–' }}{% if metrics.dora.mean_time_to_recovery_minutes is not none %}&nbsp;min{% endif %}</div>
+      <div class="meta">mean time to recovery</div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card__body">
+    <p>no release data for this sprint</p>
+  </div>
+  {% endif %}
+</section>
 {% endblock %}

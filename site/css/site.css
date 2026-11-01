@@ -380,8 +380,24 @@ section ul li a {
   font-size: 32px;
 }
 
+/* DORA measures grid */
+.dora-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 20px 16px;
+}
+
+.dora-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 @media (max-width: 767px) {
   .cost-grid {
     grid-template-columns: 1fr;
+  }
+  .dora-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

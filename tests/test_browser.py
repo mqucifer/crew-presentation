@@ -1971,6 +1971,79 @@ def test_feature_panel_empty_decided():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_sprint_overview_dora_values_shown():
+    """AC1: when the package carries DORA values, the page shows 'How releases went' with those values."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "dora": {
+                    "release_frequency": 14,
+                    "lead_time_days": 2.5,
+                    "change_failure_count": 1,
+                    "change_failure_rate_percent": 7.1,
+                    "mean_time_to_recovery_minutes": 45,
+                },
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The section heading is present
+        assert "How releases went" in html, "DORA heading 'How releases went' not found"
+        # The DORA values are rendered
+        assert "14" in html, "release_frequency value '14' not in page"
+        assert "45" in html, "mean_time_to_recovery_minutes value '45' not in page"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_overview_dora_absent_shows_no_data():
+    """AC2: when dora is null, the DORA card shows 'no release data for this sprint'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "dora": None,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The section heading is still present
+        assert "How releases went" in html, "DORA heading 'How releases went' not found"
+        # The absence message is shown
+        assert "no release data for this sprint" in html, (
+            "absence line 'no release data for this sprint' not found"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_feature_panel_light_theme_colors():
     """AC3+AC5: light-theme feature panel uses feature-bg, feature-text, feature-dim tokens."""
     tag = "delivery-history-TEST"
