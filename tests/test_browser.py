@@ -9800,3 +9800,229 @@ def test_analysis_stories_still_render_attempt_chart():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_roster_released_epics_visible_outside_chart():
+    """AC1: when roster.released_epics has 1 entry, 'epic' appears outside attempt-chart/story-list."""
+    tag = "delivery-history-ROSTER-E"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 5,
+            "points_delivered": 10,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "escalation_count": 0,
+            "cycle_time_minutes": 100,
+            "roster": {
+                "completed_stories": ["crew-presentation#100"],
+                "released_epics": ["crew-presentation#50"],
+                "achieved_goals": None,
+            },
+        }
+    }
+    cards = [
+        {
+            "repo": "crew-presentation",
+            "number": 50,
+            "type": "Epic",
+            "title": "Build the sprint overview",
+            "url": "https://github.com/mqucifer/crew-presentation/issues/50",
+            "parent": None,
+            "points": None,
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "status_set": "2026-09-25T12:00:00Z",
+            "created": "2026-09-22T09:00:00Z",
+            "closed": "2026-09-25T12:00:00Z",
+            "technical": False,
+            "closed_as": "completed",
+            "superseded_because": None,
+            "filed": {"by": "unknown", "activity": None, "kind": None, "for_project": None},
+        },
+        {
+            "repo": "crew-presentation",
+            "number": 100,
+            "type": "Story",
+            "title": "Write the sprint report as JSON",
+            "url": "https://github.com/mqucifer/crew-presentation/issues/100",
+            "parent": "crew-presentation#50",
+            "points": 3,
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "status_set": "2026-09-25T11:00:00Z",
+            "created": "2026-09-22T10:00:00Z",
+            "closed": "2026-09-25T11:00:00Z",
+            "technical": False,
+            "closed_as": "completed",
+            "superseded_because": None,
+            "filed": {"by": "unknown", "activity": None, "kind": None, "for_project": None},
+        },
+    ]
+    _make_fake_package(tag, ["Sprint 6"], metrics=metrics, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # 'epic' (case-insensitive) must appear in visible text outside .attempt-chart and .story-list
+        # Remove the attempt-chart div and story-list ul from the HTML
+        html_no_chart = re.sub(
+            r'<div class="attempt-chart">.*?</div>\s*</div>',
+            "",
+            html,
+            flags=re.DOTALL,
+        )
+        html_no_chart = re.sub(
+            r'<ul class="story-list">.*?</ul>',
+            "",
+            html_no_chart,
+            flags=re.DOTALL,
+        )
+        # The word 'epic' (case-insensitive) should still be present
+        assert re.search(r"epic", html_no_chart, re.IGNORECASE), (
+            "'epic' not found outside attempt-chart/story-list"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_roster_zero_goals_shows_no_goals():
+    """AC2: when roster.achieved_goals is 0, page shows '0' adjacent to 'Goal'/'Goals' or 'no Goals'."""
+    tag = "delivery-history-ROSTER-G"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 5,
+            "points_delivered": 10,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "escalation_count": 0,
+            "cycle_time_minutes": 100,
+            "roster": {
+                "completed_stories": ["crew-presentation#100"],
+                "released_epics": None,
+                "achieved_goals": None,
+            },
+        }
+    }
+    cards = [
+        {
+            "repo": "crew-presentation",
+            "number": 100,
+            "type": "Story",
+            "title": "Write the sprint report as JSON",
+            "url": "https://github.com/mqucifer/crew-presentation/issues/100",
+            "parent": None,
+            "points": 3,
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "status_set": "2026-09-25T11:00:00Z",
+            "created": "2026-09-22T10:00:00Z",
+            "closed": "2026-09-25T11:00:00Z",
+            "technical": False,
+            "closed_as": "completed",
+            "superseded_because": None,
+            "filed": {"by": "unknown", "activity": None, "kind": None, "for_project": None},
+        },
+    ]
+    _make_fake_package(tag, ["Sprint 6"], metrics=metrics, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Either '0' is in the same element or adjacent to 'Goal'/'Goals',
+        # or the phrase 'no Goals' (case-insensitive) appears
+        has_no_goals = re.search(r"no\s+goals?", html, re.IGNORECASE) is not None
+        has_zero_near_goals = re.search(
+            r"[\w\s]*0[\w\s]*[\w\s]*Goals?|Goals?[\w\s]*0", html, re.IGNORECASE
+        ) is not None
+        assert has_no_goals or has_zero_near_goals, (
+            f"Neither 'no Goals' nor '0' near 'Goal'/'Goals' found in page. "
+            f"Searching for: no goals | 0 near Goals"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_roster_zero_both_story_in_chart_no_empty_body():
+    """AC3: when both epics and goals are 0, story title is in chart/list, no empty card__body."""
+    tag = "delivery-history-ROSTER-Z"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 1,
+            "points_delivered": 3,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": 1,
+            "escalation_count": 0,
+            "cycle_time_minutes": 60,
+            "roster": {
+                "completed_stories": ["crew-presentation#100"],
+                "released_epics": None,
+                "achieved_goals": None,
+            },
+        }
+    }
+    cards = [
+        {
+            "repo": "crew-presentation",
+            "number": 100,
+            "type": "Story",
+            "title": "Write the sprint report as JSON",
+            "url": "https://github.com/mqucifer/crew-presentation/issues/100",
+            "parent": None,
+            "points": 3,
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "status_set": "2026-09-25T11:00:00Z",
+            "created": "2026-09-22T10:00:00Z",
+            "closed": "2026-09-25T11:00:00Z",
+            "technical": False,
+            "closed_as": "completed",
+            "superseded_because": None,
+            "filed": {"by": "unknown", "activity": None, "kind": None, "for_project": None},
+        },
+    ]
+    _make_fake_package(tag, ["Sprint 6"], metrics=metrics, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Story title must appear in attempt-chart or story-list
+        in_chart = (
+            re.search(
+                r'<div class="attempt-chart">.*?Write the sprint report as JSON.*?</div>\s*</div>',
+                html,
+                re.DOTALL,
+            )
+            is not None
+        )
+        in_list = (
+            re.search(
+                r'<ul class="story-list">.*?Write the sprint report as JSON.*?</ul>',
+                html,
+                re.DOTALL,
+            )
+            is not None
+        )
+        assert in_chart or in_list, (
+            "Story title 'Write the sprint report as JSON' not found in "
+            "attempt-chart or story-list"
+        )
+        # No section element has a div.card__body with empty textContent
+        for section_match in re.finditer(r"<section[^>]*>(.*?)</section>", html, re.DOTALL):
+            section_html = section_match.group(1)
+            for body_match in re.finditer(
+                r'<div class="card__body">(.*?)</div>\s*(?:</section>|<div)',
+                section_html,
+                re.DOTALL,
+            ):
+                body_content = re.sub(r"<[^>]+>", "", body_match.group(1)).strip()
+                assert body_content, (
+                    f"Empty .card__body found in section: {section_html[:100]}..."
+                )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
