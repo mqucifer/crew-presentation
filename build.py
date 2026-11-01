@@ -218,6 +218,9 @@ def _render_pages(pkg: Path) -> dict:
             else:
                 changed = []
         decided = analysis_by_sprint.get(sprint["name"], {}).get("decided", [])
+        if not decided:
+            sprint_events = _load_sprint_events(pkg, sprint["name"], index)
+            decided = _decided_from_events_and_cards(sprint_events, cards, sprint)
 
         context = {
             "sprints": sprints,
@@ -641,6 +644,39 @@ def _load_all_events(pkg: Path, index: dict) -> list[dict]:
             data = _load_json(events_file)
             events.extend(data.get("events", []))
     return events
+
+
+def _decided_from_events_and_cards(
+    events: list[dict], cards: list[dict], sprint: dict
+) -> list[dict]:
+    """Compute the crew's decisions from events and cards when analysis is absent."""
+    decided: list[dict] = []
+    start = sprint["start"]
+    end = sprint["end"]
+    for event in events:
+        if event.get("kind") == "pull_merged" and event.get("design_revision"):
+            decided.append(
+                {
+                    "at": event["at"],
+                    "kind": "design_revision",
+                    "number": event["number"],
+                    "repo": event["repo"],
+                }
+            )
+    for card in cards:
+        if card.get("type") == "Epic" and card.get("technical"):
+            created = card.get("created", "")
+            if created and start <= created[:10] <= end:
+                decided.append(
+                    {
+                        "at": created,
+                        "kind": "technical_epic",
+                        "number": card["number"],
+                        "repo": card["repo"],
+                    }
+                )
+    decided.sort(key=lambda d: d["at"])
+    return decided
 
 
 def _filter_events_by_card(

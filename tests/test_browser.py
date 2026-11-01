@@ -9356,3 +9356,190 @@ def test_changed_from_analysis_preserved():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _make_package_no_analysis(
+    tag: str,
+    sprints: list[dict],
+    metrics: dict,
+    cards: list[dict],
+    events: list[dict] = (),
+) -> Path:
+    """Create a fake package with no analysis field, carrying events and cards."""
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "1.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["sprints"],
+                "properties": {"sprints": {"type": "array"}},
+            }
+        )
+    )
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    if events:
+        events_dir = pkg_dir / "events"
+        events_dir.mkdir(parents=True, exist_ok=True)
+        sprint_name = sprints[0]["name"] if sprints else ""
+        events_data = {
+            "package": "delivery-history",
+            "schema_version": "1.0.0",
+            "sprint": sprint_name,
+            "start": sprints[0]["start"] if sprints else "2026-01-01",
+            "end": sprints[0]["end"] if sprints else "2026-01-01",
+            "events": list(events),
+        }
+        (events_dir / "2026-09-25.json").write_text(json.dumps(events_data))
+    index = {
+        "sprints": sprints,
+        "cards": cards,
+        "crew_repository": "crew",
+        "sprint_metrics": {"answers": metrics},
+    }
+    if events:
+        index["periods"] = [
+            {"sprint": sprints[0]["name"], "file": "events/2026-09-25.json"}
+        ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+    return pkg_dir
+
+
+def test_decided_from_events_design_revision():
+    """AC1: pull_merged with design_revision=true shows time, kind, and reference link."""
+    tag = "delivery-history-TEST"
+    sprints = [{"name": "Sprint 6", "start": "2026-09-25", "end": "2026-09-25"}]
+    metrics = {
+        "Sprint 6": {
+            "throughput": 1,
+            "points_delivered": 3,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": 1,
+            "escalation_count": 0,
+            "cycle_time_days": 1.0,
+        }
+    }
+    events = [
+        {
+            "kind": "pull_merged",
+            "at": "2026-09-25T23:38:00Z",
+            "repo": "mqucifer/crew-presentation",
+            "number": 122,
+            "title": "chore: revisit design",
+            "closes": [],
+            "crews_own": False,
+            "design_revision": True,
+            "about": [],
+        }
+    ]
+    _make_package_no_analysis(tag, sprints, metrics, [], events)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Decided by the crew" in html
+        assert "No decisions recorded this sprint" not in html
+        section_start = html.index('class="decided-list"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        assert "23:38" in section
+        assert "design revision" in section
+        assert "mqucifer/crew-presentation#122" in section
+        assert (
+            'href="https://github.com/mqucifer/crew-presentation/issues/122"' in section
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_decided_from_cards_technical_epic():
+    """AC2: card with type=Epic, technical=true, created in sprint range shows entry."""
+    tag = "delivery-history-TEST"
+    sprints = [{"name": "Sprint 6", "start": "2026-09-25", "end": "2026-09-25"}]
+    metrics = {
+        "Sprint 6": {
+            "throughput": 1,
+            "points_delivered": 3,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": 1,
+            "escalation_count": 0,
+            "cycle_time_days": 1.0,
+        }
+    }
+    cards = [
+        {
+            "repo": "mqucifer/crew-presentation",
+            "number": 123,
+            "type": "Epic",
+            "title": "A technical epic",
+            "url": "https://github.com/mqucifer/crew-presentation/issues/123",
+            "parent": None,
+            "points": None,
+            "sprint": None,
+            "status": "Ready",
+            "status_set": None,
+            "created": "2026-09-25T23:40:00Z",
+            "closed": None,
+            "technical": True,
+            "closed_as": None,
+            "superseded_because": None,
+        }
+    ]
+    _make_package_no_analysis(tag, sprints, metrics, cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Decided by the crew" in html
+        assert "No decisions recorded this sprint" not in html
+        section_start = html.index('class="decided-list"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        assert "23:40" in section
+        assert "technical epic" in section
+        assert "mqucifer/crew-presentation#123" in section
+        assert (
+            'href="https://github.com/mqucifer/crew-presentation/issues/123"' in section
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_decided_empty_when_no_events_or_cards():
+    """AC3: no design-revision merges and no technical epics shows empty message."""
+    tag = "delivery-history-TEST"
+    sprints = [{"name": "Sprint 6", "start": "2026-09-25", "end": "2026-09-25"}]
+    metrics = {
+        "Sprint 6": {
+            "throughput": 1,
+            "points_delivered": 3,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": 1,
+            "escalation_count": 0,
+            "cycle_time_days": 1.0,
+        }
+    }
+    _make_package_no_analysis(tag, sprints, metrics, [])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Decided by the crew" in html
+        assert "No decisions recorded this sprint" in html
+        assert 'class="decided-list"' not in html
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
