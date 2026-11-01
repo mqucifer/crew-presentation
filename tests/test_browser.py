@@ -9543,3 +9543,39 @@ def test_decided_empty_when_no_events_or_cards():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_decided_from_analysis_preserved():
+    """AC4: analysis decided entries (at, text, kind, number — no repo) render as before."""
+    tag = "delivery-history-TEST"
+    decided = [
+        {
+            "at": "2026-09-25T23:37:00Z",
+            "kind": "design_revision",
+            "number": 122,
+            "text": "Architect revised the design into seven modules",
+        }
+    ]
+    _make_package_with_decided(tag, decided)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Decided by the crew" in html
+        section_start = html.index('class="decided-list"')
+        section_end = html.index("</section>", section_start)
+        section = html[section_start:section_end]
+        # Time in HH:MM format
+        assert "23:37" in section
+        # Kind with underscores replaced
+        assert "design revision" in section
+        # Sentence text present
+        assert "Architect revised the design into seven modules" in section
+        # Number rendered as <code>#122</code>, not a link
+        assert "<code>#122</code>" in section
+        # No link href (repo absent from analysis entries)
+        assert "href=" not in section
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)

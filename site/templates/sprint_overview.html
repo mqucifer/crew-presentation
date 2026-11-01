@@ -110,7 +110,7 @@
     <div class="decided-list">
       {% for d in decided %}
       <span class="num">{{ d.at[11:16] }}</span>
-      <span>{% if d.text %}{{ d.text }} {% endif %}<span class="meta">{{ d.kind | replace('_', ' ') }} · <a href="https://github.com/{{ d.repo }}/issues/{{ d.number }}">{{ d.repo }}#{{ d.number }}</a></span></span>
+      <span>{% if d.text %}{{ d.text }} {% endif %}<span class="meta">{{ d.kind | replace('_', ' ') }} · {% if d.repo %}<a href="https://github.com/{{ d.repo }}/issues/{{ d.number }}">{{ d.repo }}#{{ d.number }}</a>{% else %}<code>#{{ d.number }}</code>{% endif %}</span></span>
       {% endfor %}
     </div>
     {% else %}
