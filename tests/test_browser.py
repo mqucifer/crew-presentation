@@ -9579,3 +9579,224 @@ def test_decided_from_analysis_preserved():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_story_list_from_cards_when_no_analysis():
+    """AC1: when the package has no analysis, the story list shows cards with
+    status 'Done' and matching sprint, excluding those closed as 'not_planned'.
+
+    Each row links to the story's page and shows its reference and title.
+    """
+    tag = "delivery-history-TEST"
+    cards = [
+        {
+            "repo": "mqucifer/crew",
+            "number": 100,
+            "type": "Story",
+            "title": "Story one",
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "closed_as": "completed",
+        },
+        {
+            "repo": "mqucifer/crew",
+            "number": 101,
+            "type": "Story",
+            "title": "Story two",
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "closed_as": "completed",
+        },
+        {
+            "repo": "mqucifer/crew",
+            "number": 102,
+            "type": "Story",
+            "title": "Story three",
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "closed_as": "completed",
+        },
+        {
+            "repo": "mqucifer/crew",
+            "number": 103,
+            "type": "Story",
+            "title": "Story not planned",
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "closed_as": "not_planned",
+        },
+    ]
+    _make_fake_package(tag, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Exactly 3 story-row elements (the not_planned card is excluded)
+        row_count = html.count('class="story-row"')
+        assert row_count == 3, f"expected 3 story rows, got {row_count}"
+        # The not_planned card is not shown
+        assert "#103" not in html, "not_planned card should not appear in story list"
+        assert "Story not planned" not in html
+        # Each row links to the story's page and shows its reference and title
+        for num, title in [(100, "Story one"), (101, "Story two"), (102, "Story three")]:
+            link = f'href="stories/mqucifer-crew-{num}.html"'
+            assert link in html, f"link for card #{num} not found"
+            assert title in html, f"title {title!r} not found"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_no_attempt_elements_when_no_analysis():
+    """AC2: when the package has no analysis, the page has no .attempt-block,
+    .attempt-status, or .attempt-legend element."""
+    tag = "delivery-history-TEST"
+    cards = [
+        {
+            "repo": "mqucifer/crew",
+            "number": 100,
+            "type": "Story",
+            "title": "Story one",
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "closed_as": "completed",
+        },
+    ]
+    _make_fake_package(tag, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "attempt-block" not in html, "attempt-block element found without analysis"
+        assert "attempt-status" not in html, "attempt-status element found without analysis"
+        assert "attempt-legend" not in html, "attempt-legend element found without analysis"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_no_delivered_cards_shows_empty_message():
+    """AC3: when no card has status 'Done' for the sprint, the section shows
+    'No stories were delivered this sprint' and no rows."""
+    tag = "delivery-history-TEST"
+    cards = [
+        {
+            "repo": "mqucifer/crew",
+            "number": 100,
+            "type": "Story",
+            "title": "Story in progress",
+            "sprint": "Sprint 6",
+            "status": "In Progress",
+            "closed_as": None,
+        },
+        {
+            "repo": "mqucifer/crew",
+            "number": 101,
+            "type": "Story",
+            "title": "Story blocked",
+            "sprint": "Sprint 6",
+            "status": "Blocked",
+            "closed_as": None,
+        },
+    ]
+    _make_fake_package(tag, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "No stories were delivered this sprint" in html
+        assert 'class="story-row"' not in html, "no rows expected when nothing delivered"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_announced_3_0_0_mock_shows_story_rows():
+    """AC4: the contract's own mock for 3.0.0 (carried as this project's fixture
+    from .announced/) renders at least one story row when built."""
+    base_dir = REPO_ROOT / ".announced" / "mqucifer-crew" / "delivery-history-3.0.0"
+    mock_dir = base_dir / "mock"
+    assert mock_dir.is_dir(), ".announced 3.0.0 mock not found"
+    tag = "delivery-history-3000-TEST"
+    pkg_dir = PACKAGE_DIR / tag
+    shutil.copytree(mock_dir, pkg_dir)
+    # Schema files live at the base level, not in mock/
+    for schema_file in ("schema.json", "manifest.schema.json", "events.schema.json"):
+        shutil.copy2(base_dir / schema_file, pkg_dir / schema_file)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Sprint 6 has cards 125, 126, 127, 128, 133 with status Done and
+        # closed_as completed (card 130 is not_planned)
+        row_count = html.count('class="story-row"')
+        assert row_count >= 1, (
+            f"expected at least 1 story row from 3.0.0 mock, got {row_count}"
+        )
+        # Verify the not_planned card (130) is excluded
+        assert "#130" not in html, "not_planned card should not appear"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_analysis_stories_still_render_attempt_chart():
+    """AC5: when the package has analysis.stories populated with delivered
+    stories, the attempt chart shows them with blocks and pattern-based
+    status (existing 2.x behaviour preserved)."""
+    tag = "delivery-history-TEST"
+    stories = [
+        {
+            "card": {"number": 201, "repo": "mqucifer/crew"},
+            "blocks": ["refused", "landed"],
+            "delivered": "2026-09-25T10:00:00Z",
+            "pattern": "refused_repaired_merged",
+            "crew_fixes": [],
+        },
+        {
+            "card": {"number": 202, "repo": "mqucifer/crew"},
+            "blocks": ["landed"],
+            "delivered": "2026-09-25T11:00:00Z",
+            "pattern": "",
+            "crew_fixes": [],
+        },
+    ]
+    cards = [
+        {
+            "number": 201,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "Analysis story one",
+        },
+        {
+            "number": 202,
+            "repo": "mqucifer/crew",
+            "sprint": "Sprint 6",
+            "title": "Analysis story two",
+        },
+    ]
+    _make_package_with_stories(tag, stories=stories, cards=cards)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The attempt chart is present (not the simple story list)
+        assert 'class="attempt-legend"' in html, "attempt-legend missing with analysis"
+        assert 'class="attempt-chart"' in html, "attempt-chart missing with analysis"
+        assert 'class="attempt-row"' in html, "attempt-row missing with analysis"
+        assert 'class="attempt-block' in html, "attempt-block missing with analysis"
+        assert 'class="attempt-status' in html, "attempt-status missing with analysis"
+        # The simple story-list is NOT present
+        assert 'class="story-list"' not in html, "story-list should not appear with analysis"
+        assert 'class="story-row"' not in html, "story-row should not appear with analysis"
+        # Both stories appear
+        assert "#201" in html
+        assert "#202" in html
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
