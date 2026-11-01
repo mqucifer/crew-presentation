@@ -3732,6 +3732,118 @@ def test_journey_page_path_step_without_data_stage_when_not_delivered():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_journey_page_path_from_card_status_done_completed_when_no_analysis():
+    """AC1: no analysis story entry, card status='Done' closed_as='completed' → last .path__step has data-stage='5'."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[],
+        cards=[
+            {
+                "number": 100,
+                "repo": "mqucifer/crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+                "status": "Done",
+                "closed_as": "completed",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "mqucifer-crew-presentation-100.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        # Find the .path div
+        path_match = re.search(r'<div class="path"[^>]*>(.*?)</div>\s*(?:</div>\s*)*</div>', html, re.DOTALL)
+        assert path_match, "no <div class='path'> found in journey page"
+        path_html = path_match.group(0)
+        # The last .path__step should have data-stage="5"
+        step_match = re.search(r'<div class="path__step"\s+data-stage="5">', path_html)
+        assert step_match, (
+            "no .path__step with data-stage='5' found; "
+            "expected all five stages reached when card status is Done and closed_as is completed"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_page_path_no_data_stage_when_card_in_progress_no_analysis():
+    """AC2: no analysis story entry, card status='In Progress' → no .path__step has data-stage."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[],
+        cards=[
+            {
+                "number": 100,
+                "repo": "mqucifer/crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+                "status": "In Progress",
+                "closed_as": None,
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "mqucifer-crew-presentation-100.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        # Find the .path div
+        path_match = re.search(r'<div class="path"[^>]*>(.*?)</div>\s*(?:</div>\s*)*</div>', html, re.DOTALL)
+        assert path_match, "no <div class='path'> found in journey page"
+        path_html = path_match.group(0)
+        steps = re.findall(r'<div class="path__step"[^>]*>', path_html)
+        assert steps, "no .path__step elements found in the .path div"
+        has_no_data_stage = all("data-stage" not in step for step in steps)
+        assert has_no_data_stage, (
+            f"some .path__step elements have a data-stage attribute; "
+            f"expected none when card status is In Progress: {steps}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_page_no_cost_section_when_no_analysis():
+    """AC3: no analysis story entry, card status='Done' → page does not contain 'What it cost'."""
+    tag = "delivery-history-TEST"
+    _make_package_with_stories(
+        tag,
+        stories=[],
+        cards=[
+            {
+                "number": 100,
+                "repo": "mqucifer/crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "A story's journey",
+                "status": "Done",
+                "closed_as": "completed",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "mqucifer-crew-presentation-100.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        assert "What it cost" not in html, (
+            "page contains 'What it cost' heading; "
+            "expected it absent when no analysis story entry provides cost data"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_journey_timeline_shows_events_in_order():
     """AC1: delivered story with a move event shows 'What happened, in order' with timestamp and destination column."""
     tag = "delivery-history-TEST"
