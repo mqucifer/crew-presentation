@@ -9800,3 +9800,41 @@ def test_analysis_stories_still_render_attempt_chart():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_page_title_not_sprint_name():
+    """AC1: the replay page's <title> is not the bare sprint name."""
+    tag = "delivery-history-TEST-TITLE"
+    _make_fake_package(tag, sprint_names=["Sprint 38"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        m = re.search(r"<title>(.*?)</title>", html)
+        assert m, "no <title> found in replay.html"
+        assert m.group(1) != "Sprint 38", (
+            f"replay <title> is byte-identical to sprint name: {m.group(1)!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_page_h1_not_sprint_name():
+    """AC2: the replay page's first <h1> is not the bare sprint name."""
+    tag = "delivery-history-TEST-H1"
+    _make_fake_package(tag, sprint_names=["Sprint 38"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "replay.html").read_text()
+        m = re.search(r"<h1[^>]*>(.*?)</h1>", html)
+        assert m, "no <h1> found in replay.html"
+        assert m.group(1) != "Sprint 38", (
+            f"replay <h1> is byte-identical to sprint name: {m.group(1)!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
