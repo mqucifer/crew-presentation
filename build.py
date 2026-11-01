@@ -197,16 +197,26 @@ def _render_pages(pkg: Path) -> dict:
                 }
             )
 
-        changed = [
-            {
-                "text": e["text"],
-                "label": _changed_label(e["measure"]),
-                "previous": _format_changed_value(e["measure"], e["previous"]),
-                "now": _format_changed_value(e["measure"], e["now"]),
-            }
-            for e in analysis_by_sprint.get(sprint["name"], {}).get("changed", [])
-            if e["measure"] != "escalation_count"
-        ]
+        analysis_changed = analysis_by_sprint.get(sprint["name"], {}).get(
+            "changed", []
+        )
+        if analysis_changed:
+            changed = [
+                {
+                    "text": e["text"],
+                    "label": _changed_label(e["measure"]),
+                    "previous": _format_changed_value(e["measure"], e["previous"]),
+                    "now": _format_changed_value(e["measure"], e["now"]),
+                }
+                for e in analysis_changed
+                if e["measure"] != "escalation_count"
+            ]
+        else:
+            prior = metrics.get("prior")
+            if prior:
+                changed = _changed_from_metrics(metrics, prior)
+            else:
+                changed = []
         decided = analysis_by_sprint.get(sprint["name"], {}).get("decided", [])
 
         context = {
@@ -524,6 +534,39 @@ def _changed_label(measure: str) -> str:
         "wip_violations": "WIP violations",
     }
     return LABELS.get(measure, measure)
+
+
+def _changed_from_metrics(metrics: dict, prior: dict) -> list[dict]:
+    """Build 'What changed' entries from sprint-metrics answers when analysis is absent.
+
+    Compares each measure's current value to its prior value and returns
+    entries for measures that have a non-null value in both.
+    """
+    MEASURES = [
+        "cycle_time_minutes",
+        "lead_time_minutes",
+        "throughput",
+        "points_delivered",
+        "first_attempt_rate_percent",
+        "wip_violations",
+        "blocked_aging_days",
+        "superseded_count",
+    ]
+    entries = []
+    for measure in MEASURES:
+        now_value = metrics.get(measure)
+        prev_value = prior.get(measure)
+        if now_value is None or prev_value is None:
+            continue
+        entries.append(
+            {
+                "text": "",
+                "label": _changed_label(measure),
+                "previous": _format_changed_value(measure, prev_value),
+                "now": _format_changed_value(measure, now_value),
+            }
+        )
+    return entries
 
 
 CAUSE_LABELS = {
