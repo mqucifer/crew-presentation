@@ -9124,3 +9124,235 @@ def test_attempt_section_single_story_renders_one_row():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_from_metrics_cycle_time():
+    """AC1: no analysis, sprint_metrics has cycle_time_minutes 33, prior 26.
+
+    The 'What changed' section shows 'cycle time' with '0 hr 26 min' → '0 hr 33 min'.
+    """
+    tag = "delivery-history-TEST"
+    metrics = {
+        "Sprint 6": {
+            "cycle_time_minutes": 33,
+            "throughput": 5,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "prior": {
+                "cycle_time_minutes": 26,
+                "throughput": 3,
+            },
+        }
+    }
+    _make_fake_package(tag, metrics=metrics)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_match = re.search(
+            r'<section class="card changed-trend".*?</section>',
+            html,
+            re.DOTALL,
+        )
+        assert section_match, "changed-trend section not found"
+        section_html = section_match.group(0)
+        # AC1: label is 'cycle time'
+        assert "cycle time" in section_html, (
+            f"label 'cycle time' not found in section: {section_html!r}"
+        )
+        # AC1: previous value is '0 hr 26 min'
+        assert "0 hr 26 min" in section_html, (
+            f"previous value '0 hr 26 min' not found: {section_html!r}"
+        )
+        # AC1: now value is '0 hr 33 min'
+        assert "0 hr 33 min" in section_html, (
+            f"now value '0 hr 33 min' not found: {section_html!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_from_metrics_throughput():
+    """AC2: no analysis, sprint_metrics has throughput 5, prior 3.
+
+    The 'What changed' section shows 'stories delivered' with '3' → '5'.
+    """
+    tag = "delivery-history-TEST"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 5,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "prior": {
+                "throughput": 3,
+            },
+        }
+    }
+    _make_fake_package(tag, metrics=metrics)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_match = re.search(
+            r'<section class="card changed-trend".*?</section>',
+            html,
+            re.DOTALL,
+        )
+        assert section_match, "changed-trend section not found"
+        section_html = section_match.group(0)
+        # AC2: label is 'stories delivered'
+        assert "stories delivered" in section_html, (
+            f"label 'stories delivered' not found: {section_html!r}"
+        )
+        # AC2: previous value is '3'
+        assert 'class="num">3<' in section_html, (
+            f"previous value '3' not found: {section_html!r}"
+        )
+        # AC2: now value is '5'
+        assert 'class="num">5<' in section_html, (
+            f"now value '5' not found: {section_html!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_from_metrics_first_attempt_rate_no_text():
+    """AC3: no analysis, sprint_metrics has first_attempt_rate_percent 40, prior 67.
+
+    The entry's label is 'first-attempt rate' with '67' → '40', and the
+    .changed-trend-text div is absent or empty.
+    """
+    tag = "delivery-history-TEST"
+    metrics = {
+        "Sprint 6": {
+            "first_attempt_rate_percent": 40,
+            "first_attempt_numerator": 2,
+            "first_attempt_denominator": 5,
+            "prior": {
+                "first_attempt_rate_percent": 67,
+            },
+        }
+    }
+    _make_fake_package(tag, metrics=metrics)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_match = re.search(
+            r'<section class="card changed-trend".*?</section>',
+            html,
+            re.DOTALL,
+        )
+        assert section_match, "changed-trend section not found"
+        section_html = section_match.group(0)
+        # AC3: label is 'first-attempt rate'
+        assert "first-attempt rate" in section_html, (
+            f"label 'first-attempt rate' not found: {section_html!r}"
+        )
+        # AC3: previous value is '67'
+        assert 'class="num">67<' in section_html, (
+            f"previous value '67' not found: {section_html!r}"
+        )
+        # AC3: now value is '40'
+        assert 'class="num">40<' in section_html, (
+            f"now value '40' not found: {section_html!r}"
+        )
+        # AC3: no .changed-trend-text div with content
+        text_divs = re.findall(
+            r'<div class="changed-trend-text">(.*?)</div>', section_html, re.DOTALL
+        )
+        for text_content in text_divs:
+            assert not text_content.strip(), (
+                f".changed-trend-text div contains text: {text_content!r}"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_from_metrics_prior_null_no_section():
+    """AC4: no analysis, sprint_metrics has prior set to null.
+
+    The 'What changed' section is absent from the page.
+    """
+    tag = "delivery-history-TEST"
+    metrics = {
+        "Sprint 6": {
+            "cycle_time_minutes": 33,
+            "throughput": 5,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "prior": None,
+        }
+    }
+    _make_fake_package(tag, metrics=metrics)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # AC4: no element with class 'changed-trend'
+        assert "changed-trend" not in html, (
+            "changed-trend element found when prior is null"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_from_analysis_preserved():
+    """AC5: analysis.sprints has a changed list with text, measure, previous, now.
+
+    The 'What changed' section shows the entry's sentence text and formatted
+    values as before (existing 2.x behaviour preserved).
+    """
+    tag = "delivery-history-TEST"
+    _make_package_with_changed(
+        tag,
+        "Sprint 7",
+        [
+            {
+                "text": "Cycle time improved significantly",
+                "measure": "cycle_time_minutes",
+                "previous": 45,
+                "now": 30,
+                "better": True,
+                "source": "sprint-metrics",
+            }
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+        section_match = re.search(
+            r'<section class="card changed-trend".*?</section>',
+            html,
+            re.DOTALL,
+        )
+        assert section_match, "changed-trend section not found"
+        section_html = section_match.group(0)
+        # AC5: the sentence text is present
+        assert "Cycle time improved significantly" in section_html, (
+            f"sentence text not found: {section_html!r}"
+        )
+        # AC5: the text is in a .changed-trend-text div
+        text_div = re.search(
+            r'<div class="changed-trend-text">(.*?)</div>', section_html, re.DOTALL
+        )
+        assert text_div, ".changed-trend-text div not found"
+        assert "Cycle time improved significantly" in text_div.group(1)
+        # AC5: label is 'cycle time'
+        assert "cycle time" in section_html
+        # AC5: values are formatted as minutes
+        assert "45 min" in section_html
+        assert "30 min" in section_html
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)

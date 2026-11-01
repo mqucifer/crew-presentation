@@ -34,7 +34,9 @@
   <div class="card__body">
     {% for entry in changed %}
     <div class="changed-trend-entry">
+      {% if entry.text %}
       <div class="changed-trend-text">{{ entry.text }}</div>
+      {% endif %}
       <div class="changed-trend-values">{{ entry.label }}: <span class="num">{{ entry.previous }}</span> &rarr; <span class="num">{{ entry.now }}</span></div>
     </div>
     {% endfor %}
