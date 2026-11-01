@@ -9717,9 +9717,9 @@ def test_no_delivered_cards_shows_empty_message():
 def test_announced_3_0_0_mock_shows_story_rows():
     """AC4: the contract's own mock for 3.0.0 (carried as this project's fixture
     from .announced/) renders at least one story row when built."""
-    base_dir = REPO_ROOT / ".announced" / "mqucifer-crew" / "delivery-history-3.0.0"
+    base_dir = REPO_ROOT / "tests" / "fixtures" / "delivery-history-3.0.0"
     mock_dir = base_dir / "mock"
-    assert mock_dir.is_dir(), ".announced 3.0.0 mock not found"
+    assert mock_dir.is_dir(), "3.0.0 fixture mock not found"
     tag = "delivery-history-3000-TEST"
     pkg_dir = PACKAGE_DIR / tag
     shutil.copytree(mock_dir, pkg_dir)
