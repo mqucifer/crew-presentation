@@ -50,6 +50,7 @@
     </div>
     <div class="card__body">
       {% if stories %}
+      {% if has_analysis %}
       <div class="attempt-legend">
         <span><i class="swatch swatch--landed"></i> attempt that landed</span>
         <span><i class="swatch swatch--refused"></i> refused, repaired</span>
@@ -79,6 +80,15 @@
         </div>
         {% endfor %}
       </div>
+      {% else %}
+      <ul class="story-list">
+        {% for story in stories %}
+        <li class="story-row">
+          <a href="stories/{{ story.repo | replace('/', '-') }}-{{ story.number }}.html">{{ story.repo }}<span class="num meta">#{{ story.number }}</span> {{ story.title }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
       {% else %}
       <p>No stories were delivered this sprint</p>
       {% endif %}

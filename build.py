@@ -161,41 +161,45 @@ def _render_pages(pkg: Path) -> dict:
         numerator = metrics.get("first_attempt_numerator") or 0
 
         stories = []
-        for story in analysis_stories:
-            delivered = story.get("delivered")
-            if not delivered:
-                continue
-            if isinstance(delivered, str):
-                delivered_date = delivered[:10]
-                if not (sprint["start"] <= delivered_date <= sprint["end"]):
+        has_analysis = bool(analysis_stories)
+        if has_analysis:
+            for story in analysis_stories:
+                delivered = story.get("delivered")
+                if not delivered:
                     continue
+                if isinstance(delivered, str):
+                    delivered_date = delivered[:10]
+                    if not (sprint["start"] <= delivered_date <= sprint["end"]):
+                        continue
 
-            card_key = (story["card"]["number"], story["card"]["repo"])
-            card = cards_by_key.get(card_key)
-            raw_blocks = story.get("blocks", [])
-            if isinstance(raw_blocks, int):
-                blocks = ["refused"] * (raw_blocks - 1) + ["landed"]
-            elif raw_blocks:
-                blocks = list(raw_blocks)
-            else:
-                blocks = []
-            pattern = story.get("pattern", "")
-            if pattern:
-                status = pattern.replace("_", " ")
-            else:
-                status = "merged"
-            stories.append(
-                {
-                    "number": story["card"]["number"],
-                    "repo": story["card"]["repo"],
-                    "title": card.get("title", "") if card else "",
-                    "blocks": blocks,
-                    "crew_fixes": story.get("crew_fixes", []),
-                    "delivered": bool(delivered),
-                    "pattern": pattern,
-                    "status": status,
-                }
-            )
+                card_key = (story["card"]["number"], story["card"]["repo"])
+                card = cards_by_key.get(card_key)
+                raw_blocks = story.get("blocks", [])
+                if isinstance(raw_blocks, int):
+                    blocks = ["refused"] * (raw_blocks - 1) + ["landed"]
+                elif raw_blocks:
+                    blocks = list(raw_blocks)
+                else:
+                    blocks = []
+                pattern = story.get("pattern", "")
+                if pattern:
+                    status = pattern.replace("_", " ")
+                else:
+                    status = "merged"
+                stories.append(
+                    {
+                        "number": story["card"]["number"],
+                        "repo": story["card"]["repo"],
+                        "title": card.get("title", "") if card else "",
+                        "blocks": blocks,
+                        "crew_fixes": story.get("crew_fixes", []),
+                        "delivered": bool(delivered),
+                        "pattern": pattern,
+                        "status": status,
+                    }
+                )
+        else:
+            stories = _stories_from_cards(cards, sprint["name"])
 
         analysis_changed = analysis_by_sprint.get(sprint["name"], {}).get(
             "changed", []
@@ -237,6 +241,7 @@ def _render_pages(pkg: Path) -> dict:
             "cycle_time": _format_minutes(metrics.get("cycle_time_minutes")),
             "sprint_slug": slug,
             "stories": stories,
+            "has_analysis": has_analysis,
             "changed": changed,
             "decided": decided,
             "failure_causes": _build_failure_causes(metrics),
@@ -367,6 +372,36 @@ def main() -> None:
 def _slug(name: str) -> str:
     """A sprint name as a filename: lowercase, spaces to hyphens, .html extension."""
     return name.lower().replace(" ", "-") + ".html"
+
+
+def _stories_from_cards(cards: list[dict], sprint_name: str) -> list[dict]:
+    """Build the delivered-story list from the cards' own fields.
+
+    Used when the package carries no analysis: a card is delivered when its
+    status is 'Done', its sprint matches, and it was not closed as
+    'not_planned' (which sprint-metrics does not count as delivered).
+    """
+    stories = []
+    for card in cards:
+        if card.get("status") != "Done":
+            continue
+        if card.get("sprint") != sprint_name:
+            continue
+        if card.get("closed_as") == "not_planned":
+            continue
+        stories.append(
+            {
+                "number": card.get("number"),
+                "repo": card.get("repo", ""),
+                "title": card.get("title", ""),
+                "blocks": [],
+                "crew_fixes": [],
+                "delivered": True,
+                "pattern": "",
+                "status": "merged",
+            }
+        )
+    return stories
 
 
 def _normalize_failure_causes(raw) -> list[dict]:

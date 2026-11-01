@@ -1,0 +1,1226 @@
+{
+  "$defs": {
+    "Card": {
+      "additionalProperties": false,
+      "description": "A card in a delivery repository, by repository and number.\n\nNumbers repeat across repositories, so a card's identity is its repository and\nnumber together. The `title` is the card's own, as the repository shows it.",
+      "properties": {
+        "closed": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Closed"
+        },
+        "closed_as": {
+          "anyOf": [
+            {
+              "enum": [
+                "completed",
+                "not_planned"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Closed As"
+        },
+        "created": {
+          "format": "date-time",
+          "title": "Created",
+          "type": "string"
+        },
+        "filed": {
+          "additionalProperties": false,
+          "description": "How the card was filed: by whom, for what activity, and of what kind.",
+          "properties": {
+            "activity": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Activity"
+            },
+            "by": {
+              "enum": [
+                "crew",
+                "sponsor",
+                "operator",
+                "unknown"
+              ],
+              "title": "By",
+              "type": "string"
+            },
+            "for_project": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "For Project"
+            },
+            "kind": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          "required": [
+            "by",
+            "activity",
+            "kind",
+            "for_project"
+          ],
+          "title": "Filed",
+          "type": "object"
+        },
+        "number": {
+          "title": "Number",
+          "type": "integer"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent"
+        },
+        "points": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Points"
+        },
+        "repo": {
+          "title": "Repo",
+          "type": "string"
+        },
+        "sprint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Sprint"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "status_set": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Status Set"
+        },
+        "superseded_because": {
+          "anyOf": [
+            {
+              "enum": [
+                "sponsor",
+                "story_problem"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Superseded Because"
+        },
+        "technical": {
+          "title": "Technical",
+          "type": "boolean"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Type"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repo",
+        "number",
+        "type",
+        "title",
+        "url",
+        "parent",
+        "points",
+        "sprint",
+        "status",
+        "status_set",
+        "created",
+        "closed",
+        "technical",
+        "closed_as",
+        "superseded_because",
+        "filed"
+      ],
+      "title": "Card",
+      "type": "object"
+    },
+    "Period": {
+      "additionalProperties": false,
+      "description": "A period of work, with the events that fall in it.",
+      "properties": {
+        "end": {
+          "format": "date",
+          "title": "End",
+          "type": "string"
+        },
+        "events": {
+          "title": "Events",
+          "type": "integer"
+        },
+        "file": {
+          "title": "File",
+          "type": "string"
+        },
+        "sprint": {
+          "title": "Sprint",
+          "type": "string"
+        },
+        "start": {
+          "format": "date",
+          "title": "Start",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sprint",
+        "start",
+        "end",
+        "file",
+        "events"
+      ],
+      "title": "Period",
+      "type": "object"
+    },
+    "Sprint": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "format": "date",
+          "title": "End",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "start": {
+          "format": "date",
+          "title": "Start",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "start",
+        "end"
+      ],
+      "title": "Sprint",
+      "type": "object"
+    },
+    "SprintMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "answers": {
+          "additionalProperties": {
+            "properties": {
+              "addition_working_time_minutes": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "blocked_aging_days": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "change_working_time_minutes": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "cost": {
+                "properties": {
+                  "middle": {
+                    "properties": {
+                      "input_tokens": {
+                        "type": "integer"
+                      },
+                      "model_minutes": {
+                        "type": "integer"
+                      },
+                      "output_tokens": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "model_minutes",
+                      "input_tokens",
+                      "output_tokens"
+                    ],
+                    "type": "object"
+                  },
+                  "total": {
+                    "properties": {
+                      "input_tokens": {
+                        "type": "integer"
+                      },
+                      "model_minutes": {
+                        "type": "integer"
+                      },
+                      "output_tokens": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "model_minutes",
+                      "input_tokens",
+                      "output_tokens"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "middle",
+                  "total"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "cost_by_kind": {
+                "properties": {
+                  "addition": {
+                    "type": "integer"
+                  },
+                  "change": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "addition",
+                  "change"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "cycle_time_days": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "cycle_time_minutes": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "delta": {
+                "properties": {
+                  "addition_working_time_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "blocked_aging_days": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "change_working_time_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "cycle_time_days": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "cycle_time_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "first_attempt_denominator": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "first_attempt_numerator": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "first_attempt_rate_percent": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "idle_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "input_tokens_middle": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "input_tokens_total": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "lead_time_days": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "lead_time_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "model_minutes_middle": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "model_minutes_total": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "model_time_split_delivery_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "model_time_split_refinement_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "output_tokens_middle": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "output_tokens_total": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "points_delivered": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "superseded_breakdown": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "superseded_count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "superseded_points": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "throughput": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "wip_violations": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "working_time_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "dora": {
+                "properties": {
+                  "change_failure_count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "change_failure_rate_percent": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "lead_time_days": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "mean_time_to_recovery_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "release_frequency": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "release_frequency",
+                  "lead_time_days",
+                  "change_failure_count",
+                  "change_failure_rate_percent",
+                  "mean_time_to_recovery_minutes"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "failure_breakdown": {
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "first_attempt_denominator": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "first_attempt_numerator": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "first_attempt_rate_percent": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "flags": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "idle": {
+                "properties": {
+                  "idle_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "sprint_duration_minutes": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "sprint_duration_minutes",
+                  "idle_minutes"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "lead_time_days": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "lead_time_minutes": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "model_time_split": {
+                "properties": {
+                  "delivery": {
+                    "type": "integer"
+                  },
+                  "refinement": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "refinement",
+                  "delivery"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "points_delivered": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "prior": {
+                "properties": {
+                  "addition_working_time_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "blocked_aging_days": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "change_working_time_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "cycle_time_days": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "cycle_time_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "first_attempt_denominator": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "first_attempt_numerator": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "first_attempt_rate_percent": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "idle_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "input_tokens_middle": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "input_tokens_total": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "lead_time_days": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "lead_time_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "model_minutes_middle": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "model_minutes_total": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "model_time_split_delivery_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "model_time_split_refinement_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "output_tokens_middle": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "output_tokens_total": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "points_delivered": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "superseded_breakdown": {
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "superseded_count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "superseded_points": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "throughput": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "wip_violations": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "working_time_minutes": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "rework": {
+                "properties": {
+                  "by_step": {
+                    "properties": {
+                      "qa_returns": {
+                        "additionalProperties": {
+                          "type": "integer"
+                        },
+                        "type": "object"
+                      },
+                      "sent_backs": {
+                        "additionalProperties": {
+                          "type": "integer"
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "qa_returns": {
+                    "items": {
+                      "properties": {
+                        "card_id": {
+                          "type": "string"
+                        },
+                        "returns": {
+                          "items": {
+                            "properties": {
+                              "reason": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "step": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "step",
+                              "reason"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "card_id",
+                        "returns"
+                      ],
+                      "type": "object"
+                    },
+                    "type": [
+                      "array",
+                      "null"
+                    ]
+                  },
+                  "sent_backs": {
+                    "items": {
+                      "properties": {
+                        "card_id": {
+                          "type": "string"
+                        },
+                        "send_backs": {
+                          "items": {
+                            "properties": {
+                              "reason": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "step": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "step",
+                              "reason"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "card_id",
+                        "send_backs"
+                      ],
+                      "type": "object"
+                    },
+                    "type": [
+                      "array",
+                      "null"
+                    ]
+                  },
+                  "started": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "started",
+                  "sent_backs"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "roster": {
+                "properties": {
+                  "achieved_goals": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": [
+                      "array",
+                      "null"
+                    ]
+                  },
+                  "completed_stories": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "released_epics": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": [
+                      "array",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "completed_stories",
+                  "released_epics",
+                  "achieved_goals"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "story_costs": {
+                "items": {
+                  "properties": {
+                    "cached_input_percent": {
+                      "type": "integer"
+                    },
+                    "card_id": {
+                      "type": "string"
+                    },
+                    "input_tokens": {
+                      "type": "integer"
+                    },
+                    "model_minutes": {
+                      "type": "integer"
+                    },
+                    "output_tokens": {
+                      "type": "integer"
+                    },
+                    "reasoning_output_percent": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "card_id",
+                    "model_minutes",
+                    "input_tokens",
+                    "cached_input_percent",
+                    "output_tokens",
+                    "reasoning_output_percent"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "superseded_breakdown": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "superseded_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "superseded_points": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "throughput": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "top_failure_causes": {
+                "type": [
+                  "array",
+                  "object",
+                  "null"
+                ]
+              },
+              "wip_violations": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "working_time": {
+                "properties": {
+                  "per_step": {
+                    "items": {
+                      "properties": {
+                        "minutes": {
+                          "type": "integer"
+                        },
+                        "step": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "step",
+                        "minutes"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "total": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "per_step",
+                  "total"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "cycle_time_days",
+              "lead_time_days",
+              "throughput",
+              "wip_violations",
+              "blocked_aging_days",
+              "points_delivered",
+              "first_attempt_numerator",
+              "first_attempt_denominator",
+              "superseded_count",
+              "superseded_points",
+              "first_attempt_rate_percent",
+              "failure_breakdown",
+              "top_failure_causes",
+              "superseded_breakdown",
+              "flags",
+              "prior",
+              "delta",
+              "cycle_time_minutes",
+              "lead_time_minutes"
+            ],
+            "type": "object"
+          },
+          "description": "Each sprint's answer by its name: an entry of sprint-metrics' GET /range, with the sprint before it as `prior`.",
+          "title": "Answers",
+          "type": "object"
+        },
+        "release": {
+          "description": "The sprint-metrics release that answered, e.g. 1.3.0.",
+          "title": "Release",
+          "type": "string"
+        }
+      },
+      "required": [
+        "release",
+        "answers"
+      ],
+      "title": "SprintMetrics",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The package's index: everything up to its date, so a consumer needs only the latest.\n\nThe events are in one file per period, so a page loads only the sprint it\nshows: the history grows by a sprint's worth each sprint, and a year of it\nin one file would be tens of megabytes (the Sponsor, 2026-10-08).",
+  "properties": {
+    "cards": {
+      "items": {
+        "$ref": "#/$defs/Card"
+      },
+      "title": "Cards",
+      "type": "array"
+    },
+    "crew_repository": {
+      "title": "Crew Repository",
+      "type": "string"
+    },
+    "date": {
+      "format": "date",
+      "title": "Date",
+      "type": "string"
+    },
+    "package": {
+      "const": "delivery-history",
+      "default": "delivery-history",
+      "title": "Package",
+      "type": "string"
+    },
+    "periods": {
+      "description": "Every period with events, oldest first.",
+      "items": {
+        "$ref": "#/$defs/Period"
+      },
+      "title": "Periods",
+      "type": "array"
+    },
+    "repositories": {
+      "description": "The delivery repositories it covers.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Repositories",
+      "type": "array"
+    },
+    "schema_version": {
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sprint_metrics": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SprintMetrics"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "sprint-metrics' part. None only in a build without the service: a release always carries it."
+    },
+    "sprints": {
+      "items": {
+        "$ref": "#/$defs/Sprint"
+      },
+      "title": "Sprints",
+      "type": "array"
+    },
+    "timezone": {
+      "description": "The timezone sprint days are counted in.",
+      "title": "Timezone",
+      "type": "string"
+    }
+  },
+  "required": [
+    "package",
+    "schema_version",
+    "date",
+    "timezone",
+    "crew_repository",
+    "repositories",
+    "sprints",
+    "cards",
+    "periods",
+    "sprint_metrics"
+  ],
+  "title": "DeliveryHistory",
+  "type": "object"
+}
