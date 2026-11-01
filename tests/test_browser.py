@@ -7652,7 +7652,7 @@ def test_cause_label_qa_renders_as_cause_not_recorded():
 
 
 def test_replay_header_shows_most_recent_sprint():
-    """AC1: h1 is the most recent sprint name; body contains the date range."""
+    """AC1: h1 is the most recent sprint name with replay suffix; body contains the date range."""
     tag = "delivery-history-TEST"
     sprints = [
         {"name": "Sprint 5", "start": "2026-09-15", "end": "2026-09-29"},
@@ -7667,7 +7667,7 @@ def test_replay_header_shows_most_recent_sprint():
         html = (BUILD_DIR / "replay.html").read_text()
         h1_match = re.search(r"<h1>(.*?)</h1>", html)
         assert h1_match, "no <h1> element found"
-        assert h1_match.group(1) == "Sprint 7", f"h1 is {h1_match.group(1)!r}"
+        assert h1_match.group(1) == "Sprint 7 · Replay", f"h1 is {h1_match.group(1)!r}"
         assert "2026-10-07 – 2026-10-13" in html, "date range not found in page"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -7740,7 +7740,7 @@ def test_replay_nav_aria_current():
 
 
 def test_replay_single_sprint_header():
-    """AC4: single sprint 'Sprint 1' shows correct h1 and date range."""
+    """AC4: single sprint 'Sprint 1' shows correct h1 with replay suffix and date range."""
     tag = "delivery-history-TEST"
     sprints = [{"name": "Sprint 1", "start": "2026-09-01", "end": "2026-09-07"}]
     _make_fake_package(tag, sprints=sprints)
@@ -7751,7 +7751,7 @@ def test_replay_single_sprint_header():
         html = (BUILD_DIR / "replay.html").read_text()
         h1_match = re.search(r"<h1>(.*?)</h1>", html)
         assert h1_match, "no <h1> element found"
-        assert h1_match.group(1) == "Sprint 1", f"h1 is {h1_match.group(1)!r}"
+        assert h1_match.group(1) == "Sprint 1 · Replay", f"h1 is {h1_match.group(1)!r}"
         assert "2026-09-01 – 2026-09-07" in html, "date range not found"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -8449,7 +8449,7 @@ def test_replay_json_only_most_recent_sprint_events():
 
 
 def test_replay_h1_matches_json_sprint_key():
-    """AC6: the h1 text is identical to the sprint key in the embedded JSON."""
+    """AC6: the h1 text begins with the sprint key in the embedded JSON."""
     tag = "delivery-history-TEST"
     sprints = [
         {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
@@ -8468,7 +8468,7 @@ def test_replay_h1_matches_json_sprint_key():
         assert h1_match, "no h1 found"
         h1_text = h1_match.group(1)
         data = _extract_replay_data(html)
-        assert h1_text == data["sprint"], f"h1={h1_text!r} != sprint={data['sprint']!r}"
+        assert h1_text.startswith(data["sprint"]), f"h1={h1_text!r} doesn't start with sprint={data['sprint']!r}"
         assert data["sprint"] == "Sprint 7"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)

@@ -13,6 +13,10 @@
 - The sprint overview's "What changed" section now shows how each measure moved from the prior sprint, derived from the sprint-metrics answers' `prior` field, when the package carries no analysis `changed` list for that sprint; when `prior` is null the section is absent (mqucifer/crew-presentation#266)
 - The story's journey page now shows the path strip's stages as reached when the package carries no analysis for the card and the card's own status is "Done" with closed_as "completed"; when the card is not in that state, no stage is marked reached. The "What it cost" section remains absent without analysis cost data (mqucifer/crew-presentation#266)
 
+### Fixed
+
+- The replay page's title and h1 were byte-identical to the sprint overview's (both showed the sprint name alone), making the two pages indistinguishable in a browser tab; the replay page now carries its own identifying title "Sprint N · Replay" (mqucifer/crew-presentation#279)
+
 ## [0.3.2] - 2026-10-31
 
 ### Fixed
