@@ -9,6 +9,7 @@
 
 ### Changed
 
+- The sprint overview's story list now falls back to the cards' own fields when the package carries no analysis: cards with status "Done" and matching sprint are shown as delivered stories (excluding those closed as "not_planned"), each linking to its story page; the attempt chart's blocks, status and legend are absent in this case, and when no card qualifies the section shows "No stories were delivered this sprint" (mqucifer/crew-presentation#266)
 - The sprint overview's "What changed" section now shows how each measure moved from the prior sprint, derived from the sprint-metrics answers' `prior` field, when the package carries no analysis `changed` list for that sprint; when `prior` is null the section is absent (mqucifer/crew-presentation#266)
 - The story's journey page now shows the path strip's stages as reached when the package carries no analysis for the card and the card's own status is "Done" with closed_as "completed"; when the card is not in that state, no stage is marked reached. The "What it cost" section remains absent without analysis cost data (mqucifer/crew-presentation#266)
 
