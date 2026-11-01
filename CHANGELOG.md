@@ -6,6 +6,10 @@
 
 - The site accepts delivery-history packages on schema major 3 (e.g. 3.0.0); major 3 is now in SUPPORTED_MAJOR_VERSIONS (mqucifer/crew-presentation#266)
 
+### Changed
+
+- The story's journey page now shows the path strip's stages as reached when the package carries no analysis for the card and the card's own status is "Done" with closed_as "completed"; when the card is not in that state, no stage is marked reached. The "What it cost" section remains absent without analysis cost data (mqucifer/crew-presentation#266)
+
 ## [0.3.2] - 2026-10-31
 
 ### Fixed
