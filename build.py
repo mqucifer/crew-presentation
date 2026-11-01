@@ -226,6 +226,21 @@ def _render_pages(pkg: Path) -> dict:
             sprint_events = _load_sprint_events(pkg, sprint["name"], index)
             decided = _decided_from_events_and_cards(sprint_events, cards, sprint)
 
+        roster = metrics.get("roster")
+        released_epics = []
+        achieved_goals = []
+        if roster:
+            for ref in (roster.get("released_epics") or []):
+                repo, num_str = ref.rsplit("#", 1)
+                card = cards_by_key.get((int(num_str), repo))
+                if card:
+                    released_epics.append(card)
+            for ref in (roster.get("achieved_goals") or []):
+                repo, num_str = ref.rsplit("#", 1)
+                card = cards_by_key.get((int(num_str), repo))
+                if card:
+                    achieved_goals.append(card)
+
         context = {
             "sprints": sprints,
             "sprint": sprint,
@@ -245,6 +260,8 @@ def _render_pages(pkg: Path) -> dict:
             "changed": changed,
             "decided": decided,
             "failure_causes": _build_failure_causes(metrics),
+            "roster_released_epics": released_epics,
+            "roster_achieved_goals": achieved_goals,
             "current_view": "sprint",
         }
         pages[slug] = sprint_template.render(**context)
