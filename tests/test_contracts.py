@@ -73,14 +73,36 @@ def test_build_check_exits_zero():
     ]
     assert sprint_files, "no sprint-overview page in build output"
 
-    # Attempt-chart section structure in the rendered page
-    page = sprint_files[0].read_text()
+    # Section structure of the rendered page, which the pinned package decides:
+    # a 3.0.0 package carries no analysis, so the page renders the story list;
+    # a 2.x (or earlier) package carries analysis with delivered stories, so
+    # the page renders the attempt chart. test_browser holds the no-analysis
+    # case (test_no_attempt_elements_when_no_analysis).
+    index = _load_json(_package_dir() / "delivery-history.json")
+    analysis_stories = index.get("analysis", {}).get("stories", [])
+    has_delivered_story = any(story.get("delivered") for story in analysis_stories)
+
+    page = sorted(sprint_files)[0].read_text()
     assert "The Architect's split, story by story" in page, (
-        "attempt chart heading not found in sprint-overview page"
+        "sprint chart heading not found in sprint-overview page"
     )
-    assert "attempt-legend" in page, "attempt legend section not found"
-    assert "attempt-row" in page, "attempt rows not found"
-    assert "attempt-block" in page, "attempt blocks not found"
+    if has_delivered_story:
+        # AC2: the package carries delivered analysis, so the page shows the
+        # attempt chart.
+        assert 'class="attempt-legend"' in page, "attempt legend section not found"
+        assert 'class="attempt-row"' in page, "attempt rows not found"
+        # attempt-block is always rendered alongside a modifier class, e.g.
+        # class="attempt-block attempt-block--landed", so check the prefix.
+        assert 'class="attempt-block' in page, "attempt blocks not found"
+    else:
+        # AC1: the package carries no analysis, so the page shows the story
+        # list and no attempt elements.
+        assert 'class="story-list"' in page, "story list not found"
+        assert 'class="attempt-legend"' not in page, (
+            "attempt legend found without analysis"
+        )
+        assert 'class="attempt-row"' not in page, "attempt rows found without analysis"
+        assert 'class="attempt-block' not in page, "attempt blocks found without analysis"
 
     # CSS: striped-blocked gradient present, no placeholder marker
     css = (build_dir / "css" / "site.css").read_text()
