@@ -50,7 +50,7 @@ def test_design_system_stylesheet_exists():
 
 
 def test_build_check_exits_zero():
-    """AC: build.py validates the package, renders the attempt chart, and writes the site to build/."""
+    """AC: build.py validates the package, renders the sprint overview, and writes the site to build/."""
     result = subprocess.run(
         [sys.executable, "build.py"],
         capture_output=True,
