@@ -50,7 +50,7 @@ def test_design_system_stylesheet_exists():
 
 
 def test_build_check_exits_zero():
-    """AC: build.py validates the package, renders the attempt chart, and writes the site to build/."""
+    """AC: build.py validates the package, renders the sprint overview, and writes the site to build/."""
     result = subprocess.run(
         [sys.executable, "build.py"],
         capture_output=True,
@@ -73,14 +73,36 @@ def test_build_check_exits_zero():
     ]
     assert sprint_files, "no sprint-overview page in build output"
 
-    # Attempt-chart section structure in the rendered page
-    page = sprint_files[0].read_text()
+    # Section structure of the rendered page, which the pinned package decides:
+    # a 3.0.0 package carries no analysis, so the page renders the story list;
+    # a 2.x (or earlier) package carries analysis with delivered stories, so
+    # the page renders the attempt chart. test_browser holds the no-analysis
+    # case (test_no_attempt_elements_when_no_analysis).
+    index = _load_json(_package_dir() / "delivery-history.json")
+    analysis_stories = index.get("analysis", {}).get("stories", [])
+    has_delivered_story = any(story.get("delivered") for story in analysis_stories)
+
+    page = sorted(sprint_files)[0].read_text()
     assert "The Architect's split, story by story" in page, (
-        "attempt chart heading not found in sprint-overview page"
+        "sprint chart heading not found in sprint-overview page"
     )
-    assert "attempt-legend" in page, "attempt legend section not found"
-    assert "attempt-row" in page, "attempt rows not found"
-    assert "attempt-block" in page, "attempt blocks not found"
+    if has_delivered_story:
+        # AC2: the package carries delivered analysis, so the page shows the
+        # attempt chart.
+        assert 'class="attempt-legend"' in page, "attempt legend section not found"
+        assert 'class="attempt-row"' in page, "attempt rows not found"
+        # attempt-block is always rendered alongside a modifier class, e.g.
+        # class="attempt-block attempt-block--landed", so check the prefix.
+        assert 'class="attempt-block' in page, "attempt blocks not found"
+    else:
+        # AC1: the package carries no analysis, so the page shows the story
+        # list and no attempt elements.
+        assert 'class="story-list"' in page, "story list not found"
+        assert 'class="attempt-legend"' not in page, (
+            "attempt legend found without analysis"
+        )
+        assert 'class="attempt-row"' not in page, "attempt rows found without analysis"
+        assert 'class="attempt-block' not in page, "attempt blocks found without analysis"
 
     # CSS: striped-blocked gradient present, no placeholder marker
     css = (build_dir / "css" / "site.css").read_text()
@@ -419,6 +441,141 @@ def test_build_succeeds_on_well_formed_major_3_package():
         )
         assert (build_dir / "replay.html").is_file(), (
             "replay page not written for 3.0.0 package"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_sprint_page_shows_story_list_without_analysis():
+    """AC1: with no analysis in the package, the first sprint page shows the
+    story list and no attempt-chart elements (the case a 3.0.0 pin takes)."""
+    tag = "delivery-history-TEST-3-NOANALYSIS"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-11-06"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+
+    index = {
+        "package": "delivery-history",
+        "schema_version": "3.0.0",
+        "date": "2026-11-06",
+        "timezone": "America/Chicago",
+        "crew_repository": "crew",
+        "repositories": ["crew-presentation"],
+        "sprints": [
+            {"name": "Sprint 1", "start": "2026-11-06", "end": "2026-11-06"}
+        ],
+        "cards": [
+            {
+                "repo": "crew-presentation",
+                "number": 1,
+                "type": "Story",
+                "title": "A test story",
+                "url": "https://github.com/mqucifer/crew-presentation/issues/1",
+                "parent": None,
+                "points": 1,
+                "sprint": "Sprint 1",
+                "status": "Done",
+                "status_set": "2026-11-06T12:00:00Z",
+                "created": "2026-11-06T09:00:00Z",
+                "closed": "2026-11-06T12:00:00Z",
+                "technical": False,
+                "closed_as": "completed",
+                "superseded_because": None,
+            }
+        ],
+        "periods": [
+            {
+                "sprint": "Sprint 1",
+                "start": "2026-11-06",
+                "end": "2026-11-06",
+                "file": "events/2026-11-06.json",
+                "events": 1,
+            }
+        ],
+        "sprint_metrics": {
+            "release": "3.0.0",
+            "answers": {
+                "Sprint 1": {
+                    "cycle_time_days": 0,
+                    "lead_time_days": 0,
+                    "throughput": 1,
+                    "wip_violations": 0,
+                    "blocked_aging_days": 0,
+                    "escalation_rate_percent": 0,
+                    "points_delivered": 1,
+                    "first_attempt_numerator": 1,
+                    "first_attempt_denominator": 1,
+                    "escalation_count": 0,
+                    "superseded_count": 0,
+                    "superseded_points": 0,
+                    "first_attempt_rate_percent": 100,
+                    "failure_breakdown": [],
+                    "top_failure_causes": {},
+                    "superseded_breakdown": None,
+                    "flags": None,
+                    "prior": None,
+                    "delta": None,
+                    "cycle_time_minutes": 30,
+                    "lead_time_minutes": 30,
+                    "roster": {"completed_stories": ["crew-presentation#1"]},
+                }
+            },
+        },
+    }
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(parents=True, exist_ok=True)
+    (events_dir / "2026-11-06.json").write_text(
+        json.dumps(
+            {
+                "events": [
+                    {
+                        "at": "2026-11-06T09:00:00Z",
+                        "card": {"repo": "crew-presentation", "number": 1},
+                        "from_column": "Inbox (Goals)",
+                        "to_column": "Sprint Backlog",
+                    }
+                ]
+            }
+        )
+    )
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"build.py should succeed for a no-analysis 3.0.0 package:\n"
+            f"{result.stdout}\n{result.stderr}"
+        )
+        build_dir = REPO_ROOT / "build"
+        page = (build_dir / "sprint-1.html").read_text()
+        assert 'class="story-list"' in page, "story list not found without analysis"
+        assert 'class="attempt-legend"' not in page, (
+            "attempt legend found without analysis"
+        )
+        assert 'class="attempt-row"' not in page, "attempt rows found without analysis"
+        assert 'class="attempt-block' not in page, (
+            "attempt blocks found without analysis"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original_tag)
