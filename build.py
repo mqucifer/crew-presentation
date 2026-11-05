@@ -570,6 +570,7 @@ def _format_changed_value(measure: str, value) -> str:
     """Format a changed-trend value for display.
 
     Time measures (cycle_time, lead_time) are shown as hours and minutes;
+    first_attempt_rate_percent is shown with a '%' unit;
     other measures are shown as their raw number.
     """
     if value is None:
@@ -579,6 +580,10 @@ def _format_changed_value(measure: str, value) -> str:
         return _format_minutes(total_minutes)
     if measure in ("cycle_time_minutes", "lead_time_minutes"):
         return _format_minutes(round(value))
+    if measure == "first_attempt_rate_percent":
+        if isinstance(value, float) and value == int(value):
+            return f"{int(value)}%"
+        return f"{value}%"
     if isinstance(value, float) and value == int(value):
         return str(int(value))
     return str(value)
@@ -588,6 +593,7 @@ def _format_metrics_value(measure: str, value) -> str:
     """Format a value for the metrics-derived 'What changed' fallback.
 
     Time measures always show both hours and minutes (e.g. '0 hr 26 min');
+    first_attempt_rate_percent is shown with a '%' unit;
     other measures are shown as their raw number.
     """
     if value is None:
@@ -600,6 +606,10 @@ def _format_metrics_value(measure: str, value) -> str:
         total_minutes = round(value * 24 * 60)
         hours, minutes = divmod(total_minutes, 60)
         return f"{hours} hr {minutes} min"
+    if measure == "first_attempt_rate_percent":
+        if isinstance(value, float) and value == int(value):
+            return f"{int(value)}%"
+        return f"{value}%"
     if isinstance(value, float) and value == int(value):
         return str(int(value))
     return str(value)

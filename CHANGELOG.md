@@ -1,5 +1,23 @@
 # Changelog
 
+What's merged and not yet released waits as fragments in [`changes/`](changes/): a release
+builds its section here from them (towncrier, Keep a Changelog). Entries still under
+`[Unreleased]` were merged before the fragments; the next release collects them too.
+
+<!-- towncrier release notes start -->
+
+## [Unreleased]
+
+### Fixed
+
+- The sprint overview's "What changed" row for first-attempt rate printed the value as a bare number (e.g. "75 → 76") with no unit; it now prints the '%' unit with the value (e.g. "75% → 76%") (mqucifer/crew-presentation#305)
+
+## [Unreleased]
+
+### Fixed
+
+- The sprint overview's delivered-stories section heading used the crew's internal vocabulary ("The Architect's split, story by story") and the first-attempt stat label used "landed first try"; both are now in plain language: the heading reads "Stories delivered this sprint" and the stat label reads "first-attempt pass" (mqucifer/crew-presentation#305)
+
 ## [Unreleased]
 
 ### Fixed

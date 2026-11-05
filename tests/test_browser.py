@@ -1261,7 +1261,7 @@ def test_attempt_chart_heading_text_and_style():
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
         # Exact heading text
-        assert "The Architect's split, story by story" in html, (
+        assert "Stories delivered this sprint" in html, (
             "heading text not found"
         )
         # The heading is an h2 with id split-h
@@ -1271,7 +1271,7 @@ def test_attempt_chart_heading_text_and_style():
             re.DOTALL,
         )
         assert h2_match, "h2#split-h not found"
-        assert h2_match.group(1).strip() == "The Architect's split, story by story"
+        assert h2_match.group(1).strip() == "Stories delivered this sprint"
         # CSS sets the font and size for this heading
         css = (BUILD_DIR / "css" / "site.css").read_text()
         # The .sprint-chart .card__head h2 rule (or equivalent) uses the display font and xl size
@@ -2215,12 +2215,12 @@ def test_stat_values_match_package_data():
                 f"expected {answers['throughput']!r} from package"
             )
 
-            # Exact text for landed first try
+            # Exact text for first-attempt pass
             first_attempt_text = page.evaluate("""
                 () => {
                     const labels = document.querySelectorAll('.stat__label');
                     for (const label of labels) {
-                        if (label.textContent.trim() === 'landed first try') {
+                        if (label.textContent.trim() === 'first-attempt pass') {
                             const stat = label.closest('.stat');
                             return stat.querySelector('.stat__value').textContent.trim();
                         }
@@ -2233,7 +2233,7 @@ def test_stat_values_match_package_data():
                 f"{answers['first_attempt_denominator']}"
             )
             assert first_attempt_text == expected_fa, (
-                f"landed first try shows {first_attempt_text!r}, expected {expected_fa!r}"
+                f"first-attempt pass shows {first_attempt_text!r}, expected {expected_fa!r}"
             )
 
             # Design-system CSS was served from local file: the sandbox has no
@@ -3510,7 +3510,7 @@ def test_sprint_headings_text_and_no_clipping_at_phone_width():
             page.wait_for_load_state("domcontentloaded")
 
             chart_h2_text = page.locator(".sprint-chart h2").inner_text()
-            assert chart_h2_text == "The Architect's split, story by story", (
+            assert chart_h2_text == "Stories delivered this sprint", (
                 f"chart h2 text is {chart_h2_text!r}"
             )
 
@@ -4754,7 +4754,7 @@ def test_changed_trend_lead_time_minutes_format():
 
 
 def test_changed_trend_non_time_measure_no_unit():
-    """AC3, AC8: first_attempt_rate_percent shows bare numbers, no time unit."""
+    """AC3, AC8: first_attempt_rate_percent shows numbers with '%', no time unit."""
     tag = "delivery-history-TEST"
     _make_package_with_changed(
         tag,
@@ -4775,12 +4775,12 @@ def test_changed_trend_non_time_measure_no_unit():
     try:
         _build()
         html = (BUILD_DIR / "sprint-7.html").read_text()
-        # AC3: values are bare numbers in num spans
-        assert 'class="num">40<' in html, (
-            "previous value is not '40' in a num span"
+        # AC3: values carry the '%' unit in num spans
+        assert 'class="num">40%<' in html, (
+            "previous value is not '40%' in a num span"
         )
-        assert 'class="num">55<' in html, (
-            "now value is not '55' in a num span"
+        assert 'class="num">55%<' in html, (
+            "now value is not '55%' in a num span"
         )
         # AC8: no time-unit substring in the span text
         values_div = re.search(
@@ -6358,7 +6358,7 @@ def test_non_first_try_count_mismatch_names_both_values():
                 () => {
                     const labels = document.querySelectorAll('.stat__label');
                     for (const label of labels) {
-                        if (label.textContent.trim() === 'landed first try') {
+                        if (label.textContent.trim() === 'first-attempt pass') {
                             const stat = label.closest('.stat');
                             return stat.querySelector('.stat__value').textContent.trim();
                         }
@@ -6441,7 +6441,7 @@ def test_non_first_try_count_all_first_try():
                 () => {
                     const labels = document.querySelectorAll('.stat__label');
                     for (const label of labels) {
-                        if (label.textContent.trim() === 'landed first try') {
+                        if (label.textContent.trim() === 'first-attempt pass') {
                             const stat = label.closest('.stat');
                             return stat.querySelector('.stat__value').textContent.trim();
                         }
@@ -8835,13 +8835,13 @@ def test_zero_sprint_metrics_render_zero_and_fraction():
         assert throughput_match.group(1) == "0", (
             f"throughput stat is {throughput_match.group(1)!r}, expected '0'"
         )
-        # '0 of 4' immediately before 'landed first try'
+        # '0 of 4' immediately before 'first-attempt pass'
         first_try_match = re.search(
-            r'<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>\s*<span class="stat__label">landed first try</span>',
+            r'<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>\s*<span class="stat__label">first-attempt pass</span>',
             stats,
             re.DOTALL,
         )
-        assert first_try_match, "no 'landed first try' stat found"
+        assert first_try_match, "no 'first-attempt pass' stat found"
         assert first_try_match.group(1) == "0 of 4", (
             f"first-try stat is {first_try_match.group(1)!r}, expected '0 of 4'"
         )
@@ -9366,7 +9366,7 @@ def test_changed_from_metrics_throughput():
 def test_changed_from_metrics_first_attempt_rate_no_text():
     """AC3: no analysis, sprint_metrics has first_attempt_rate_percent 40, prior 67.
 
-    The entry's label is 'first-attempt rate' with '67' → '40', and the
+    The entry's label is 'first-attempt rate' with '67%' → '40%', and the
     .changed-trend-text div is absent or empty.
     """
     tag = "delivery-history-TEST"
@@ -9397,13 +9397,13 @@ def test_changed_from_metrics_first_attempt_rate_no_text():
         assert "first-attempt rate" in section_html, (
             f"label 'first-attempt rate' not found: {section_html!r}"
         )
-        # AC3: previous value is '67'
-        assert 'class="num">67<' in section_html, (
-            f"previous value '67' not found: {section_html!r}"
+        # AC3: previous value is '67%'
+        assert 'class="num">67%<' in section_html, (
+            f"previous value '67%' not found: {section_html!r}"
         )
-        # AC3: now value is '40'
-        assert 'class="num">40<' in section_html, (
-            f"now value '40' not found: {section_html!r}"
+        # AC3: now value is '40%'
+        assert 'class="num">40%<' in section_html, (
+            f"now value '40%' not found: {section_html!r}"
         )
         # AC3: no .changed-trend-text div with content
         text_divs = re.findall(
@@ -10304,6 +10304,138 @@ def test_roster_zero_both_story_in_chart_no_empty_body():
                 assert body_content, (
                     f"Empty .card__body found in section: {section_html[:100]}..."
                 )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_first_attempt_rate_shows_percent_unit_in_metrics_path():
+    """AC1: first_attempt_rate_percent non-null in both sprint and prior shows '%' in the 'What changed' row.
+
+    Given prior=75, current=76, the row reads 'first-attempt rate: 75% → 76%'.
+    """
+    tag = "delivery-history-TEST"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 5,
+            "points_delivered": 18,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 4,
+            "escalation_count": 0,
+            "cycle_time_days": 2.0,
+            "first_attempt_rate_percent": 76,
+            "prior": {
+                "first_attempt_rate_percent": 75,
+                "points_delivered": 9,
+            },
+        }
+    }
+    _make_fake_package(tag, metrics=metrics)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_match = re.search(
+            r'<section class="card changed-trend".*?</section>',
+            html,
+            re.DOTALL,
+        )
+        assert section_match, "changed-trend section not found"
+        section_html = section_match.group(0)
+        # Find the first-attempt rate row specifically
+        rate_match = re.search(
+            r'class="changed-trend-values">first-attempt rate: (.*?)</div>',
+            section_html,
+        )
+        assert rate_match, (
+            f"first-attempt rate row not found in changed-trend section: {section_html!r}"
+        )
+        row_html = rate_match.group(1)
+        # previous span ends with '%'
+        prev_span = re.search(r'class="num">(.*?)<', row_html)
+        assert prev_span, f"no previous num span in rate row: {row_html!r}"
+        assert prev_span.group(1).endswith("%"), (
+            f"previous span {prev_span.group(1)!r} does not end with '%'"
+        )
+        assert prev_span.group(1) == "75%", (
+            f"previous span is {prev_span.group(1)!r}, expected '75%'"
+        )
+        # now span ends with '%'
+        now_span = re.search(r'class="num">(.*?)<', row_html[prev_span.end():])
+        assert now_span, f"no now num span in rate row: {row_html!r}"
+        assert now_span.group(1).endswith("%"), (
+            f"now span {now_span.group(1)!r} does not end with '%'"
+        )
+        assert now_span.group(1) == "76%", (
+            f"now span is {now_span.group(1)!r}, expected '76%'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_points_delivered_no_percent_in_metrics_path():
+    """AC2: points_delivered non-null in both sprint and prior shows no '%' in the 'What changed' row.
+
+    Given prior=9, current=18, the row reads 'points delivered: 9 → 18' with no '%'.
+    """
+    tag = "delivery-history-TEST"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 5,
+            "points_delivered": 18,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 4,
+            "escalation_count": 0,
+            "cycle_time_days": 2.0,
+            "first_attempt_rate_percent": 76,
+            "prior": {
+                "first_attempt_rate_percent": 75,
+                "points_delivered": 9,
+            },
+        }
+    }
+    _make_fake_package(tag, metrics=metrics)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_match = re.search(
+            r'<section class="card changed-trend".*?</section>',
+            html,
+            re.DOTALL,
+        )
+        assert section_match, "changed-trend section not found"
+        section_html = section_match.group(0)
+        # Find the points delivered row specifically
+        points_match = re.search(
+            r'class="changed-trend-values">points delivered: (.*?)</div>',
+            section_html,
+        )
+        assert points_match, (
+            f"points delivered row not found in changed-trend section: {section_html!r}"
+        )
+        row_html = points_match.group(1)
+        # previous span is exactly '9', no '%'
+        prev_span = re.search(r'class="num">(.*?)<', row_html)
+        assert prev_span, f"no previous num span in points row: {row_html!r}"
+        assert "%" not in prev_span.group(1), (
+            f"previous span {prev_span.group(1)!r} contains '%'"
+        )
+        assert prev_span.group(1) == "9", (
+            f"previous span is {prev_span.group(1)!r}, expected '9'"
+        )
+        # now span is exactly '18', no '%'
+        now_span = re.search(r'class="num">(.*?)<', row_html[prev_span.end():])
+        assert now_span, f"no now num span in points row: {row_html!r}"
+        assert "%" not in now_span.group(1), (
+            f"now span {now_span.group(1)!r} contains '%'"
+        )
+        assert now_span.group(1) == "18", (
+            f"now span is {now_span.group(1)!r}, expected '18'"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
