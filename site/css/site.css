@@ -194,6 +194,32 @@
   grid-column: span 5;
 }
 
+/* Sent-back card: sits in the right column, same width as the failure-causes card */
+.sprint-sent-back {
+  grid-column: span 5;
+}
+
+.sent-back-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.sent-back-row {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.sent-back-row__number {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.sent-back-row__time {
+  margin-left: 4px;
+}
+
 .cause-chart {
   display: flex;
   flex-direction: column;
@@ -278,6 +304,7 @@
   }
   .sprint-chart,
   .sprint-side,
+  .sprint-sent-back,
   .sprint-decided,
   .replay-board {
     grid-column: 1 / -1;
