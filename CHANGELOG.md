@@ -1,5 +1,11 @@
 # Changelog
 
+What's merged and not yet released waits as fragments in [`changes/`](changes/): a release
+builds its section here from them (towncrier, Keep a Changelog). Entries still under
+`[Unreleased]` were merged before the fragments; the next release collects them too.
+
+<!-- towncrier release notes start -->
+
 ## [Unreleased]
 
 ### Fixed
