@@ -632,6 +632,312 @@ def test_build_fails_on_non_conforming_data_file():
         shutil.rmtree(pkg_dir, ignore_errors=True)
 
 
+def _sent_back_package(sent_back_events: list[dict], sprint_name: str = "Sprint 1") -> dict:
+    """A minimal 3.0.0 package index with the given sent_back events."""
+    return {
+        "package": "delivery-history",
+        "schema_version": "3.0.0",
+        "date": "2026-11-06",
+        "timezone": "America/Chicago",
+        "crew_repository": "crew",
+        "repositories": ["crew-presentation"],
+        "sprints": [
+            {"name": sprint_name, "start": "2026-11-06", "end": "2026-11-06"}
+        ],
+        "cards": [],
+        "periods": [
+            {
+                "sprint": sprint_name,
+                "start": "2026-11-06",
+                "end": "2026-11-06",
+                "file": "events/2026-11-06.json",
+                "events": len(sent_back_events),
+            }
+        ],
+        "sprint_metrics": {
+            "release": "3.0.0",
+            "answers": {
+                sprint_name: {
+                    "cycle_time_days": 0,
+                    "lead_time_days": 0,
+                    "throughput": 1,
+                    "wip_violations": 0,
+                    "blocked_aging_days": 0,
+                    "escalation_rate_percent": 0,
+                    "points_delivered": 1,
+                    "first_attempt_numerator": 1,
+                    "first_attempt_denominator": 1,
+                    "escalation_count": 0,
+                    "superseded_count": 0,
+                    "superseded_points": 0,
+                    "first_attempt_rate_percent": 100,
+                    "failure_breakdown": [],
+                    "top_failure_causes": {},
+                    "superseded_breakdown": None,
+                    "flags": None,
+                    "prior": None,
+                    "delta": None,
+                    "cycle_time_minutes": 30,
+                    "lead_time_minutes": 30,
+                }
+            },
+        },
+    }
+
+
+def _build_with_sent_back(events: list[dict]) -> str:
+    """Build a site from a package carrying the given events; return the sprint page."""
+    tag = "delivery-history-TEST-SENTBACK"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-11-06"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    index = _sent_back_package(events)
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(parents=True, exist_ok=True)
+    (events_dir / "2026-11-06.json").write_text(json.dumps({"events": events}))
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"build.py should succeed:\n{result.stdout}\n{result.stderr}"
+        )
+        page = (REPO_ROOT / "build" / "sprint-1.html").read_text()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+    return page
+
+
+def test_sent_back_card_shows_count_and_rows():
+    """AC1: the card head's count equals the number of rows, one per sent_back event."""
+    events = [
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T10:00:00Z",
+            "repo": "crew-presentation",
+            "card": {"repo": "crew-presentation", "number": 100},
+            "sent_from": "review",
+            "sent_to": "build",
+            "rule": "gate.review_changes_requested",
+            "round": 1,
+            "counts": {"findings": 1},
+        },
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T11:00:00Z",
+            "repo": "crew-presentation",
+            "card": {"repo": "crew-presentation", "number": 101},
+            "sent_from": "gate",
+            "sent_to": "build",
+            "rule": "gate.findings_at_done",
+            "round": 1,
+            "counts": {"findings": 2},
+        },
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T12:00:00Z",
+            "repo": "crew-presentation",
+            "card": {"repo": "crew-presentation", "number": 102},
+            "sent_from": "ci",
+            "sent_to": "build",
+            "rule": "gate.ci_before_review",
+            "round": 1,
+            "counts": {"jobs": 1},
+        },
+    ]
+    page = _build_with_sent_back(events)
+    assert 'id="sent-back-h"' in page, "'Sent back' card heading not found"
+    assert "3 times" in page, "card head count should be '3 times'"
+    # One row per sent_back event
+    assert page.count('class="sent-back-row"') == 3, (
+        "expected 3 sent-back rows, one per event"
+    )
+
+
+def test_sent_back_row_shows_card_number_steps_reason_time():
+    """AC2: a row shows the card number, steps in the board's words, a plain reason, and the time."""
+    events = [
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T22:48:00Z",
+            "repo": "crew-presentation",
+            "card": {"repo": "crew-presentation", "number": 136},
+            "sent_from": "review",
+            "sent_to": "build",
+            "rule": "gate.review_changes_requested",
+            "round": 1,
+            "counts": {"findings": 1},
+        },
+    ]
+    page = _build_with_sent_back(events)
+    # Card number
+    assert "#136" in page, "card number not shown"
+    # Steps in the board's own words
+    assert "review" in page, "sent_from step not named in the board's words"
+    assert "building" in page, "sent_to step not named in the board's words"
+    # Plain sentence (not a raw rule code)
+    assert "asked for changes" in page, "reason should be a plain sentence"
+    # Time
+    assert "22:48" in page, "time not shown"
+
+
+def test_sent_back_no_raw_rule_code_on_page():
+    """AC3: no raw machine code (rule) appears on the page."""
+    events = [
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T10:00:00Z",
+            "repo": "crew-presentation",
+            "card": {"repo": "crew-presentation", "number": 100},
+            "sent_from": "gate",
+            "sent_to": "build",
+            "rule": "gate.findings_at_done",
+            "round": 1,
+            "counts": {"findings": 1},
+        },
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T11:00:00Z",
+            "repo": "crew-presentation",
+            "card": None,
+            "sent_from": "review",
+            "sent_to": "design",
+            "rule": "gate.design_refused",
+            "round": None,
+            "counts": {},
+        },
+    ]
+    page = _build_with_sent_back(events)
+    assert "gate.findings_at_done" not in page, "raw rule code visible on page"
+    assert "gate.design_refused" not in page, "raw rule code visible on page"
+    assert "sent_back" not in page.replace("Sent back", "").replace("sent-back", ""), (
+        "raw event kind visible on page"
+    )
+
+
+def test_sent_back_no_card_reads_as_design():
+    """AC4: a send-back with no card reads as the project's design being sent back."""
+    events = [
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T21:49:00Z",
+            "repo": "crew-presentation",
+            "card": None,
+            "sent_from": "review",
+            "sent_to": "design",
+            "rule": "gate.design_refused",
+            "round": None,
+            "counts": {},
+        },
+    ]
+    page = _build_with_sent_back(events)
+    # No card number shown
+    assert "sent-back-row__number" not in page, (
+        "no-card row should not show a story number"
+    )
+    # Reads as design sent back
+    assert "A design was refused at review" in page, (
+        "no-card row should read as the design being sent back"
+    )
+    assert "back to design" in page, "sent_to step not named"
+    # Time shown
+    assert "21:49" in page, "time not shown"
+
+
+def test_sent_back_unknown_step_still_renders():
+    """AC5: an unknown step name reads as a step, the row is not dropped."""
+    events = [
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T10:00:00Z",
+            "repo": "crew-presentation",
+            "card": {"repo": "crew-presentation", "number": 100},
+            "sent_from": "some_new_step",
+            "sent_to": "build",
+            "rule": "some_unknown_rule",
+            "round": 1,
+            "counts": {},
+        },
+    ]
+    page = _build_with_sent_back(events)
+    assert 'id="sent-back-h"' in page, "'Sent back' card heading not found"
+    assert "1 times" in page, "count should be 1"
+    assert page.count('class="sent-back-row"') == 1, "row should not be dropped"
+    # Unknown step reads as a step (underscores replaced with spaces)
+    assert "some new step" in page, "unknown step should read as a step"
+    # Known step renders in the board's own word
+    assert "building" in page, "known step should render in the board's word"
+
+
+def test_sent_back_empty_shows_plain_words():
+    """AC6: a sprint with no sent_back events says so in plain words, never blank or 0."""
+    events = [
+        {
+            "kind": "card_moved",
+            "at": "2026-11-06T09:00:00Z",
+            "card": {"repo": "crew-presentation", "number": 1},
+            "from_column": "Inbox (Goals)",
+            "to_column": "Sprint Backlog",
+            "by": "crew",
+        }
+    ]
+    page = _build_with_sent_back(events)
+    assert 'id="sent-back-h"' in page, "'Sent back' card heading not found"
+    # No count of 0
+    assert "0 times" not in page, "should not show a count of 0"
+    # Plain words saying no send-backs
+    assert "No send-backs recorded" in page, (
+        "should say in plain words that no send-backs are recorded"
+    )
+    # No rows
+    assert 'class="sent-back-row"' not in page, "no rows should be rendered"
+
+
+def test_sent_back_pinned_package_builds():
+    """AC7: the pinned package builds and the sent-back card is populated from events alone."""
+    result = subprocess.run(
+        [sys.executable, "build.py"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    assert result.returncode == 0, f"build failed:\n{result.stdout}\n{result.stderr}"
+    build_dir = REPO_ROOT / "build"
+    sprint_files = [
+        f for f in build_dir.iterdir()
+        if f.suffix == ".html" and f.name not in ("replay.html", "story-journey.html")
+    ]
+    assert sprint_files, "no sprint pages in build output"
+    # Every sprint page has the 'Sent back' card
+    for f in sprint_files:
+        page = f.read_text()
+        assert 'id="sent-back-h"' in page, (
+            f"{f.name}: 'Sent back' card heading not found"
+        )
+
+
 def test_placeholder_checks_contain_marker():
     """AC: the check files contain the assertions proving each acceptance criterion is exercised.
 
