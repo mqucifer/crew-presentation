@@ -46,6 +46,7 @@
   var cardElements = {};
   var columnElements = {};
   var initialBoardHTML = '';
+  var initialWhoHTML = '';
 
   function indexColumns() {
     columnElements = {};
@@ -505,9 +506,7 @@
     initWho();
     initTicker();
     initialBoardHTML = boardEl ? boardEl.innerHTML : '';
-    var initialWhoHTML_val = whoEl ? whoEl.innerHTML : '';
-    // Reassign to the outer variable
-    initialWhoHTML = initialWhoHTML_val;
+    initialWhoHTML = whoEl ? whoEl.innerHTML : '';
   }
 
   // Expose the API
