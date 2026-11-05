@@ -2044,6 +2044,55 @@ def test_sprint_overview_dora_absent_shows_no_data():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_sprint_overview_dora_all_null_shows_no_data():
+    """AC1: when dora is an all-null object, the DORA card shows 'no release data for this sprint'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "dora": {
+                    "release_frequency": None,
+                    "lead_time_days": None,
+                    "change_failure_count": None,
+                    "mean_time_to_recovery_minutes": None,
+                },
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The section heading is still present
+        assert "How releases went" in html, "DORA heading 'How releases went' not found"
+        # The absence message is shown
+        assert "no release data for this sprint" in html, (
+            "absence line 'no release data for this sprint' not found"
+        )
+        # Metric labels should not appear when all values are null
+        for label in (
+            "Releases this sprint",
+            "Change to release",
+            "Releases that failed",
+            "Time to recover",
+        ):
+            assert label not in html, (
+                f"metric label '{label}' should not appear when dora is all-null"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_feature_panel_light_theme_colors():
     """AC3+AC5: light-theme feature panel uses feature-bg, feature-text, feature-dim tokens."""
     tag = "delivery-history-TEST"
