@@ -11,7 +11,6 @@ builds its section here from them (towncrier, Keep a Changelog). Entries still u
 ### Fixed
 
 - The sprint overview's "What changed" row for first-attempt rate printed the value as a bare number (e.g. "75 → 76") with no unit; it now prints the '%' unit with the value (e.g. "75% → 76%") (mqucifer/crew-presentation#305)
-- The sprint overview's "How releases went" card showed four bare dashes when the DORA object existed but all four measures were null; it now shows "no release data for this sprint", consistent with the no-DORA-object case (mqucifer/crew-presentation#305)
 
 ## [Unreleased]
 
