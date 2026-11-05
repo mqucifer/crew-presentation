@@ -239,13 +239,12 @@ def test_events_schema_compiled_once_reused_across_event_files(monkeypatch):
 
     real_validator = jsonschema.Draft202012Validator
 
-    class CountingValidator(real_validator):
-        def __init__(self, *args, **kwargs):
-            if args and args[0] == events_schema:
-                compilations["count"] += 1
-            super().__init__(*args, **kwargs)
+    def counting_constructor(schema, *args, **kwargs):
+        if schema == events_schema:
+            compilations["count"] += 1
+        return real_validator(schema, *args, **kwargs)
 
-    monkeypatch.setattr(jsonschema, "Draft202012Validator", CountingValidator)
+    monkeypatch.setattr(jsonschema, "Draft202012Validator", counting_constructor)
     build._validate_package(pkg)
 
     assert compilations["count"] < E, (
