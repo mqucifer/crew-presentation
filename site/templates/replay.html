@@ -4,10 +4,12 @@
 {% block content %}
 <div class="meta">{{ current_sprint.start }} – {{ current_sprint.end }}</div>
 
-<section aria-label="Timeline"></section>
+<div id="replay-controls"></div>
+
+<section aria-label="Timeline" id="replay-timeline"></section>
 
 <div class="sprint-grid">
-  <section aria-label="Board" class="replay-board">
+  <section aria-label="Board" class="replay-board" id="replay-board">
   {% for col in board_columns %}
     <div class="replay-col">
       <div class="replay-col__header">{{ col }}</div>
@@ -22,10 +24,10 @@
     </div>
   {% endfor %}
   </section>
-  <section aria-label="Who's working"></section>
+  <section aria-label="Who's working" id="replay-who"></section>
 </div>
 
-<section aria-label="Event ticker"></section>
+<section aria-label="Event ticker" id="replay-ticker"></section>
 
 <script type="application/json" id="replay-data">{{ replay_data_json | safe }}</script>
 <script src="js/replay.js"></script>
