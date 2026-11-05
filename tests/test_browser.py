@@ -3008,6 +3008,76 @@ def test_story_journey_root_page_single_h1_and_story_links():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_story_journey_index_labels_cards_with_type():
+    """AC1-AC2: the index list items carry each card's type in visible text."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["cards"] = [
+        {
+            "repo": "mqucifer/crew",
+            "number": 127,
+            "title": "Extract threshold logic",
+            "type": "Story",
+        },
+        {
+            "repo": "mqucifer/crew",
+            "number": 41,
+            "title": "Goal: a walking skeleton",
+            "type": "Goal",
+        },
+        {
+            "repo": "mqucifer/crew",
+            "number": 151,
+            "title": "The trend line overflows",
+            "type": "Bug",
+        },
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "story-journey.html").read_text()
+
+        # AC1: the list item for #127 includes the word "Story"
+        li_127 = _find_li_containing(html, "mqucifer/crew#127")
+        assert li_127 is not None, "no list item contains mqucifer/crew#127"
+        assert "Story" in li_127, (
+            f"list item for #127 does not include 'Story': {li_127[:200]}"
+        )
+
+        # AC1: the list item for #41 includes the word "Goal"
+        li_41 = _find_li_containing(html, "mqucifer/crew#41")
+        assert li_41 is not None, "no list item contains mqucifer/crew#41"
+        assert "Goal" in li_41, (
+            f"list item for #41 does not include 'Goal': {li_41[:200]}"
+        )
+
+        # AC2: the list item for #151 includes "Bug" and does not include "Story"
+        li_151 = _find_li_containing(html, "mqucifer/crew#151")
+        assert li_151 is not None, "no list item contains mqucifer/crew#151"
+        assert "Bug" in li_151, (
+            f"list item for #151 does not include 'Bug': {li_151[:200]}"
+        )
+        assert "Story" not in li_151, (
+            f"list item for #151 should not include 'Story': {li_151[:200]}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _find_li_containing(html: str, needle: str) -> str | None:
+    """Return the inner text of the <li> whose visible text contains *needle*."""
+    for m in re.finditer(r"<li[^>]*>(.*?)</li>", html, re.DOTALL):
+        if needle in m.group(1):
+            # Strip HTML tags to get visible text
+            return re.sub(r"<[^>]+>", "", m.group(1))
+    return None
+
+
 def test_cycle_time_stat_formats_hours_and_minutes():
     """AC1-AC4: the cycle time stat renders hours and minutes with exact text.
 
