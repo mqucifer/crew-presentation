@@ -35,6 +35,14 @@ def _load_setup():
 setup = _load_setup()
 
 
+def _load_build():
+    """Import build.py, which is a script rather than a package."""
+    spec = importlib.util.spec_from_file_location("build", REPO_ROOT / "build.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 
 
 
@@ -209,6 +217,41 @@ def test_well_formed_package_passes():
         for events_file in sorted(events_dir.glob("*.json")):
             data = _load_json(events_file)
             _validate_against_schema(data, events_schema, f"events/{events_file.name}")
+
+
+def test_events_schema_compiled_once_reused_across_event_files(monkeypatch):
+    """AC1: the events schema is compiled into one validator, reused across the
+    events files, not a fresh validator per file (which made the build overflow
+    the gate's per-test cap under load).
+
+    Wraps the validator constructor and counts how many times the events schema
+    is compiled by ``build._validate_package``: once per file (E) before, one
+    (reused) after; the check is that it is compiled strictly fewer than E times.
+    """
+    build = _load_build()
+    pkg = _package_dir()
+    event_files = sorted((pkg / "events").glob("*.json"))
+    E = len(event_files)
+    assert E > 1, "the reuse check needs more than one event file"
+
+    events_schema = _load_json(pkg / "events.schema.json")
+    compilations = {"count": 0}
+
+    real_validator = jsonschema.Draft202012Validator
+
+    class CountingValidator(real_validator):
+        def __init__(self, *args, **kwargs):
+            if args and args[0] == events_schema:
+                compilations["count"] += 1
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(jsonschema, "Draft202012Validator", CountingValidator)
+    build._validate_package(pkg)
+
+    assert compilations["count"] < E, (
+        f"events schema compiled {compilations['count']} times for {E} event "
+        f"files; one validator should be reused across the files"
+    )
 
 
 def test_non_conforming_file_fails_with_file_name():
@@ -623,6 +666,58 @@ def test_build_fails_on_non_conforming_data_file():
         output = result.stdout + result.stderr
         assert "delivery-history.json" in output, (
             f"output should name the failing file: {output}"
+        )
+        assert "does not conform" in output, (
+            f"output should say the file does not conform: {output}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_build_fails_on_non_conforming_events_file():
+    """AC2: exactly one file under events/ that does not conform to events.schema.json
+    makes build.py exit non-zero, naming that events file and saying it does not conform."""
+    tag = "delivery-history-TEST-EVENTS"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["events"]})
+    )
+    (pkg_dir / "delivery-history.json").write_text(json.dumps({}))
+
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir()
+    (events_dir / "2026-09-24.json").write_text(json.dumps({"events": []}))
+    (events_dir / "2026-09-25.json").write_text(json.dumps({"not_events": []}))
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode != 0, (
+            "build.py should fail for a non-conforming events file"
+        )
+        output = result.stdout + result.stderr
+        assert "events/2026-09-25.json" in output, (
+            f"output should name the failing events file: {output}"
         )
         assert "does not conform" in output, (
             f"output should say the file does not conform: {output}"

@@ -51,9 +51,16 @@ def _load_json(path: Path) -> dict:
     return json.loads(path.read_text())
 
 
-def _validate_against_schema(data, schema, file_label: str) -> None:
-    """Validate data against a JSON schema; exit with an error naming the file on failure."""
-    validator = jsonschema.Draft202012Validator(schema)
+def _validate_against_schema(data, schema, file_label: str, validator=None) -> None:
+    """Validate data against a JSON schema; exit with an error naming the file on failure.
+
+    ``validator`` is a pre-built ``Draft202012Validator`` for ``schema``, passed in
+    when the same schema is checked against many files (the events) so the schema
+    is compiled once, not once per file. Omit it for a single validation and a
+    validator is built from ``schema``.
+    """
+    if validator is None:
+        validator = jsonschema.Draft202012Validator(schema)
     errors = sorted(validator.iter_errors(data), key=lambda e: list(e.path))
     if errors:
         messages = "; ".join(
@@ -99,9 +106,15 @@ def _validate_package(pkg: Path) -> None:
 
     events_dir = pkg / "events"
     if events_dir.is_dir():
+        events_validator = jsonschema.Draft202012Validator(events_schema)
         for events_file in sorted(events_dir.glob("*.json")):
             data = _load_json(events_file)
-            _validate_against_schema(data, events_schema, f"events/{events_file.name}")
+            _validate_against_schema(
+                data,
+                events_schema,
+                f"events/{events_file.name}",
+                validator=events_validator,
+            )
 
 
 def _render_pages(pkg: Path) -> dict:
