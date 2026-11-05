@@ -1261,7 +1261,7 @@ def test_attempt_chart_heading_text_and_style():
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
         # Exact heading text
-        assert "The Architect's split, story by story" in html, (
+        assert "Stories delivered this sprint" in html, (
             "heading text not found"
         )
         # The heading is an h2 with id split-h
@@ -1271,7 +1271,7 @@ def test_attempt_chart_heading_text_and_style():
             re.DOTALL,
         )
         assert h2_match, "h2#split-h not found"
-        assert h2_match.group(1).strip() == "The Architect's split, story by story"
+        assert h2_match.group(1).strip() == "Stories delivered this sprint"
         # CSS sets the font and size for this heading
         css = (BUILD_DIR / "css" / "site.css").read_text()
         # The .sprint-chart .card__head h2 rule (or equivalent) uses the display font and xl size
@@ -2215,12 +2215,12 @@ def test_stat_values_match_package_data():
                 f"expected {answers['throughput']!r} from package"
             )
 
-            # Exact text for landed first try
+            # Exact text for first-attempt pass
             first_attempt_text = page.evaluate("""
                 () => {
                     const labels = document.querySelectorAll('.stat__label');
                     for (const label of labels) {
-                        if (label.textContent.trim() === 'landed first try') {
+                        if (label.textContent.trim() === 'first-attempt pass') {
                             const stat = label.closest('.stat');
                             return stat.querySelector('.stat__value').textContent.trim();
                         }
@@ -2233,7 +2233,7 @@ def test_stat_values_match_package_data():
                 f"{answers['first_attempt_denominator']}"
             )
             assert first_attempt_text == expected_fa, (
-                f"landed first try shows {first_attempt_text!r}, expected {expected_fa!r}"
+                f"first-attempt pass shows {first_attempt_text!r}, expected {expected_fa!r}"
             )
 
             # Design-system CSS was served from local file: the sandbox has no
@@ -3440,7 +3440,7 @@ def test_sprint_headings_text_and_no_clipping_at_phone_width():
             page.wait_for_load_state("domcontentloaded")
 
             chart_h2_text = page.locator(".sprint-chart h2").inner_text()
-            assert chart_h2_text == "The Architect's split, story by story", (
+            assert chart_h2_text == "Stories delivered this sprint", (
                 f"chart h2 text is {chart_h2_text!r}"
             )
 
@@ -6288,7 +6288,7 @@ def test_non_first_try_count_mismatch_names_both_values():
                 () => {
                     const labels = document.querySelectorAll('.stat__label');
                     for (const label of labels) {
-                        if (label.textContent.trim() === 'landed first try') {
+                        if (label.textContent.trim() === 'first-attempt pass') {
                             const stat = label.closest('.stat');
                             return stat.querySelector('.stat__value').textContent.trim();
                         }
@@ -6371,7 +6371,7 @@ def test_non_first_try_count_all_first_try():
                 () => {
                     const labels = document.querySelectorAll('.stat__label');
                     for (const label of labels) {
-                        if (label.textContent.trim() === 'landed first try') {
+                        if (label.textContent.trim() === 'first-attempt pass') {
                             const stat = label.closest('.stat');
                             return stat.querySelector('.stat__value').textContent.trim();
                         }
@@ -8765,13 +8765,13 @@ def test_zero_sprint_metrics_render_zero_and_fraction():
         assert throughput_match.group(1) == "0", (
             f"throughput stat is {throughput_match.group(1)!r}, expected '0'"
         )
-        # '0 of 4' immediately before 'landed first try'
+        # '0 of 4' immediately before 'first-attempt pass'
         first_try_match = re.search(
-            r'<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>\s*<span class="stat__label">landed first try</span>',
+            r'<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>\s*<span class="stat__label">first-attempt pass</span>',
             stats,
             re.DOTALL,
         )
-        assert first_try_match, "no 'landed first try' stat found"
+        assert first_try_match, "no 'first-attempt pass' stat found"
         assert first_try_match.group(1) == "0 of 4", (
             f"first-try stat is {first_try_match.group(1)!r}, expected '0 of 4'"
         )

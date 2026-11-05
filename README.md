@@ -29,8 +29,8 @@ metrics itself. Nothing it publishes carries what the crew was told or thought.
 ## What the site shows
 
 - **Sprint overview** — one page per sprint: the sprint's figures (stories
-  delivered, landed first try, cycle time, points delivered), what changed
-  between sprints, the Architect's split story by story, why work didn't land
+  delivered, first-attempt pass, cycle time, points delivered), what changed
+  between sprints, the stories delivered story by story, why work didn't land
   first time, and decisions the crew made.
 - **Replay** — the crew's work on a day, played back: who did what, and how the
   board moved.

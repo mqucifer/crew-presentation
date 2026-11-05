@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- The sprint overview's delivered-stories section heading used the crew's internal vocabulary ("The Architect's split, story by story") and the first-attempt stat label used "landed first try"; both are now in plain language: the heading reads "Stories delivered this sprint" and the stat label reads "first-attempt pass" (mqucifer/crew-presentation#305)
+
 ## [0.4.0] - 2026-11-01
 
 ### Added
