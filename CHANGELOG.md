@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- The story-journey index page listed every card (Goals, Epics, Stories, Bugs) as one unlabelled list under a "Stories" heading; each list item now shows the card's type (e.g. "Story", "Goal", "Bug") so a reader can recognise which entries are stories (mqucifer/crew-presentation#305)
+
 ## [0.4.0] - 2026-11-01
 
 ### Added
