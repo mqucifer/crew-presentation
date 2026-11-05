@@ -83,7 +83,7 @@ def test_build_check_exits_zero():
     has_delivered_story = any(story.get("delivered") for story in analysis_stories)
 
     page = sorted(sprint_files)[0].read_text()
-    assert "The Architect's split, story by story" in page, (
+    assert "Stories delivered this sprint" in page, (
         "sprint chart heading not found in sprint-overview page"
     )
     if has_delivered_story:
@@ -650,8 +650,8 @@ def test_placeholder_checks_contain_marker():
     assert "stories delivered" in source, (
         "AC1: no assertion on the 'stories delivered' label"
     )
-    assert "landed first try" in source, (
-        "AC1: no assertion on the 'landed first try' label"
+    assert "first-attempt pass" in source, (
+        "AC1: no assertion on the 'first-attempt pass' label"
     )
     assert "--color-bg" in source, (
         "AC1: no assertion that design-system CSS was loaded"
