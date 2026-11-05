@@ -147,7 +147,7 @@ def test_setup_fails_on_missing_release(monkeypatch, tmp_path):
     assert not index, f"index file present after failed setup: {index}"
 
 
-SUPPORTED_MAJOR_VERSIONS = (1, 2, 3)
+SUPPORTED_MAJOR_VERSIONS = (1, 2, 3, 4)
 
 
 def _package_dir() -> Path:
@@ -232,19 +232,24 @@ def test_non_conforming_file_fails_with_file_name():
 
 def test_unsupported_major_version_fails_with_version():
     """AC3: a package on an unsupported major version fails, naming the version."""
-    manifest = {"schema_version": "4.0.0"}
+    manifest = {"schema_version": "5.0.0"}
 
     with pytest.raises(ValueError) as exc_info:
         _check_schema_version(manifest)
 
     message = str(exc_info.value)
-    assert "4" in message
+    assert "5" in message
     assert "cannot display" in message
 
 
 def test_check_schema_version_accepts_major_2():
     """AC1: a manifest on schema major 2 passes the version gate without raising."""
     _check_schema_version({"schema_version": "2.0.0"})
+
+
+def test_check_schema_version_accepts_major_4():
+    """AC2: a manifest on schema major 4 passes the version gate without raising."""
+    _check_schema_version({"schema_version": "4.0.0"})
 
 
 def test_build_fails_on_unsupported_major_version():
@@ -255,7 +260,7 @@ def test_build_fails_on_unsupported_major_version():
 
     (pkg_dir / "manifest.json").write_text(
         json.dumps(
-            {"schema_version": "4.0.0", "package": "delivery-history", "date": "2026-01-01"}
+            {"schema_version": "5.0.0", "package": "delivery-history", "date": "2026-01-01"}
         )
     )
     (pkg_dir / "manifest.schema.json").write_text(
@@ -278,7 +283,7 @@ def test_build_fails_on_unsupported_major_version():
         )
         assert result.returncode != 0, "build.py should fail for unsupported major version"
         output = result.stdout + result.stderr
-        assert "4" in output, f"output should name the major version: {output}"
+        assert "5" in output, f"output should name the major version: {output}"
         assert "cannot display" in output, (
             f"output should say the version is unsupported: {output}"
         )
