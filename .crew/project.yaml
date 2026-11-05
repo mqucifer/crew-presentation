@@ -166,8 +166,9 @@ design:
     versions and hashes; never written by hand (§19.3). delivery-history.tag — one
     line: the release tag of the delivery-history package the site displays; read
     by setup and the build; agents must not change it. CHANGELOG.md — the release
-    log, append-only: each story adds its entries under the [Unreleased] section.
-    A shared file that parallel stories in the same sprint will collide in.'
+    log, written only by a release: each story adds its entry as a towncrier fragment,
+    changes/<issue>.<kind>.md, and the release builds its dated section from them,
+    deleting them, so parallel stories never collide in it.'
   docs:
   - README.md
   - CHANGELOG.md
