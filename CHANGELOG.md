@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- The sprint overview's "What changed" row for first-attempt rate printed the value as a bare number (e.g. "75 → 76") with no unit; it now prints the '%' unit with the value (e.g. "75% → 76%") (mqucifer/crew-presentation#305)
+
 ## [0.4.0] - 2026-11-01
 
 ### Added
