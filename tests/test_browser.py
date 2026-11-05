@@ -10369,3 +10369,301 @@ def test_points_delivered_no_percent_in_metrics_path():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_player_controls_and_sections_populated():
+    """AC1: at page load with at least one event, the page has play/pause, speed
+    buttons 1x 30x 60x, skip-idle, a scrubber, and each of Timeline, Who's
+    working and Event ticker contains at least one rendered child."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {
+            "kind": "move",
+            "at": "2026-10-07T08:00:00Z",
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "from_column": "Sprint Backlog",
+            "to_column": "In Progress",
+            "role": "Developer",
+        },
+        {
+            "kind": "move",
+            "at": "2026-10-07T09:00:00Z",
+            "card": {"number": 1, "repo": "mqucifer/crew"},
+            "from_column": "In Progress",
+            "to_column": "Done",
+            "role": "Developer",
+        },
+    ]
+    cards = [
+        {"number": 1, "repo": "mqucifer/crew", "title": "test.py"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 1280, "height": 800})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Play/pause control
+            play_btn = page.query_selector("#replay-play-btn")
+            assert play_btn is not None, "no play/pause button found"
+
+            # Speed buttons labelled 1×, 30×, 60×
+            speed_btns = page.query_selector_all(".replay-speed-btn")
+            assert len(speed_btns) >= 3, (
+                f"expected at least 3 speed buttons, got {len(speed_btns)}"
+            )
+            labels = []
+            for btn in speed_btns:
+                labels.append(btn.text_content().strip())
+            assert "1\u00d7" in labels, f"speed button '1\u00d7' not found: {labels}"
+            assert "30\u00d7" in labels, f"speed button '30\u00d7' not found: {labels}"
+            assert "60\u00d7" in labels, f"speed button '60\u00d7' not found: {labels}"
+
+            # Skip-idle control
+            skip_btn = page.query_selector(".replay-skip-idle")
+            assert skip_btn is not None, "no skip-idle control found"
+
+            # Timeline scrubber
+            scrubber = page.query_selector("#replay-scrubber")
+            assert scrubber is not None, "no timeline scrubber found"
+
+            # Timeline section has at least one child
+            timeline = page.query_selector("#replay-timeline")
+            assert timeline is not None, "no Timeline section found"
+            timeline_children = timeline.query_selector_all("*")
+            assert len(timeline_children) >= 1, (
+                "Timeline section has no rendered children"
+            )
+
+            # Who's working section has at least one child
+            who = page.query_selector("#replay-who")
+            assert who is not None, "no Who's working section found"
+            who_children = who.query_selector_all("*")
+            assert len(who_children) >= 1, (
+                "Who's working section has no rendered children"
+            )
+
+            # Event ticker section has at least one child (placeholder at load)
+            ticker = page.query_selector("#replay-ticker")
+            assert ticker is not None, "no Event ticker section found"
+            ticker_children = ticker.query_selector_all("*")
+            assert len(ticker_children) >= 1, (
+                "Event ticker section has no rendered children at load time"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_card_moves_to_target_column():
+    """AC2: after playing past an event that moves a card to a column, the
+    card's number appears under that column's header."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {
+            "kind": "move",
+            "at": "2026-10-07T08:00:00Z",
+            "card": {"number": 42, "repo": "mqucifer/crew"},
+            "from_column": "Sprint Backlog",
+            "to_column": "In Progress",
+            "role": "Developer",
+        },
+    ]
+    cards = [
+        {"number": 42, "repo": "mqucifer/crew", "title": "feature.py"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 1280, "height": 800})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Play all events
+            page.evaluate("window.replay.finish()")
+
+            # Find the In Progress column and check the card is there
+            board = page.query_selector("#replay-board")
+            assert board is not None, "no board section found"
+            cols = board.query_selector_all(".replay-col")
+            ip_col = None
+            for col in cols:
+                header = col.query_selector(".replay-col__header")
+                if header and header.text_content().strip() == "In Progress":
+                    ip_col = col
+                    break
+            assert ip_col is not None, "In Progress column not found"
+            cards_in_ip = ip_col.query_selector_all(".replay-card")
+            found = False
+            for card in cards_in_ip:
+                link = card.query_selector("a.num")
+                if link and "#42" in link.text_content():
+                    found = True
+                    break
+            assert found, (
+                "card #42 not found in In Progress column after replay"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_ticker_shows_card_number():
+    """AC3: after playing past an event that names a card, the Event ticker
+    shows a row whose text contains that card's number."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {
+            "kind": "move",
+            "at": "2026-10-07T08:00:00Z",
+            "card": {"number": 99, "repo": "mqucifer/crew"},
+            "from_column": "Sprint Backlog",
+            "to_column": "In Progress",
+            "role": "Developer",
+        },
+    ]
+    cards = [
+        {"number": 99, "repo": "mqucifer/crew", "title": "metrics.py"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 1280, "height": 800})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Play all events
+            page.evaluate("window.replay.finish()")
+
+            # Check the ticker for a row containing the card number
+            ticker = page.query_selector("#replay-ticker")
+            assert ticker is not None, "no Event ticker section found"
+            rows = ticker.query_selector_all(".ticker-row")
+            found = False
+            for row in rows:
+                if row.get_attribute("class") and "placeholder" in row.get_attribute("class"):
+                    continue
+                text = row.text_content() or ""
+                if "#99" in text:
+                    found = True
+                    break
+            assert found, (
+                f"no ticker row contains '#99'; rows: "
+                f"{[r.text_content() for r in rows]}"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_empty_events_board_and_ticker_empty():
+    """AC4: with an empty events array, after loading and starting the replay,
+    the In Progress, Reviewing, QAing, Merging and Done columns each contain
+    zero cards and the Event ticker contains zero event rows."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    _make_package_with_board(tag, sprints, [], [], "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 1280, "height": 800})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Start the replay
+            page.evaluate("window.replay.play()")
+
+            # Check that the named columns (if present) have zero cards
+            board = page.query_selector("#replay-board")
+            if board:
+                cols = board.query_selector_all(".replay-col")
+                for col in cols:
+                    header = col.query_selector(".replay-col__header")
+                    if header is None:
+                        continue
+                    name = header.text_content().strip()
+                    if name in (
+                        "In Progress", "Reviewing", "QAing",
+                        "Merging", "Done",
+                    ):
+                        cards = col.query_selector_all(".replay-card")
+                        assert len(cards) == 0, (
+                            f"column {name!r} has {len(cards)} cards, "
+                            f"expected 0"
+                        )
+
+            # Check the ticker has zero event rows (excluding placeholder)
+            ticker = page.query_selector("#replay-ticker")
+            assert ticker is not None, "no Event ticker section found"
+            rows = ticker.query_selector_all(".ticker-row")
+            non_placeholder = []
+            for row in rows:
+                cls = row.get_attribute("class") or ""
+                if "placeholder" not in cls:
+                    non_placeholder.append(row)
+            assert len(non_placeholder) == 0, (
+                f"Event ticker has {len(non_placeholder)} event rows, "
+                f"expected 0"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
