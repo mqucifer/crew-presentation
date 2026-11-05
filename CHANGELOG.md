@@ -18,6 +18,12 @@ builds its section here from them (towncrier, Keep a Changelog). Entries still u
 
 - The sprint overview's delivered-stories section heading used the crew's internal vocabulary ("The Architect's split, story by story") and the first-attempt stat label used "landed first try"; both are now in plain language: the heading reads "Stories delivered this sprint" and the stat label reads "first-attempt pass" (mqucifer/crew-presentation#305)
 
+## [Unreleased]
+
+### Fixed
+
+- The story-journey index page listed every card (Goals, Epics, Stories, Bugs) as one unlabelled list under a "Stories" heading; each list item now shows the card's type (e.g. "Story", "Goal", "Bug") so a reader can recognise which entries are stories (mqucifer/crew-presentation#305)
+
 ## [0.4.0] - 2026-11-01
 
 ### Added

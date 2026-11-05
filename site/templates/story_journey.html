@@ -70,10 +70,10 @@
   {% endif %}
   {% else %}
   <section>
-    <h2>Stories</h2>
+    <h2>Cards</h2>
     <ul>
     {% for c in package.cards %}
-    <li><a href="stories/{{ c.repo | replace('/', '-') }}-{{ c.number }}.html">{{ c.repo }}#{{ c.number }} — {{ c.title }}</a></li>
+    <li>{% if c.type %}<span class="card-type">{{ c.type }}</span> {% endif %}<a href="stories/{{ c.repo | replace('/', '-') }}-{{ c.number }}.html">{{ c.repo }}#{{ c.number }} — {{ c.title }}</a></li>
     {% endfor %}
     </ul>
   </section>
