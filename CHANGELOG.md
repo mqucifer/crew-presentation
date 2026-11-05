@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- The replay page showed only a static board snapshot with no playback controls; the Timeline, Who's working and Event ticker sections rendered empty. The replay page now has a working player (play/pause, speed 1×/30×/60×, skip-idle, timeline scrubber) that animates the board, populates the timeline, the ticker and the who's-working panel from the sprint's embedded events (mqucifer/crew-presentation#305)
+
+### Fixed
+
 - The sprint overview's "What changed" row for first-attempt rate printed the value as a bare number (e.g. "75 → 76") with no unit; it now prints the '%' unit with the value (e.g. "75% → 76%") (mqucifer/crew-presentation#305)
 
 ## [Unreleased]
