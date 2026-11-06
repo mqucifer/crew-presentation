@@ -10664,3 +10664,27 @@ def test_orientation_text_identical_across_sprints():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_readme_what_the_site_shows_mentions_orientation():
+    """AC5: the README's 'What the site shows' section tells the reader that
+    every page opens with a short 'What this is' explanation before any measure."""
+    readme = (REPO_ROOT / "README.md").read_text()
+    # Find the "What the site shows" section
+    section_start = readme.find("## What the site shows")
+    assert section_start != -1, "no 'What the site shows' section in README.md"
+    # Find the next section (or end of file)
+    next_section = readme.find("\n## ", section_start + 1)
+    if next_section == -1:
+        section_text = readme[section_start:]
+    else:
+        section_text = readme[section_start:next_section]
+    # The section must mention the orientation block
+    assert "What this is" in section_text, (
+        "README 'What the site shows' section does not mention the "
+        "'What this is' orientation block"
+    )
+    assert "before any measure" in section_text, (
+        "README 'What the site shows' section does not say the orientation "
+        "appears before any measure"
+    )
