@@ -220,6 +220,27 @@
   margin-left: 4px;
 }
 
+/* Left-open card: stories still open at the sprint's end */
+.sprint-left-open {
+  grid-column: span 5;
+}
+
+.left-open-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.left-open-row {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.left-open-row__duration {
+  margin-left: 4px;
+}
+
 .cause-chart {
   display: flex;
   flex-direction: column;
@@ -305,6 +326,7 @@
   .sprint-chart,
   .sprint-side,
   .sprint-sent-back,
+  .sprint-left-open,
   .sprint-decided,
   .replay-board {
     grid-column: 1 / -1;

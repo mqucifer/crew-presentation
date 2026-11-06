@@ -988,6 +988,297 @@ def test_sent_back_pinned_package_builds():
         )
 
 
+def _left_open_package(
+    events: list[dict], cards: list[dict], sprint_name: str = "Sprint 1"
+) -> dict:
+    """A minimal 3.0.0 package index with the given events and cards."""
+    return {
+        "package": "delivery-history",
+        "schema_version": "3.0.0",
+        "date": "2026-11-06",
+        "timezone": "America/Chicago",
+        "crew_repository": "crew",
+        "repositories": ["crew-presentation"],
+        "sprints": [
+            {"name": sprint_name, "start": "2026-11-06", "end": "2026-11-06"}
+        ],
+        "cards": cards,
+        "periods": [
+            {
+                "sprint": sprint_name,
+                "start": "2026-11-06",
+                "end": "2026-11-06",
+                "file": "events/2026-11-06.json",
+                "events": len(events),
+            }
+        ],
+        "sprint_metrics": {
+            "release": "3.0.0",
+            "answers": {
+                sprint_name: {
+                    "cycle_time_days": 0,
+                    "lead_time_days": 0,
+                    "throughput": 0,
+                    "wip_violations": 0,
+                    "blocked_aging_days": 0,
+                    "escalation_rate_percent": 0,
+                    "points_delivered": 0,
+                    "first_attempt_numerator": 0,
+                    "first_attempt_denominator": 0,
+                    "escalation_count": 0,
+                    "superseded_count": 0,
+                    "superseded_points": 0,
+                    "first_attempt_rate_percent": 0,
+                    "failure_breakdown": [],
+                    "top_failure_causes": {},
+                    "superseded_breakdown": None,
+                    "flags": None,
+                    "prior": None,
+                    "delta": None,
+                    "cycle_time_minutes": 0,
+                    "lead_time_minutes": 0,
+                }
+            },
+        },
+    }
+
+
+def _build_with_left_open(
+    events: list[dict], cards: list[dict]
+) -> str:
+    """Build a site from a package carrying the given events and cards; return the sprint page."""
+    tag = "delivery-history-TEST-LEFTOPEN"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-11-06"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    index = _left_open_package(events, cards)
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(parents=True, exist_ok=True)
+    (events_dir / "2026-11-06.json").write_text(json.dumps({"events": events}))
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"build.py should succeed:\n{result.stdout}\n{result.stderr}"
+        )
+        page = (REPO_ROOT / "build" / "sprint-1.html").read_text()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+    return page
+
+
+def test_left_open_shows_stories_not_done_at_sprint_end():
+    """AC1: stories not in Done at the sprint's end get rows; stories that reached Done do not; epics and goals do not."""
+    cards = [
+        {"repo": "crew-presentation", "number": 1, "type": "Story", "title": "Story one"},
+        {"repo": "crew-presentation", "number": 2, "type": "Story", "title": "Story two"},
+        {"repo": "crew-presentation", "number": 3, "type": "Epic", "title": "An epic"},
+        {"repo": "crew-presentation", "number": 4, "type": "Goal", "title": "A goal"},
+        {"repo": "crew-presentation", "number": 5, "type": "Story", "title": "Story five"},
+    ]
+    events = [
+        # Story 1 ends in In Progress
+        {"kind": "card_moved", "at": "2026-11-06T10:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 1},
+         "from_column": "Ready", "to_column": "In Progress"},
+        # Story 2 ends in Done
+        {"kind": "card_moved", "at": "2026-11-06T09:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 2},
+         "from_column": "Ready", "to_column": "In Progress"},
+        {"kind": "card_moved", "at": "2026-11-06T11:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 2},
+         "from_column": "In Progress", "to_column": "Done"},
+        # Epic 3 ends in Ready (should NOT get a row)
+        {"kind": "card_moved", "at": "2026-11-06T10:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 3},
+         "from_column": "Inbox (Goals)", "to_column": "Ready"},
+        # Goal 4 ends in Sprint Backlog (should NOT get a row)
+        {"kind": "card_moved", "at": "2026-11-06T10:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 4},
+         "from_column": "Inbox (Goals)", "to_column": "Sprint Backlog"},
+        # Story 5 ends in Reviewing (should get a row)
+        {"kind": "card_moved", "at": "2026-11-06T12:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 5},
+         "from_column": "In Progress", "to_column": "Reviewing"},
+    ]
+    page = _build_with_left_open(events, cards)
+    assert 'id="left-open-h"' in page, "'Left open at the end' card heading not found"
+    # Story 1 and Story 5 get rows
+    assert "#1" in page, "Story 1 should have a row"
+    assert "#5" in page, "Story 5 should have a row"
+    assert "Story one" in page, "Story 1 title should be shown"
+    assert "Story five" in page, "Story 5 title should be shown"
+    # Story 2 reached Done, so no row
+    assert "#2" not in page or "Story two" not in page, (
+        "Story 2 reached Done and should not have a row"
+    )
+    # Epic and Goal do not get rows
+    assert "An epic" not in page, "Epic should not have a row"
+    assert "A goal" not in page, "Goal should not have a row"
+    # Exactly 2 rows
+    assert page.count('class="left-open-row"') == 2, (
+        "expected exactly 2 left-open rows"
+    )
+
+
+def test_left_open_badge_blocked_for_blocked_column():
+    """AC2: a story in the Blocked column gets a 'Blocked' badge in the blocked tone."""
+    cards = [
+        {"repo": "crew-presentation", "number": 10, "type": "Story", "title": "Blocked story"},
+    ]
+    events = [
+        {"kind": "card_moved", "at": "2026-11-06T14:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 10},
+         "from_column": "In Progress", "to_column": "Blocked"},
+    ]
+    page = _build_with_left_open(events, cards)
+    assert 'data-tone="blocked"' in page, "blocked badge should use the blocked tone"
+    assert ">Blocked<" in page, "badge label should be 'Blocked'"
+
+
+def test_left_open_badge_refused_for_send_back_move():
+    """AC2: a story whose last move into its column was a send-back gets a 'Refused' badge in the blocked tone."""
+    cards = [
+        {"repo": "crew-presentation", "number": 20, "type": "Story", "title": "Refused story"},
+    ]
+    events = [
+        # The card_moved event and sent_back event at the same second
+        {"kind": "card_moved", "at": "2026-11-06T15:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 20},
+         "from_column": "Reviewing", "to_column": "In Progress"},
+        {"kind": "sent_back", "at": "2026-11-06T15:00:00Z",
+         "repo": "crew-presentation",
+         "card": {"repo": "crew-presentation", "number": 20},
+         "sent_from": "review", "sent_to": "build",
+         "rule": "gate.review_changes_requested",
+         "round": 1, "counts": {"findings": 1}},
+    ]
+    page = _build_with_left_open(events, cards)
+    assert 'data-tone="blocked"' in page, "refused badge should use the blocked tone"
+    assert ">Refused<" in page, "badge label should be 'Refused'"
+
+
+def test_left_open_badge_waiting_for_other_columns():
+    """AC2: a story in a column other than Blocked, not moved by a send-back, gets a 'Waiting' badge in the waiting tone."""
+    cards = [
+        {"repo": "crew-presentation", "number": 30, "type": "Story", "title": "Waiting story"},
+    ]
+    events = [
+        {"kind": "card_moved", "at": "2026-11-06T16:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 30},
+         "from_column": "Ready", "to_column": "In Progress"},
+    ]
+    page = _build_with_left_open(events, cards)
+    assert 'data-tone="waiting"' in page, "waiting badge should use the waiting tone"
+    assert ">Waiting<" in page, "badge label should be 'Waiting'"
+
+
+def test_left_open_row_shows_repo_number_title_and_duration():
+    """AC3: a row shows the story's repository, number, title, and duration with a unit."""
+    cards = [
+        {"repo": "crew-presentation", "number": 40, "type": "Story", "title": "Duration story"},
+    ]
+    events = [
+        # Moved at 10:00, sprint ends at 2026-11-07 00:00 UTC
+        # Duration = 14 hours
+        {"kind": "card_moved", "at": "2026-11-06T10:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 40},
+         "from_column": "Ready", "to_column": "In Progress"},
+    ]
+    page = _build_with_left_open(events, cards)
+    assert "crew-presentation" in page, "repository should be shown"
+    assert "#40" in page, "number should be shown"
+    assert "Duration story" in page, "title should be shown"
+    # Duration: 14 hours (sprint ends at 2026-11-07T00:00:00Z, moved at 2026-11-06T10:00:00Z)
+    assert "for 14 hours" in page, "duration should read 'for 14 hours'"
+
+
+def test_left_open_duration_counts_back_before_sprint_start():
+    """AC4: a story moved before the sprint started counts from that earlier move, not clamped at the sprint's start."""
+    cards = [
+        {"repo": "crew-presentation", "number": 50, "type": "Story", "title": "Early story"},
+    ]
+    events = [
+        # Moved at 2026-11-04T12:00:00Z (2 days before the sprint's end date 2026-11-06)
+        # Duration = 2026-11-07T00:00:00Z - 2026-11-04T12:00:00Z = 60 hours = 2 days 12 hours
+        # Should read "for 2 days"
+        {"kind": "card_moved", "at": "2026-11-04T12:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 50},
+         "from_column": "Ready", "to_column": "In Progress"},
+    ]
+    page = _build_with_left_open(events, cards)
+    # 60 hours = 2 days + 12 hours → "for 2 days"
+    assert "for 2 days" in page, (
+        "duration should count back from the earlier move, not clamp at sprint start"
+    )
+
+
+def test_left_open_empty_says_nothing_left_open():
+    """AC5: a sprint with every story in Done says so in plain words, never a blank card."""
+    cards = [
+        {"repo": "crew-presentation", "number": 60, "type": "Story", "title": "Done story"},
+    ]
+    events = [
+        {"kind": "card_moved", "at": "2026-11-06T09:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 60},
+         "from_column": "Ready", "to_column": "In Progress"},
+        {"kind": "card_moved", "at": "2026-11-06T12:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 60},
+         "from_column": "In Progress", "to_column": "Done"},
+    ]
+    page = _build_with_left_open(events, cards)
+    assert 'id="left-open-h"' in page, "'Left open at the end' card heading should always be present"
+    assert "Nothing was left open" in page, (
+        "should say in plain words that nothing was left open"
+    )
+    assert 'class="left-open-row"' not in page, "no rows should be rendered"
+
+
+def test_left_open_pinned_package_builds():
+    """AC1 (pinned): the pinned package builds and every sprint page has the left-open card."""
+    result = subprocess.run(
+        [sys.executable, "build.py"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    assert result.returncode == 0, f"build failed:\n{result.stdout}\n{result.stderr}"
+    build_dir = REPO_ROOT / "build"
+    sprint_files = [
+        f for f in build_dir.iterdir()
+        if f.suffix == ".html" and f.name not in ("replay.html", "story-journey.html")
+    ]
+    assert sprint_files, "no sprint pages in build output"
+    for f in sprint_files:
+        page = f.read_text()
+        assert 'id="left-open-h"' in page, (
+            f"{f.name}: 'Left open at the end' card heading not found"
+        )
+
+
 def test_placeholder_checks_contain_marker():
     """AC: the check files contain the assertions proving each acceptance criterion is exercised.
 

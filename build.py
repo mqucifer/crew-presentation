@@ -4,6 +4,7 @@ import json
 import re
 import shutil
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import jinja2
@@ -243,6 +244,7 @@ def _render_pages(pkg: Path) -> dict:
 
         sent_back_events = _load_sprint_events(pkg, sprint["name"], index)
         sent_back_rows = _build_sent_back_rows(sent_back_events)
+        left_open_rows = _left_open_rows(sent_back_events, cards, sprint)
 
         context = {
             "sprints": sprints,
@@ -264,6 +266,7 @@ def _render_pages(pkg: Path) -> dict:
             "decided": decided,
             "failure_causes": _build_failure_causes(metrics),
             "sent_back_rows": sent_back_rows,
+            "left_open_rows": left_open_rows,
             "roster_released_epics": released_epics,
             "roster_achieved_goals": achieved_goals,
             "current_view": "sprint",
@@ -760,6 +763,143 @@ def _build_sent_back_rows(events: list[dict]) -> list[dict]:
                 "time": _format_event_time(event.get("at", "")),
             }
         )
+    return rows
+
+
+def _parse_iso_timestamp(at: str) -> datetime | None:
+    """Parse an ISO 8601 timestamp to a UTC datetime; None when unparseable."""
+    if not at:
+        return None
+    try:
+        return datetime.fromisoformat(at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _format_left_open_duration(seconds: float) -> str:
+    """A duration in seconds as the left-open card's own words: 'for 2 days', 'for 1 hour', 'for 30 min'."""
+    if seconds <= 0:
+        return "for 0 min"
+    total_minutes = round(seconds / 60)
+    if total_minutes < 60:
+        return f"for {total_minutes} min"
+    total_hours = total_minutes // 60
+    if total_hours < 24:
+        return f"for {total_hours} hour{'s' if total_hours != 1 else ''}"
+    total_days = total_hours // 24
+    return f"for {total_days} day{'s' if total_days != 1 else ''}"
+
+
+def _left_open_rows(
+    events: list[dict], cards: list[dict], sprint: dict
+) -> list[dict]:
+    """Rows for the sprint's 'Left open at the end' card.
+
+    Replays the board from the sprint's events alone: each story's column at
+    the sprint's end is the to_column of its last card_moved (or move) event
+    that carries a non-null to_column. A story whose end-of-sprint column is
+    not Done gets a row with a badge (Blocked, Refused or Waiting), its
+    repository, number, title, and how long it has been in that state.
+    Epics and Goals are excluded.
+    """
+    # Card types: only "Story" cards get rows
+    card_types: dict[tuple, str] = {}
+    cards_by_key: dict[tuple, dict] = {}
+    for card in cards:
+        key = (card.get("repo"), card.get("number"))
+        card_types[key] = card.get("type", "")
+        cards_by_key[key] = card
+
+    # Collect sent_back keys for identifying send-back moves:
+    # (repo, number, at_truncated_to_seconds)
+    sent_back_keys: set[tuple] = set()
+    for event in events:
+        if event.get("kind") == "sent_back":
+            card_ref = event.get("card")
+            if card_ref:
+                at_sec = event.get("at", "")[:19]
+                sent_back_keys.add(
+                    (card_ref.get("repo"), card_ref.get("number"), at_sec)
+                )
+
+    # Replay the board: track each card's last move into a column
+    card_state: dict[tuple, dict] = {}
+    for event in events:
+        if event.get("kind") not in ("card_moved", "move"):
+            continue
+        card_ref = event.get("card")
+        if not card_ref:
+            continue
+        to_col = event.get("to_column")
+        if not to_col:
+            continue
+        key = (card_ref.get("repo"), card_ref.get("number"))
+        at_sec = event.get("at", "")[:19]
+        is_sent_back = (
+            card_ref.get("repo"),
+            card_ref.get("number"),
+            at_sec,
+        ) in sent_back_keys
+        card_state[key] = {
+            "column": to_col,
+            "moved_at": event.get("at", ""),
+            "moved_by_sent_back": is_sent_back,
+        }
+
+    # The sprint's end as a UTC datetime: midnight of the day after the end date
+    end_date = sprint.get("end", "")
+    try:
+        from datetime import timezone
+
+        sprint_end_dt = (
+            datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            + timedelta(days=1)
+        )
+    except ValueError:
+        return []
+
+    rows = []
+    for key, state in card_state.items():
+        if state["column"] == "Done":
+            continue
+        if card_types.get(key, "") != "Story":
+            continue
+
+        repo, number = key
+        card = cards_by_key.get(key, {})
+        title = card.get("title", "")
+
+        # Badge per R34
+        if state["column"] == "Blocked":
+            badge_label = "Blocked"
+            badge_tone = "blocked"
+        elif state["moved_by_sent_back"]:
+            badge_label = "Refused"
+            badge_tone = "blocked"
+        else:
+            badge_label = "Waiting"
+            badge_tone = "waiting"
+
+        # Duration: from the last move into this column to the sprint's end
+        moved_dt = _parse_iso_timestamp(state["moved_at"])
+        if moved_dt:
+            duration_seconds = (sprint_end_dt - moved_dt).total_seconds()
+        else:
+            duration_seconds = 0.0
+        duration = _format_left_open_duration(duration_seconds)
+
+        rows.append(
+            {
+                "repo": repo,
+                "number": number,
+                "title": title,
+                "badge_label": badge_label,
+                "badge_tone": badge_tone,
+                "duration": duration,
+            }
+        )
+
+    rows.sort(key=lambda r: (r["repo"] or "", r["number"] or 0))
     return rows
 
 
