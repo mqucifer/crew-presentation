@@ -172,6 +172,26 @@
       {% endif %}
     </div>
   </section>
+  <section class="card sprint-left-open" aria-labelledby="left-open-h">
+    <div class="card__head">
+      <h2 id="left-open-h">Left open at the end</h2>
+    </div>
+    <div class="card__body">
+      {% if left_open_rows %}
+      <div class="left-open-list">
+        {% for row in left_open_rows %}
+        <div class="left-open-row">
+          <span class="badge" data-tone="{{ row.badge_tone }}">{{ row.badge_label }}</span>
+          <span class="num">{{ row.repo }}#{{ row.number }}</span> {{ row.title }}
+          <span class="meta num left-open-row__duration">{{ row.duration }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p>Nothing was left open at the end of this sprint</p>
+      {% endif %}
+    </div>
+  </section>
   <section class="feature sprint-decided" aria-labelledby="decided-h">
     <h2 id="decided-h">Decided by the crew</h2>
     {% if decided %}
