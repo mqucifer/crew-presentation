@@ -147,7 +147,7 @@ def test_setup_fails_on_missing_release(monkeypatch, tmp_path):
     assert not index, f"index file present after failed setup: {index}"
 
 
-SUPPORTED_MAJOR_VERSIONS = (1, 2, 3)
+SUPPORTED_MAJOR_VERSIONS = (1, 2, 3, 4)
 
 
 def _package_dir() -> Path:
@@ -232,19 +232,69 @@ def test_non_conforming_file_fails_with_file_name():
 
 def test_unsupported_major_version_fails_with_version():
     """AC3: a package on an unsupported major version fails, naming the version."""
-    manifest = {"schema_version": "4.0.0"}
+    manifest = {"schema_version": "5.0.0"}
 
     with pytest.raises(ValueError) as exc_info:
         _check_schema_version(manifest)
 
     message = str(exc_info.value)
-    assert "4" in message
+    assert "5" in message
     assert "cannot display" in message
 
 
 def test_check_schema_version_accepts_major_2():
     """AC1: a manifest on schema major 2 passes the version gate without raising."""
     _check_schema_version({"schema_version": "2.0.0"})
+
+
+def test_check_schema_version_accepts_major_4():
+    """AC2: a manifest on schema major 4 passes the version gate without raising."""
+    _check_schema_version({"schema_version": "4.0.0"})
+
+
+def test_build_succeeds_on_well_formed_major_4_package():
+    """AC1: a well-formed 4.0.0 package completes the build and writes the expected pages."""
+    tag = "delivery-history-TEST-4"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "4.0.0", "package": "delivery-history", "date": "2026-11-05"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "delivery-history.json").write_text(json.dumps({}))
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"build.py should succeed for a well-formed 4.0.0 package:\n"
+            f"{result.stdout}\n{result.stderr}"
+        )
+        build_dir = REPO_ROOT / "build"
+        assert (build_dir / "replay.html").is_file(), (
+            "replay page not written for 4.0.0 package"
+        )
+        assert (build_dir / "story-journey.html").is_file(), (
+            "story-journey page not written for 4.0.0 package"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
 
 
 def test_build_fails_on_unsupported_major_version():
@@ -255,7 +305,7 @@ def test_build_fails_on_unsupported_major_version():
 
     (pkg_dir / "manifest.json").write_text(
         json.dumps(
-            {"schema_version": "4.0.0", "package": "delivery-history", "date": "2026-01-01"}
+            {"schema_version": "5.0.0", "package": "delivery-history", "date": "2026-01-01"}
         )
     )
     (pkg_dir / "manifest.schema.json").write_text(
@@ -278,7 +328,7 @@ def test_build_fails_on_unsupported_major_version():
         )
         assert result.returncode != 0, "build.py should fail for unsupported major version"
         output = result.stdout + result.stderr
-        assert "4" in output, f"output should name the major version: {output}"
+        assert "5" in output, f"output should name the major version: {output}"
         assert "cannot display" in output, (
             f"output should say the version is unsupported: {output}"
         )
