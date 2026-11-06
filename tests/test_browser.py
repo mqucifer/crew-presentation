@@ -10439,3 +10439,261 @@ def test_points_delivered_no_percent_in_metrics_path():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_player_controls_and_sections_populated():
+    """AC1: at page load with at least one event, the page contains play/pause,
+    speed buttons (1×, 30×, 60×), skip-idle, a timeline scrubber, and each of
+    the Timeline, Who's working, and Event ticker sections has at least one
+    rendered child element."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"kind": "move", "at": "2026-10-07T08:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+    ]
+    cards = [
+        {"number": 1, "repo": "mqucifer/crew", "title": "alpha"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Play/pause control
+            play_btn = page.query_selector(".replay-controls__play")
+            assert play_btn is not None, "no play/pause control found"
+
+            # Speed buttons labelled 1×, 30×, 60×
+            speed_btns = page.query_selector_all(".replay-controls__speed-btn")
+            speed_labels = [b.text_content() for b in speed_btns]
+            assert "1\u00D7" in speed_labels, f"1× button not found: {speed_labels}"
+            assert "30\u00D7" in speed_labels, f"30× button not found: {speed_labels}"
+            assert "60\u00D7" in speed_labels, f"60× button not found: {speed_labels}"
+
+            # Skip-idle control
+            skip_btn = page.query_selector(".replay-controls__skip")
+            assert skip_btn is not None, "no skip-idle control found"
+
+            # Timeline scrubber
+            scrubber = page.query_selector(".replay-scrubber")
+            assert scrubber is not None, "no timeline scrubber found"
+
+            # Timeline section has at least one child
+            timeline = page.query_selector('[aria-label="Timeline"]')
+            assert timeline is not None, "no Timeline section"
+            timeline_children = timeline.query_selector_all(":scope > *")
+            assert len(timeline_children) >= 1, (
+                f"Timeline section has {len(timeline_children)} children, expected >= 1"
+            )
+
+            # Who's working section has at least one child
+            who = page.query_selector('[aria-label="Who\'s working"]')
+            assert who is not None, "no Who's working section"
+            who_children = who.query_selector_all(":scope > *")
+            assert len(who_children) >= 1, (
+                f"Who's working section has {len(who_children)} children, expected >= 1"
+            )
+
+            # Event ticker section has at least one child
+            ticker = page.query_selector('[aria-label="Event ticker"]')
+            assert ticker is not None, "no Event ticker section"
+            ticker_children = ticker.query_selector_all(":scope > *")
+            assert len(ticker_children) >= 1, (
+                f"Event ticker section has {len(ticker_children)} children, expected >= 1"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_card_moves_to_target_column():
+    """AC2: when the replay is played past an event that moves a card to a
+    column, that card's number appears under the board column whose header
+    matches the event's to_column."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"kind": "move", "at": "2026-10-07T08:00:00Z", "card": {"number": 42, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+        {"kind": "move", "at": "2026-10-07T09:00:00Z", "card": {"number": 42, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "Reviewing", "role": "Developer"},
+    ]
+    cards = [
+        {"number": 42, "repo": "mqucifer/crew", "title": "thresholds.py"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Play to the end
+            page.evaluate("window.replay.finish()")
+
+            # After both events, card #42 should be in the Reviewing column
+            board = page.query_selector('[aria-label="Board"]')
+            assert board is not None, "no Board section"
+            cols = board.query_selector_all(".replay-col")
+            found = False
+            for col in cols:
+                header = col.query_selector(".replay-col__header")
+                if header and header.text_content().strip() == "Reviewing":
+                    cards_div = col.query_selector(".replay-col__cards")
+                    if cards_div:
+                        text = cards_div.text_content()
+                        if "#42" in text:
+                            found = True
+                            break
+            assert found, (
+                "card #42 not found under the Reviewing column after playback"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_ticker_shows_card_number():
+    """AC3: when the replay is played past an event that names a card,
+    the Event ticker section shows a row whose text contains that card's number."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"kind": "move", "at": "2026-10-07T08:00:00Z", "card": {"number": 127, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+    ]
+    cards = [
+        {"number": 127, "repo": "mqucifer/crew", "title": "thresholds.py"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Play to the end
+            page.evaluate("window.replay.finish()")
+
+            # Check the ticker for a row containing #127
+            ticker = page.query_selector('[aria-label="Event ticker"]')
+            assert ticker is not None, "no Event ticker section"
+            rows = ticker.query_selector_all(".ticker-row")
+            found = False
+            for row in rows:
+                text = row.text_content()
+                if "#127" in text:
+                    found = True
+                    break
+            assert found, (
+                "no ticker row contains #127 after playback"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_empty_events_board_and_ticker_empty():
+    """AC4: when the embedded events array is empty, after loading and starting
+    the replay, the In Progress, Reviewing, QAing, Merging and Done columns
+    each contain zero cards and the Event ticker section contains zero event rows."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = []
+    cards = []
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Start the replay
+            page.evaluate("window.replay.play()")
+
+            # Check the standard columns exist and have zero cards
+            board = page.query_selector('[aria-label="Board"]')
+            assert board is not None, "no Board section"
+            expected_columns = [
+                "In Progress", "Reviewing", "QAing", "Merging", "Done",
+            ]
+            for col_name in expected_columns:
+                col = None
+                for candidate in board.query_selector_all(".replay-col"):
+                    header = candidate.query_selector(".replay-col__header")
+                    if header and header.text_content().strip() == col_name:
+                        col = candidate
+                        break
+                assert col is not None, (
+                    f"column {col_name!r} not found in the board"
+                )
+                cards_div = col.query_selector(".replay-col__cards")
+                assert cards_div is not None, (
+                    f"column {col_name!r} has no .replay-col__cards"
+                )
+                card_count = len(cards_div.query_selector_all(".replay-card"))
+                assert card_count == 0, (
+                    f"column {col_name!r} has {card_count} cards, expected 0"
+                )
+
+            # Check the Event ticker section exists and has zero event rows
+            ticker = page.query_selector('[aria-label="Event ticker"]')
+            assert ticker is not None, "no Event ticker section"
+            ticker_rows = ticker.query_selector_all(".ticker-row")
+            assert len(ticker_rows) == 0, (
+                f"Event ticker has {len(ticker_rows)} rows, expected 0"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
