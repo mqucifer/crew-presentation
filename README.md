@@ -28,6 +28,9 @@ metrics itself. Nothing it publishes carries what the crew was told or thought.
 
 ## What the site shows
 
+Every page opens with a short "What this is" explanation of what the crew is and
+what each page shows, before any measure.
+
 - **Sprint overview** — one page per sprint: the sprint's figures (stories
   delivered, first-attempt pass, cycle time, points delivered), what changed
   between sprints, the stories delivered story by story, every send-back of
