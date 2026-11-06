@@ -2991,17 +2991,12 @@ def test_story_journey_root_page_single_h1_and_story_links():
         # matches the pattern stories/
         content_start = html.index("</header>")
         content_html = html[content_start:]
-        section_match = re.search(
-            r'<section[^>]*>(.*?)</section>', content_html, re.DOTALL
-        )
-        assert section_match, "no section element found in content area"
-        section_html = section_match.group(1)
+        # Skip the orientation section; the content section has the Cards heading
         story_links = re.findall(
-            r'<a[^>]*href="([^"]*stories/[^"]*)"[^>]*>', section_html
+            r'<a[^>]*href="([^"]*stories/[^"]*)"[^>]*>', content_html
         )
         assert story_links, (
-            f"no story links found in content section; "
-            f"section content: {section_html[:200]}"
+            f"no story links found in content area"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
