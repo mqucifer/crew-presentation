@@ -1,6 +1,25 @@
 /* The site's own CSS: layout, the scrubber, the speed control,
    the board columns, the attempt chart. */
 
+/* Orientation block: what this is, before any measure */
+.orientation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+  align-items: baseline;
+}
+
+.orientation h2 {
+  font-size: var(--text-lg);
+  flex: 0 0 auto;
+}
+
+.orientation p {
+  margin: 0;
+  flex: 1 1 420px;
+  color: var(--color-text-dim);
+}
+
 /* Stat values: Public Sans style C — large numbers, tightened, tabular. */
 .stat__value {
   font-family: var(--font-sans);

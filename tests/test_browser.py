@@ -10439,3 +10439,233 @@ def test_points_delivered_no_percent_in_metrics_path():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _orientation_section(html: str) -> str:
+    """Extract the orientation section's inner HTML from a page (by class)."""
+    match = re.search(
+        r'<section class="orientation"[^>]*>(.*?)</section>', html, re.DOTALL
+    )
+    assert match, "no orientation section (class='orientation') found"
+    return match.group(1)
+
+
+def _orientation_text(html: str) -> str:
+    """Extract the paragraph text from the orientation section, tags stripped."""
+    section = _orientation_section(html)
+    match = re.search(r"<p[^>]*>(.*?)</p>", section, re.DOTALL)
+    assert match, "no paragraph in orientation section"
+    return re.sub(r"<[^>]+>", "", match.group(1))
+
+
+def test_orientation_block_before_sprint_totals():
+    """AC1: 'What this is' heading and paragraph appear in document order before
+    the 'Sprint totals' stats and before every section that displays a number."""
+    tag = "delivery-history-TEST"
+    names = ["Sprint 6", "Sprint 7"]
+    _make_fake_package(tag, names)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+
+        # The orientation section must exist
+        orientation_pos = html.find('class="orientation"')
+        assert orientation_pos != -1, "no orientation section found in sprint page"
+
+        # The Sprint totals section must exist
+        totals_pos = html.find('aria-label="Sprint totals"')
+        assert totals_pos != -1, "no Sprint totals section found"
+
+        # Orientation must come before totals in document order
+        assert orientation_pos < totals_pos, (
+            "orientation section must appear before Sprint totals in document order"
+        )
+
+        # Verify the heading text
+        orientation = _orientation_section(html)
+        assert "What this is" in orientation, (
+            "no 'What this is' heading in orientation section"
+        )
+
+        # Verify the paragraph covers the key concepts
+        para = _orientation_text(html)
+        assert "AI roles" in para, (
+            f"orientation text does not say the crew is AI roles: {para!r}"
+        )
+        assert "sprints" in para, (
+            f"orientation text does not mention sprints: {para!r}"
+        )
+        assert "approving its plans" in para, (
+            f"orientation text does not mention one person approving plans: {para!r}"
+        )
+        # What each page shows
+        assert "sprint page" in para, (
+            f"orientation text does not describe the sprint pages: {para!r}"
+        )
+        assert "journey" in para, (
+            f"orientation text does not describe a story's journey: {para!r}"
+        )
+        assert "replay" in para, (
+            f"orientation text does not describe the replay: {para!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_orientation_block_readable_at_phone_width():
+    """AC2: the 'What this is' block is fully readable at 375px: text is not
+    clipped, overlapped or hidden."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # The orientation section must be visible
+            orientation = page.locator("section.orientation")
+            assert orientation.is_visible(), (
+                "orientation section is not visible at 375px"
+            )
+
+            # The heading must be visible with the right text
+            heading = orientation.locator("h2")
+            assert heading.is_visible(), (
+                "orientation heading is not visible at 375px"
+            )
+            heading_text = heading.text_content()
+            assert "What this is" in heading_text, (
+                f"heading text is {heading_text!r}, expected 'What this is'"
+            )
+
+            # The paragraph must be visible and have substantial text
+            para = orientation.locator("p")
+            assert para.is_visible(), (
+                "orientation paragraph is not visible at 375px"
+            )
+            para_text = para.text_content()
+            assert para_text and len(para_text.strip()) > 50, (
+                f"orientation paragraph text too short: {para_text!r}"
+            )
+
+            # The paragraph must have a non-zero width and height (not hidden)
+            para_box = para.bounding_box()
+            assert para_box, "orientation paragraph has no bounding box"
+            assert para_box["width"] > 0, "orientation paragraph has zero width"
+            assert para_box["height"] > 0, "orientation paragraph has zero height"
+
+            # Document must not overflow horizontally at 375px
+            scroll_width = page.evaluate("document.documentElement.scrollWidth")
+            assert scroll_width <= 375, (
+                f"scrollWidth is {scroll_width}, expected <= 375 at 375px viewport"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_orientation_block_on_story_journey_and_replay():
+    """AC3: story-journey and replay pages carry the 'What this is' block before
+    their main content, server-rendered into the HTML at build time."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+
+        # Story journey page
+        journey_html = (BUILD_DIR / "story-journey.html").read_text()
+        journey_orientation = _orientation_section(journey_html)
+        assert "What this is" in journey_orientation, (
+            "no 'What this is' heading in story-journey page"
+        )
+        journey_text = _orientation_text(journey_html)
+        assert "AI roles" in journey_text, (
+            "story-journey orientation text does not mention AI roles"
+        )
+
+        # The orientation must come before the main content
+        orientation_pos = journey_html.find('class="orientation"')
+        # The main content on the root journey page is a <section> with a Cards heading
+        content_marker = journey_html.find("<h2>Cards</h2>")
+        if content_marker == -1:
+            content_marker = journey_html.find("class=\"card", orientation_pos)
+        assert content_marker != -1, "no main content found in story-journey page"
+        assert orientation_pos < content_marker, (
+            "orientation section must appear before the main content on story-journey"
+        )
+
+        # Replay page
+        replay_html = (BUILD_DIR / "replay.html").read_text()
+        replay_orientation = _orientation_section(replay_html)
+        assert "What this is" in replay_orientation, (
+            "no 'What this is' heading in replay page"
+        )
+        replay_text = _orientation_text(replay_html)
+        assert "AI roles" in replay_text, (
+            "replay orientation text does not mention AI roles"
+        )
+
+        # The text must be identical on both pages (constant text, server-rendered)
+        assert journey_text == replay_text, (
+            "orientation text differs between story-journey and replay pages"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_orientation_text_identical_across_sprints():
+    """AC4: two different sprint pages have identical orientation block text;
+    it is constant, derived from nothing in the package."""
+    tag = "delivery-history-TEST"
+    names = ["Sprint 6", "Sprint 7"]
+    _make_fake_package(tag, names)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html6 = (BUILD_DIR / "sprint-6.html").read_text()
+        html7 = (BUILD_DIR / "sprint-7.html").read_text()
+
+        text6 = _orientation_text(html6)
+        text7 = _orientation_text(html7)
+
+        assert text6 == text7, (
+            f"orientation text differs between sprints:\n"
+            f"  sprint-6: {text6!r}\n"
+            f"  sprint-7: {text7!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
