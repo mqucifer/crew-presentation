@@ -10717,3 +10717,30 @@ def test_where_time_went_css_uses_tokens_only():
     assert not re.search(r"rgba?\(\s*\d", mts_section), (
         "model-time-split CSS contains a raw rgb/rgba colour"
     )
+
+
+def test_readme_sprint_overview_mentions_where_time_went():
+    """AC7: the README's 'Sprint overview' bullet mentions the 'Where the time went' card showing the model time split between planning and building in minutes."""
+    readme = (REPO_ROOT / "README.md").read_text()
+    # Find the 'Sprint overview' bullet
+    sprint_line = next(
+        line for line in readme.splitlines() if "Sprint overview" in line
+    )
+    # The bullet (possibly multi-line) must mention the card
+    # Gather the full bullet: from 'Sprint overview' to the next bullet or end of section
+    lines = readme.splitlines()
+    idx = lines.index(sprint_line)
+    bullet = sprint_line
+    for i in range(idx + 1, len(lines)):
+        if lines[i].startswith("- **") or lines[i].startswith("## "):
+            break
+        bullet += " " + lines[i]
+    assert "Where the time went" in bullet, (
+        "README 'Sprint overview' bullet must mention 'Where the time went'"
+    )
+    assert "planning" in bullet.lower() and "building" in bullet.lower(), (
+        "README 'Sprint overview' bullet must mention planning and building"
+    )
+    assert "minutes" in bullet.lower(), (
+        "README 'Sprint overview' bullet must mention minutes"
+    )
