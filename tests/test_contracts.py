@@ -1279,6 +1279,27 @@ def test_left_open_pinned_package_builds():
         )
 
 
+def test_left_open_docs_mention_the_new_card():
+    """AC6: README's 'What the site shows' section and the changelog fragment tell the reader what the sprint page now shows."""
+    readme = (REPO_ROOT / "README.md").read_text()
+    # README's 'What the site shows' section mentions the left-open card
+    what_shows = readme[readme.index("## What the site shows"):]
+    assert "still open" in what_shows, (
+        "README's 'What the site shows' section should mention what was still open"
+    )
+    assert "waiting, blocked" in what_shows, (
+        "README should mention the three states: waiting, blocked or refused"
+    )
+    assert "refused" in what_shows, (
+        "README should mention the three states: waiting, blocked or refused"
+    )
+    # Changelog fragment exists and names the feature
+    fragment = REPO_ROOT / "changes" / "323.added.md"
+    assert fragment.is_file(), "changelog fragment changes/323.added.md not found"
+    text = fragment.read_text()
+    assert "open" in text.lower(), "changelog fragment should mention the left-open card"
+
+
 def test_placeholder_checks_contain_marker():
     """AC: the check files contain the assertions proving each acceptance criterion is exercised.
 
