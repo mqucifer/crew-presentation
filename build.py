@@ -17,7 +17,7 @@ TEMPLATES_DIR = REPO_ROOT / "site" / "templates"
 CSS_DIR = REPO_ROOT / "site" / "css"
 JS_DIR = REPO_ROOT / "site" / "js"
 
-SUPPORTED_MAJOR_VERSIONS = (1, 2, 3)
+SUPPORTED_MAJOR_VERSIONS = (1, 2, 3, 4)
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
@@ -241,6 +241,9 @@ def _render_pages(pkg: Path) -> dict:
                 if card:
                     achieved_goals.append(card)
 
+        sent_back_events = _load_sprint_events(pkg, sprint["name"], index)
+        sent_back_rows = _build_sent_back_rows(sent_back_events)
+
         context = {
             "sprints": sprints,
             "sprint": sprint,
@@ -260,6 +263,7 @@ def _render_pages(pkg: Path) -> dict:
             "changed": changed,
             "decided": decided,
             "failure_causes": _build_failure_causes(metrics),
+            "sent_back_rows": sent_back_rows,
             "roster_released_epics": released_epics,
             "roster_achieved_goals": achieved_goals,
             "current_view": "sprint",
@@ -678,6 +682,85 @@ CAUSE_LABELS = {
     "no_test_written": "No test written",
     "unrecorded": "Cause not recorded",
 }
+
+# Board's own word for each step the flow records.
+STEP_DISPLAY = {
+    "sponsor": "the sponsor",
+    "decompose": "decomposition",
+    "refinement": "refinement",
+    "story_problem": "the story's problem",
+    "split": "the split",
+    "criteria_check": "criteria check",
+    "build": "building",
+    "gate": "the checks",
+    "ci": "CI",
+    "review": "review",
+    "deploy_review": "deploy review",
+    "qa": "QA",
+    "merge": "merge",
+    "main": "main",
+    "release_check": "release check",
+    "revert": "revert",
+    "revisit": "revisit",
+    "design": "design",
+}
+
+# Rule codes as plain-sentence fragments. The fragment completes the sentence
+# "X <fragment>, so back to Y" where X is the sent_from step's display word.
+RULE_FRAGMENTS = {
+    "gate.findings_at_done": "found problems at done",
+    "gate.merge_changes_requested": "asked for changes",
+    "gate.ci_before_review": "found problems",
+    "gate.review_changes_requested": "asked for changes",
+    "gate.criteria_repair": "found conflicts",
+    "gate.design_refused": "was refused at",
+}
+
+
+def _step_display(step: str) -> str:
+    """A step's display word; an unknown step reads as a step, not a code."""
+    if step in STEP_DISPLAY:
+        return STEP_DISPLAY[step]
+    return step.replace("_", " ") if step else ""
+
+
+def _sent_back_sentence(event: dict) -> str:
+    """A plain sentence for a send-back row, naming the steps in the board's words."""
+    rule = event.get("rule", "")
+    sent_from = _step_display(event.get("sent_from", ""))
+    sent_to = _step_display(event.get("sent_to", ""))
+    card = event.get("card")
+
+    fragment = RULE_FRAGMENTS.get(rule)
+    if fragment:
+        if fragment == "was refused at":
+            # No-card design send-back: "A design was refused at <sent_from>"
+            sentence = f"A design was refused at {sent_from}"
+        else:
+            sentence = f"{sent_from} {fragment}"
+    else:
+        sentence = f"{sent_from} sent it back"
+
+    if sent_to:
+        sentence += f", so back to {sent_to}"
+    return sentence
+
+
+def _build_sent_back_rows(events: list[dict]) -> list[dict]:
+    """One row per sent_back event, ready to render in the sprint's 'Sent back' card."""
+    rows = []
+    for event in events:
+        if event.get("kind") != "sent_back":
+            continue
+        card = event.get("card")
+        rows.append(
+            {
+                "card_number": card.get("number") if card else None,
+                "sentence": _sent_back_sentence(event),
+                "time": _format_event_time(event.get("at", "")),
+            }
+        )
+    return rows
 
 
 _COLUMN_ORDER: list[str] = [

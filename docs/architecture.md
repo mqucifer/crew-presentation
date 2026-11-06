@@ -111,7 +111,7 @@ C4Component
     Component(replay, "The replay page", "HTML with embedded JSON", "The sprint's board in its opening state, rendered at build time; the sprint's events and cards are embedded as JSON for the player")
     Component(root, "The root page, index.html", "HTML", "Written by the deploy workflow, not by the build: redirects to the newest sprint's page")
     Component(css, "site/css/site.css", "CSS", "The site's own components: the stats row, the sprint grid, the attempt chart, the failure-cause bars, the board columns; design-system tokens only, no raw colours")
-    Component(js, "site/js/replay.js", "Vanilla JavaScript", "A placeholder as of 2026-10-28: the player (play, pause, speed, skip-idle, the scrubber, the ticker) is not built yet")
+    Component(js, "site/js/replay.js", "Vanilla JavaScript", "The replay player: play/pause, speed (1×, 30×, 60×), skip-idle, the timeline scrubber, the event ticker, the who's-working panel, and board-state animation driven by the embedded events")
 
     System_Ext(designcss, "The design-system CSS", "Pinned at a tag in the site's code, served by jsDelivr")
 
@@ -120,7 +120,7 @@ C4Component
     Rel(replay, base, "extends")
     Rel(base, css, "links the site's own CSS")
     Rel(base, designcss, "links its stylesheet at the pinned tag, via jsDelivr")
-    Rel(replay, js, "loads the player, which is a placeholder")
+    Rel(replay, js, "loads the replay player")
     Rel(root, overview, "redirects to the newest sprint's page")
 ```
 
@@ -207,13 +207,8 @@ sprint-metrics' `escalation_count` and `escalation_rate_percent` leave.
 
 As of 2026-10-28 the code does not yet have:
 
-- The replay player. `site/js/replay.js` is a placeholder; the replay page
-  shows the board's opening state, rendered at build time, with the
-  sprint's events and cards embedded as JSON for the player.
 - The story's journey. The journey pages carry only the card's repository,
   number and title.
-- The timeline, event-ticker and who's-working sections on the replay
-  page: they are empty containers, awaiting the player.
 
 The boards in `docs/design/mock/` are the design reference to build to; they
 are not part of the system.

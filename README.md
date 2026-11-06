@@ -33,7 +33,9 @@ what each page shows, before any measure.
 
 - **Sprint overview** — one page per sprint: the sprint's figures (stories
   delivered, first-attempt pass, cycle time, points delivered), what changed
-  between sprints, the stories delivered story by story, why work didn't land
+  between sprints, the stories delivered story by story, every send-back of
+  the sprint (which step sent it back, which step it went back to, why, and
+  when, with the sprint's total count in the card head), why work didn't land
   first time, and decisions the crew made.
 - **Replay** — the crew's work on a day, played back: who did what, and how the
   board moved.

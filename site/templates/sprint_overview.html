@@ -147,6 +147,31 @@
       </div>
     </div>
   </section>
+  <section class="card sprint-sent-back" aria-labelledby="sent-back-h">
+    <div class="card__head">
+      <h2 id="sent-back-h">Sent back</h2>
+      {% if sent_back_rows %}
+      <span class="meta num">{{ sent_back_rows | length }} times</span>
+      {% endif %}
+    </div>
+    <div class="card__body">
+      {% if sent_back_rows %}
+      <div class="sent-back-list">
+        {% for row in sent_back_rows %}
+        <div class="sent-back-row">
+          {% if row.card_number is not none %}
+          <span class="num sent-back-row__number">#{{ row.card_number }}</span>
+          {% endif %}
+          {{ row.sentence }}
+          <span class="meta num sent-back-row__time">· {{ row.time }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p>No send-backs recorded for this sprint</p>
+      {% endif %}
+    </div>
+  </section>
   <section class="feature sprint-decided" aria-labelledby="decided-h">
     <h2 id="decided-h">Decided by the crew</h2>
     {% if decided %}
