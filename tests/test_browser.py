@@ -2005,6 +2005,10 @@ def test_sprint_overview_dora_values_shown():
         # The DORA values are rendered
         assert "14" in html, "release_frequency value '14' not in page"
         assert "45" in html, "mean_time_to_recovery_minutes value '45' not in page"
+        # The absence message is NOT shown when values are present
+        assert "no release data for this sprint" not in html, (
+            "absence line 'no release data for this sprint' should not appear when DORA values exist"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -2039,6 +2043,50 @@ def test_sprint_overview_dora_absent_shows_no_data():
         assert "no release data for this sprint" in html, (
             "absence line 'no release data for this sprint' not found"
         )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_overview_dora_all_null_shows_no_data():
+    """AC1: when dora exists but all four values are null, show 'no release data for this sprint'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "dora": {
+                    "release_frequency": None,
+                    "lead_time_days": None,
+                    "change_failure_count": None,
+                    "mean_time_to_recovery_minutes": None,
+                },
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The section heading is still present
+        assert "How releases went" in html, "DORA heading 'How releases went' not found"
+        # The absence message is shown
+        assert "no release data for this sprint" in html, (
+            "absence line 'no release data for this sprint' not found"
+        )
+        # None of the metric labels are rendered
+        assert "Releases this sprint" not in html, "metric label 'Releases this sprint' should not appear"
+        assert "Change to release" not in html, "metric label 'Change to release' should not appear"
+        assert "Releases that failed" not in html, "metric label 'Releases that failed' should not appear"
+        assert "Time to recover" not in html, "metric label 'Time to recover' should not appear"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
