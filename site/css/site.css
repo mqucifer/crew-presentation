@@ -1,6 +1,25 @@
 /* The site's own CSS: layout, the scrubber, the speed control,
    the board columns, the attempt chart. */
 
+/* Orientation block: what this is, before any measure */
+.orientation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+  align-items: baseline;
+}
+
+.orientation h2 {
+  font-size: var(--text-lg);
+  flex: 0 0 auto;
+}
+
+.orientation p {
+  margin: 0;
+  flex: 1 1 420px;
+  color: var(--color-text-dim);
+}
+
 /* Stat values: Public Sans style C — large numbers, tightened, tabular. */
 .stat__value {
   font-family: var(--font-sans);
@@ -194,6 +213,53 @@
   grid-column: span 5;
 }
 
+/* Sent-back card: sits in the right column, same width as the failure-causes card */
+.sprint-sent-back {
+  grid-column: span 5;
+}
+
+.sent-back-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.sent-back-row {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.sent-back-row__number {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.sent-back-row__time {
+  margin-left: 4px;
+}
+
+/* Left-open card: stories still open at the sprint's end */
+.sprint-left-open {
+  grid-column: span 5;
+}
+
+.left-open-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.left-open-row {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.left-open-row__duration {
+  margin-left: 4px;
+}
+
 .cause-chart {
   display: flex;
   flex-direction: column;
@@ -278,6 +344,8 @@
   }
   .sprint-chart,
   .sprint-side,
+  .sprint-sent-back,
+  .sprint-left-open,
   .sprint-decided,
   .replay-board {
     grid-column: 1 / -1;
@@ -457,4 +525,158 @@ section ul li a {
   .dora-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Replay controls: play/pause, speed, skip-idle */
+.replay-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.replay-controls__play {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: none;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.replay-controls__play:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.replay-controls__speed {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.replay-controls__speed-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-dim);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.replay-controls__speed-btn.is-active {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.replay-controls__speed-btn:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.replay-controls__skip {
+  min-height: 40px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-dim);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.replay-controls__skip.is-active {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+
+.replay-controls__skip:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Replay scrubber */
+.replay-scrubber {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.replay-scrubber__track {
+  position: relative;
+  height: 34px;
+  cursor: pointer;
+}
+
+.replay-scrubber__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 15px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-surface-raised);
+  overflow: hidden;
+}
+
+.replay-scrubber__progress::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  background: var(--color-accent);
+  transform-origin: left;
+  transform: scaleX(var(--progress, 0));
+}
+
+/* Who's working entries */
+.who-entry {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Event ticker rows */
+.ticker-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 12px;
+  font-size: 14px;
+  padding: 4px 0;
+}
+
+.ticker-row__time {
+  color: var(--color-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.ticker-row__text {
+  color: var(--color-text);
+  overflow-wrap: break-word;
+}
+
+.ticker-row--placeholder {
+  color: var(--color-text-dim);
 }

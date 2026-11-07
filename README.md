@@ -28,9 +28,16 @@ metrics itself. Nothing it publishes carries what the crew was told or thought.
 
 ## What the site shows
 
+Every page opens with a short "What this is" explanation of what the crew is and
+what each page shows, before any measure.
+
 - **Sprint overview** — one page per sprint: the sprint's figures (stories
   delivered, first-attempt pass, cycle time, points delivered), what changed
-  between sprints, the stories delivered story by story, why work didn't land
+  between sprints, the stories delivered story by story, every send-back of
+  the sprint (which step sent it back, which step it went back to, why, and
+  when, with the sprint's total count in the card head), what was still open
+  at the sprint's end (each story with its state — waiting, blocked or
+  refused — and how long it has been in that state), why work didn't land
   first time, a 'Where the time went' card showing how the sprint's model time
   split between planning and building (with both numbers in minutes), and
   decisions the crew made.

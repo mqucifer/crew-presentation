@@ -4,6 +4,7 @@ import json
 import re
 import shutil
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import jinja2
@@ -17,7 +18,7 @@ TEMPLATES_DIR = REPO_ROOT / "site" / "templates"
 CSS_DIR = REPO_ROOT / "site" / "css"
 JS_DIR = REPO_ROOT / "site" / "js"
 
-SUPPORTED_MAJOR_VERSIONS = (1, 2, 3)
+SUPPORTED_MAJOR_VERSIONS = (1, 2, 3, 4)
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
@@ -241,6 +242,10 @@ def _render_pages(pkg: Path) -> dict:
                 if card:
                     achieved_goals.append(card)
 
+        sent_back_events = _load_sprint_events(pkg, sprint["name"], index)
+        sent_back_rows = _build_sent_back_rows(sent_back_events)
+        left_open_rows = _left_open_rows(sent_back_events, cards, sprint)
+
         context = {
             "sprints": sprints,
             "sprint": sprint,
@@ -260,6 +265,8 @@ def _render_pages(pkg: Path) -> dict:
             "changed": changed,
             "decided": decided,
             "failure_causes": _build_failure_causes(metrics),
+            "sent_back_rows": sent_back_rows,
+            "left_open_rows": left_open_rows,
             "roster_released_epics": released_epics,
             "roster_achieved_goals": achieved_goals,
             "model_time_split": _build_model_time_split(metrics),
@@ -710,6 +717,222 @@ CAUSE_LABELS = {
     "no_test_written": "No test written",
     "unrecorded": "Cause not recorded",
 }
+
+# Board's own word for each step the flow records.
+STEP_DISPLAY = {
+    "sponsor": "the sponsor",
+    "decompose": "decomposition",
+    "refinement": "refinement",
+    "story_problem": "the story's problem",
+    "split": "the split",
+    "criteria_check": "criteria check",
+    "build": "building",
+    "gate": "the checks",
+    "ci": "CI",
+    "review": "review",
+    "deploy_review": "deploy review",
+    "qa": "QA",
+    "merge": "merge",
+    "main": "main",
+    "release_check": "release check",
+    "revert": "revert",
+    "revisit": "revisit",
+    "design": "design",
+}
+
+# Rule codes as plain-sentence fragments. The fragment completes the sentence
+# "X <fragment>, so back to Y" where X is the sent_from step's display word.
+RULE_FRAGMENTS = {
+    "gate.findings_at_done": "found problems at done",
+    "gate.merge_changes_requested": "asked for changes",
+    "gate.ci_before_review": "found problems",
+    "gate.review_changes_requested": "asked for changes",
+    "gate.criteria_repair": "found conflicts",
+    "gate.design_refused": "was refused at",
+}
+
+
+def _step_display(step: str) -> str:
+    """A step's display word; an unknown step reads as a step, not a code."""
+    if step in STEP_DISPLAY:
+        return STEP_DISPLAY[step]
+    return step.replace("_", " ") if step else ""
+
+
+def _sent_back_sentence(event: dict) -> str:
+    """A plain sentence for a send-back row, naming the steps in the board's words."""
+    rule = event.get("rule", "")
+    sent_from = _step_display(event.get("sent_from", ""))
+    sent_to = _step_display(event.get("sent_to", ""))
+    card = event.get("card")
+
+    fragment = RULE_FRAGMENTS.get(rule)
+    if fragment:
+        if fragment == "was refused at":
+            # No-card design send-back: "A design was refused at <sent_from>"
+            sentence = f"A design was refused at {sent_from}"
+        else:
+            sentence = f"{sent_from} {fragment}"
+    else:
+        sentence = f"{sent_from} sent it back"
+
+    if sent_to:
+        sentence += f", so back to {sent_to}"
+    return sentence
+
+
+def _build_sent_back_rows(events: list[dict]) -> list[dict]:
+    """One row per sent_back event, ready to render in the sprint's 'Sent back' card."""
+    rows = []
+    for event in events:
+        if event.get("kind") != "sent_back":
+            continue
+        card = event.get("card")
+        rows.append(
+            {
+                "card_number": card.get("number") if card else None,
+                "sentence": _sent_back_sentence(event),
+                "time": _format_event_time(event.get("at", "")),
+            }
+        )
+    return rows
+
+
+def _parse_iso_timestamp(at: str) -> datetime | None:
+    """Parse an ISO 8601 timestamp to a UTC datetime; None when unparseable."""
+    if not at:
+        return None
+    try:
+        return datetime.fromisoformat(at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _format_left_open_duration(seconds: float) -> str:
+    """A duration in seconds as the left-open card's own words: 'for 2 days', 'for 1 hour', 'for 30 min'."""
+    if seconds <= 0:
+        return "for 0 min"
+    total_minutes = round(seconds / 60)
+    if total_minutes < 60:
+        return f"for {total_minutes} min"
+    total_hours = total_minutes // 60
+    if total_hours < 24:
+        return f"for {total_hours} hour{'s' if total_hours != 1 else ''}"
+    total_days = total_hours // 24
+    return f"for {total_days} day{'s' if total_days != 1 else ''}"
+
+
+def _left_open_rows(
+    events: list[dict], cards: list[dict], sprint: dict
+) -> list[dict]:
+    """Rows for the sprint's 'Left open at the end' card.
+
+    Replays the board from the sprint's events alone: each story's column at
+    the sprint's end is the to_column of its last card_moved (or move) event
+    that carries a non-null to_column. A story whose end-of-sprint column is
+    not Done gets a row with a badge (Blocked, Refused or Waiting), its
+    repository, number, title, and how long it has been in that state.
+    Epics and Goals are excluded.
+    """
+    # Card types: only "Story" cards get rows
+    card_types: dict[tuple, str] = {}
+    cards_by_key: dict[tuple, dict] = {}
+    for card in cards:
+        key = (card.get("repo"), card.get("number"))
+        card_types[key] = card.get("type", "")
+        cards_by_key[key] = card
+
+    # Collect sent_back keys for identifying send-back moves:
+    # (repo, number, at_truncated_to_seconds)
+    sent_back_keys: set[tuple] = set()
+    for event in events:
+        if event.get("kind") == "sent_back":
+            card_ref = event.get("card")
+            if card_ref:
+                at_sec = event.get("at", "")[:19]
+                sent_back_keys.add(
+                    (card_ref.get("repo"), card_ref.get("number"), at_sec)
+                )
+
+    # Replay the board: track each card's last move into a column
+    card_state: dict[tuple, dict] = {}
+    for event in events:
+        if event.get("kind") not in ("card_moved", "move"):
+            continue
+        card_ref = event.get("card")
+        if not card_ref:
+            continue
+        to_col = event.get("to_column")
+        if not to_col:
+            continue
+        key = (card_ref.get("repo"), card_ref.get("number"))
+        at_sec = event.get("at", "")[:19]
+        is_sent_back = (
+            card_ref.get("repo"),
+            card_ref.get("number"),
+            at_sec,
+        ) in sent_back_keys
+        card_state[key] = {
+            "column": to_col,
+            "moved_at": event.get("at", ""),
+            "moved_by_sent_back": is_sent_back,
+        }
+
+    # The sprint's end as a UTC datetime: midnight of the day after the end date
+    end_date = sprint.get("end", "")
+    try:
+        from datetime import timezone
+
+        sprint_end_dt = (
+            datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            + timedelta(days=1)
+        )
+    except ValueError:
+        return []
+
+    rows = []
+    for key, state in card_state.items():
+        if state["column"] == "Done":
+            continue
+        if card_types.get(key, "") != "Story":
+            continue
+
+        repo, number = key
+        card = cards_by_key.get(key, {})
+        title = card.get("title", "")
+
+        # Badge per R34
+        if state["column"] == "Blocked":
+            badge_label = "Blocked"
+            badge_tone = "blocked"
+        elif state["moved_by_sent_back"]:
+            badge_label = "Refused"
+            badge_tone = "blocked"
+        else:
+            badge_label = "Waiting"
+            badge_tone = "waiting"
+
+        # Duration: from the last move into this column to the sprint's end
+        moved_dt = _parse_iso_timestamp(state["moved_at"])
+        if moved_dt:
+            duration_seconds = (sprint_end_dt - moved_dt).total_seconds()
+        else:
+            duration_seconds = 0.0
+        duration = _format_left_open_duration(duration_seconds)
+
+        rows.append(
+            {
+                "repo": repo,
+                "number": number,
+                "title": title,
+                "badge_label": badge_label,
+                "badge_tone": badge_tone,
+                "duration": duration,
+            }
+        )
+
+    rows.sort(key=lambda r: (r["repo"] or "", r["number"] or 0))
+    return rows
 
 
 _COLUMN_ORDER: list[str] = [

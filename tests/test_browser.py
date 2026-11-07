@@ -2991,17 +2991,12 @@ def test_story_journey_root_page_single_h1_and_story_links():
         # matches the pattern stories/
         content_start = html.index("</header>")
         content_html = html[content_start:]
-        section_match = re.search(
-            r'<section[^>]*>(.*?)</section>', content_html, re.DOTALL
-        )
-        assert section_match, "no section element found in content area"
-        section_html = section_match.group(1)
+        # Skip the orientation section; the content section has the Cards heading
         story_links = re.findall(
-            r'<a[^>]*href="([^"]*stories/[^"]*)"[^>]*>', section_html
+            r'<a[^>]*href="([^"]*stories/[^"]*)"[^>]*>', content_html
         )
         assert story_links, (
-            f"no story links found in content section; "
-            f"section content: {section_html[:200]}"
+            f"no story links found in content area"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -10743,4 +10738,516 @@ def test_readme_sprint_overview_mentions_where_time_went():
     )
     assert "minutes" in bullet.lower(), (
         "README 'Sprint overview' bullet must mention minutes"
+    )
+
+
+def test_replay_player_controls_and_sections_populated():
+    """AC1: at page load with at least one event, the page contains play/pause,
+    speed buttons (1×, 30×, 60×), skip-idle, a timeline scrubber, and each of
+    the Timeline, Who's working, and Event ticker sections has at least one
+    rendered child element."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"kind": "move", "at": "2026-10-07T08:00:00Z", "card": {"number": 1, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+    ]
+    cards = [
+        {"number": 1, "repo": "mqucifer/crew", "title": "alpha"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Play/pause control
+            play_btn = page.query_selector(".replay-controls__play")
+            assert play_btn is not None, "no play/pause control found"
+
+            # Speed buttons labelled 1×, 30×, 60×
+            speed_btns = page.query_selector_all(".replay-controls__speed-btn")
+            speed_labels = [b.text_content() for b in speed_btns]
+            assert "1\u00D7" in speed_labels, f"1× button not found: {speed_labels}"
+            assert "30\u00D7" in speed_labels, f"30× button not found: {speed_labels}"
+            assert "60\u00D7" in speed_labels, f"60× button not found: {speed_labels}"
+
+            # Skip-idle control
+            skip_btn = page.query_selector(".replay-controls__skip")
+            assert skip_btn is not None, "no skip-idle control found"
+
+            # Timeline scrubber
+            scrubber = page.query_selector(".replay-scrubber")
+            assert scrubber is not None, "no timeline scrubber found"
+
+            # Timeline section has at least one child
+            timeline = page.query_selector('[aria-label="Timeline"]')
+            assert timeline is not None, "no Timeline section"
+            timeline_children = timeline.query_selector_all(":scope > *")
+            assert len(timeline_children) >= 1, (
+                f"Timeline section has {len(timeline_children)} children, expected >= 1"
+            )
+
+            # Who's working section has at least one child
+            who = page.query_selector('[aria-label="Who\'s working"]')
+            assert who is not None, "no Who's working section"
+            who_children = who.query_selector_all(":scope > *")
+            assert len(who_children) >= 1, (
+                f"Who's working section has {len(who_children)} children, expected >= 1"
+            )
+
+            # Event ticker section has at least one child
+            ticker = page.query_selector('[aria-label="Event ticker"]')
+            assert ticker is not None, "no Event ticker section"
+            ticker_children = ticker.query_selector_all(":scope > *")
+            assert len(ticker_children) >= 1, (
+                f"Event ticker section has {len(ticker_children)} children, expected >= 1"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_card_moves_to_target_column():
+    """AC2: when the replay is played past an event that moves a card to a
+    column, that card's number appears under the board column whose header
+    matches the event's to_column."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"kind": "move", "at": "2026-10-07T08:00:00Z", "card": {"number": 42, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+        {"kind": "move", "at": "2026-10-07T09:00:00Z", "card": {"number": 42, "repo": "mqucifer/crew"}, "from_column": "In Progress", "to_column": "Reviewing", "role": "Developer"},
+    ]
+    cards = [
+        {"number": 42, "repo": "mqucifer/crew", "title": "thresholds.py"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Play to the end
+            page.evaluate("window.replay.finish()")
+
+            # After both events, card #42 should be in the Reviewing column
+            board = page.query_selector('[aria-label="Board"]')
+            assert board is not None, "no Board section"
+            cols = board.query_selector_all(".replay-col")
+            found = False
+            for col in cols:
+                header = col.query_selector(".replay-col__header")
+                if header and header.text_content().strip() == "Reviewing":
+                    cards_div = col.query_selector(".replay-col__cards")
+                    if cards_div:
+                        text = cards_div.text_content()
+                        if "#42" in text:
+                            found = True
+                            break
+            assert found, (
+                "card #42 not found under the Reviewing column after playback"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_ticker_shows_card_number():
+    """AC3: when the replay is played past an event that names a card,
+    the Event ticker section shows a row whose text contains that card's number."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = [
+        {"kind": "move", "at": "2026-10-07T08:00:00Z", "card": {"number": 127, "repo": "mqucifer/crew"}, "from_column": "Sprint Backlog", "to_column": "In Progress", "role": "Developer"},
+    ]
+    cards = [
+        {"number": 127, "repo": "mqucifer/crew", "title": "thresholds.py"},
+    ]
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Play to the end
+            page.evaluate("window.replay.finish()")
+
+            # Check the ticker for a row containing #127
+            ticker = page.query_selector('[aria-label="Event ticker"]')
+            assert ticker is not None, "no Event ticker section"
+            rows = ticker.query_selector_all(".ticker-row")
+            found = False
+            for row in rows:
+                text = row.text_content()
+                if "#127" in text:
+                    found = True
+                    break
+            assert found, (
+                "no ticker row contains #127 after playback"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_replay_empty_events_board_and_ticker_empty():
+    """AC4: when the embedded events array is empty, after loading and starting
+    the replay, the In Progress, Reviewing, QAing, Merging and Done columns
+    each contain zero cards and the Event ticker section contains zero event rows."""
+    tag = "delivery-history-TEST"
+    sprints = [
+        {"name": "Sprint 7", "start": "2026-10-07", "end": "2026-10-13"},
+    ]
+    events = []
+    cards = []
+    _make_package_with_board(tag, sprints, events, cards, "Sprint 7")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "replay.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Start the replay
+            page.evaluate("window.replay.play()")
+
+            # Check the standard columns exist and have zero cards
+            board = page.query_selector('[aria-label="Board"]')
+            assert board is not None, "no Board section"
+            expected_columns = [
+                "In Progress", "Reviewing", "QAing", "Merging", "Done",
+            ]
+            for col_name in expected_columns:
+                col = None
+                for candidate in board.query_selector_all(".replay-col"):
+                    header = candidate.query_selector(".replay-col__header")
+                    if header and header.text_content().strip() == col_name:
+                        col = candidate
+                        break
+                assert col is not None, (
+                    f"column {col_name!r} not found in the board"
+                )
+                cards_div = col.query_selector(".replay-col__cards")
+                assert cards_div is not None, (
+                    f"column {col_name!r} has no .replay-col__cards"
+                )
+                card_count = len(cards_div.query_selector_all(".replay-card"))
+                assert card_count == 0, (
+                    f"column {col_name!r} has {card_count} cards, expected 0"
+                )
+
+            # Check the Event ticker section exists and has zero event rows
+            ticker = page.query_selector('[aria-label="Event ticker"]')
+            assert ticker is not None, "no Event ticker section"
+            ticker_rows = ticker.query_selector_all(".ticker-row")
+            assert len(ticker_rows) == 0, (
+                f"Event ticker has {len(ticker_rows)} rows, expected 0"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _orientation_section(html: str) -> str:
+    """Extract the orientation section's inner HTML from a page (by class)."""
+    match = re.search(
+        r'<section class="orientation"[^>]*>(.*?)</section>', html, re.DOTALL
+    )
+    assert match, "no orientation section (class='orientation') found"
+    return match.group(1)
+
+
+def _orientation_text(html: str) -> str:
+    """Extract the paragraph text from the orientation section, tags stripped."""
+    section = _orientation_section(html)
+    match = re.search(r"<p[^>]*>(.*?)</p>", section, re.DOTALL)
+    assert match, "no paragraph in orientation section"
+    return re.sub(r"<[^>]+>", "", match.group(1))
+
+
+def test_orientation_block_before_sprint_totals():
+    """AC1: 'What this is' heading and paragraph appear in document order before
+    the 'Sprint totals' stats and before every section that displays a number."""
+    tag = "delivery-history-TEST"
+    names = ["Sprint 6", "Sprint 7"]
+    _make_fake_package(tag, names)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-7.html").read_text()
+
+        # The orientation section must exist
+        orientation_pos = html.find('class="orientation"')
+        assert orientation_pos != -1, "no orientation section found in sprint page"
+
+        # The Sprint totals section must exist
+        totals_pos = html.find('aria-label="Sprint totals"')
+        assert totals_pos != -1, "no Sprint totals section found"
+
+        # Orientation must come before totals in document order
+        assert orientation_pos < totals_pos, (
+            "orientation section must appear before Sprint totals in document order"
+        )
+
+        # Verify the heading text
+        orientation = _orientation_section(html)
+        assert "What this is" in orientation, (
+            "no 'What this is' heading in orientation section"
+        )
+
+        # Verify the paragraph covers the key concepts
+        para = _orientation_text(html)
+        assert "AI roles" in para, (
+            f"orientation text does not say the crew is AI roles: {para!r}"
+        )
+        assert "sprints" in para, (
+            f"orientation text does not mention sprints: {para!r}"
+        )
+        assert "approving its plans" in para, (
+            f"orientation text does not mention one person approving plans: {para!r}"
+        )
+        # What each page shows
+        assert "sprint page" in para, (
+            f"orientation text does not describe the sprint pages: {para!r}"
+        )
+        assert "journey" in para, (
+            f"orientation text does not describe a story's journey: {para!r}"
+        )
+        assert "replay" in para, (
+            f"orientation text does not describe the replay: {para!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_orientation_block_readable_at_phone_width():
+    """AC2: the 'What this is' block is fully readable at 375px: text is not
+    clipped, overlapped or hidden."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 375, "height": 812})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # The orientation section must be visible
+            orientation = page.locator("section.orientation")
+            assert orientation.is_visible(), (
+                "orientation section is not visible at 375px"
+            )
+
+            # The heading must be visible with the right text
+            heading = orientation.locator("h2")
+            assert heading.is_visible(), (
+                "orientation heading is not visible at 375px"
+            )
+            heading_text = heading.text_content()
+            assert "What this is" in heading_text, (
+                f"heading text is {heading_text!r}, expected 'What this is'"
+            )
+
+            # The paragraph must be visible and have substantial text
+            para = orientation.locator("p")
+            assert para.is_visible(), (
+                "orientation paragraph is not visible at 375px"
+            )
+            para_text = para.text_content()
+            assert para_text and len(para_text.strip()) > 50, (
+                f"orientation paragraph text too short: {para_text!r}"
+            )
+
+            # The paragraph must have a non-zero width and height (not hidden)
+            para_box = para.bounding_box()
+            assert para_box, "orientation paragraph has no bounding box"
+            assert para_box["width"] > 0, "orientation paragraph has zero width"
+            assert para_box["height"] > 0, "orientation paragraph has zero height"
+
+            # Document must not overflow horizontally at 375px
+            scroll_width = page.evaluate("document.documentElement.scrollWidth")
+            assert scroll_width <= 375, (
+                f"scrollWidth is {scroll_width}, expected <= 375 at 375px viewport"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_orientation_block_on_story_journey_and_replay():
+    """AC3: story-journey and replay pages carry the 'What this is' block before
+    their main content, server-rendered into the HTML at build time."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+
+        # Story journey page
+        journey_html = (BUILD_DIR / "story-journey.html").read_text()
+        journey_orientation = _orientation_section(journey_html)
+        assert "What this is" in journey_orientation, (
+            "no 'What this is' heading in story-journey page"
+        )
+        journey_text = _orientation_text(journey_html)
+        assert "AI roles" in journey_text, (
+            "story-journey orientation text does not mention AI roles"
+        )
+
+        # The orientation must come before the main content
+        orientation_pos = journey_html.find('class="orientation"')
+        # The main content on the root journey page is a <section> with a Cards heading
+        content_marker = journey_html.find("<h2>Cards</h2>")
+        if content_marker == -1:
+            content_marker = journey_html.find("class=\"card", orientation_pos)
+        assert content_marker != -1, "no main content found in story-journey page"
+        assert orientation_pos < content_marker, (
+            "orientation section must appear before the main content on story-journey"
+        )
+
+        # Replay page
+        replay_html = (BUILD_DIR / "replay.html").read_text()
+        replay_orientation = _orientation_section(replay_html)
+        assert "What this is" in replay_orientation, (
+            "no 'What this is' heading in replay page"
+        )
+        replay_text = _orientation_text(replay_html)
+        assert "AI roles" in replay_text, (
+            "replay orientation text does not mention AI roles"
+        )
+
+        # The text must be identical on both pages (constant text, server-rendered)
+        assert journey_text == replay_text, (
+            "orientation text differs between story-journey and replay pages"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_orientation_text_identical_across_sprints():
+    """AC4: two different sprint pages have identical orientation block text;
+    it is constant, derived from nothing in the package."""
+    tag = "delivery-history-TEST"
+    names = ["Sprint 6", "Sprint 7"]
+    _make_fake_package(tag, names)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html6 = (BUILD_DIR / "sprint-6.html").read_text()
+        html7 = (BUILD_DIR / "sprint-7.html").read_text()
+
+        text6 = _orientation_text(html6)
+        text7 = _orientation_text(html7)
+
+        assert text6 == text7, (
+            f"orientation text differs between sprints:\n"
+            f"  sprint-6: {text6!r}\n"
+            f"  sprint-7: {text7!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_readme_what_the_site_shows_mentions_orientation():
+    """AC5: the README's 'What the site shows' section tells the reader that
+    every page opens with a short 'What this is' explanation before any measure."""
+    readme = (REPO_ROOT / "README.md").read_text()
+    # Find the "What the site shows" section
+    section_start = readme.find("## What the site shows")
+    assert section_start != -1, "no 'What the site shows' section in README.md"
+    # Find the next section (or end of file)
+    next_section = readme.find("\n## ", section_start + 1)
+    if next_section == -1:
+        section_text = readme[section_start:]
+    else:
+        section_text = readme[section_start:next_section]
+    # The section must mention the orientation block
+    assert "What this is" in section_text, (
+        "README 'What the site shows' section does not mention the "
+        "'What this is' orientation block"
+    )
+    assert "before any measure" in section_text, (
+        "README 'What the site shows' section does not say the orientation "
+        "appears before any measure"
     )

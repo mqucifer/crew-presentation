@@ -29,6 +29,10 @@
       <a href="{{ static_prefix }}replay.html" {% if current_view == 'replay' %}aria-current="page"{% endif %}>Replay</a>
     </nav>
   </header>
+  <section class="orientation" aria-labelledby="orientation-h">
+    <h2 id="orientation-h">What this is</h2>
+    <p>This site shows how the crew works. The crew is a group of AI roles that builds software in sprints, with one person approving its plans. Each sprint page shows what the crew delivered in that sprint and how its measures moved. A story&rsquo;s journey shows one story&rsquo;s path from a Goal to merged. The replay plays back the crew&rsquo;s work on a day, showing who did what and how the board moved.</p>
+  </section>
   {% block content %}{% endblock %}
 </div>
 </body>
