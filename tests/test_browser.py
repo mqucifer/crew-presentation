@@ -10946,3 +10946,87 @@ def test_readme_what_the_site_shows_mentions_orientation():
         "README 'What the site shows' section does not say the orientation "
         "appears before any measure"
     )
+
+
+def test_sprint_page_shows_timezone_line():
+    """AC1: a sprint page shows a line stating the timezone, taken from
+    the package's timezone field."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    # Add the timezone to the package's delivery-history.json
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["timezone"] = "America/Chicago"
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Times are Chicago time" in html, (
+            "sprint page does not state the timezone: "
+            "expected 'Times are Chicago time' in page"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_page_timezone_names_package_zone_not_chicago():
+    """AC2: the timezone line names the zone from the package, not a
+    hardcoded or guessed one."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["timezone"] = "America/Denver"
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Times are Denver time" in html, (
+            "sprint page should name the package's zone (Denver), not Chicago"
+        )
+        assert "Times are Chicago time" not in html, (
+            "sprint page must not name a zone the package does not carry"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_page_timezone_line_present_without_clock_times():
+    """AC3: the timezone line is present even when no decisions or
+    send-backs are recorded (no clock times on the page)."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 0,
+                "points_delivered": 0,
+                "first_attempt_numerator": 0,
+                "first_attempt_denominator": 0,
+                "escalation_count": 0,
+                "cycle_time_minutes": None,
+            }
+        },
+    )
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["timezone"] = "America/Chicago"
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Times are Chicago time" in html, (
+            "timezone line must be present even when no clock times are shown"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
