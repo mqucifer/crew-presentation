@@ -562,7 +562,7 @@ def test_header_meta_line_and_document_order():
 
 
 def test_view_nav_aria_current():
-    """AC6: view nav has three links in order; Sprint has aria-current=page, others don't."""
+    """AC6: view nav has four links in order; Sprint has aria-current=page, others don't."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -584,10 +584,10 @@ def test_view_nav_aria_current():
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
         view_nav = _view_nav(html)
-        # Three links in order
+        # Four links in order
         links = re.findall(r"<a[^>]*>(.*?)</a>", view_nav)
-        assert links == ["Sprint", "A story's journey", "Replay"], (
-            f"view nav links are {links}, expected ['Sprint', \"A story's journey\", 'Replay']"
+        assert links == ["Sprint", "A story's journey", "Replay", "About the crew"], (
+            f"view nav links are {links}, expected ['Sprint', \"A story's journey\", 'Replay', 'About the crew']"
         )
         # Sprint link has aria-current="page"
         sprint_link = re.search(
@@ -595,7 +595,7 @@ def test_view_nav_aria_current():
         )
         assert sprint_link, "Sprint link does not have aria-current='page'"
         # Other links do NOT have aria-current
-        for text in ("A story's journey", "Replay"):
+        for text in ("A story's journey", "Replay", "About the crew"):
             link_match = re.search(
                 rf'<a[^>]*>{re.escape(text)}</a>', view_nav
             )
@@ -7135,8 +7135,8 @@ def test_view_nav_links_at_least_44px_at_phone_width():
                 "Array.from(document.querySelectorAll('nav.nav a'))"
                 ".map(el => el.getBoundingClientRect().height)"
             )
-            assert len(heights) == 3, (
-                f"expected 3 view-nav links, got {len(heights)}"
+            assert len(heights) == 4, (
+                f"expected 4 view-nav links, got {len(heights)}"
             )
             for h in heights:
                 assert h >= 44, f"view-nav link height {h} < 44px"
@@ -7217,7 +7217,7 @@ def test_view_nav_no_horizontal_overflow_at_phone_width():
 
 
 def test_view_nav_exactly_three_links_in_order_at_phone_width():
-    """AC4: at 375px, nav.nav has exactly 3 links 'Sprint', "A story's journey", 'Replay'."""
+    """AC4: at 375px, nav.nav has exactly 4 links 'Sprint', "A story's journey", 'Replay', 'About the crew'."""
     tag = "delivery-history-TEST"
     _make_fake_package(tag, ["Sprint 6"])
     original = DELIVERY_HISTORY_TAG.read_text()
@@ -7240,7 +7240,7 @@ def test_view_nav_exactly_three_links_in_order_at_phone_width():
                 "Array.from(document.querySelectorAll('nav.nav a'))"
                 ".map(el => el.textContent.trim())"
             )
-            assert texts == ["Sprint", "A story's journey", "Replay"], (
+            assert texts == ["Sprint", "A story's journey", "Replay", "About the crew"], (
                 f"view-nav links are {texts}, expected the desktop set and order"
             )
 
@@ -7308,8 +7308,8 @@ def test_view_nav_links_at_least_40px_at_desktop_width():
                 "Array.from(document.querySelectorAll('nav.nav a'))"
                 ".map(el => el.getBoundingClientRect().height)"
             )
-            assert len(heights) == 3, (
-                f"expected 3 view-nav links, got {len(heights)}"
+            assert len(heights) == 4, (
+                f"expected 4 view-nav links, got {len(heights)}"
             )
             for h in heights:
                 assert h >= 40, f"view-nav link height {h} < 40px on desktop"
