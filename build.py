@@ -270,6 +270,7 @@ def _render_pages(pkg: Path) -> dict:
             "left_open_rows": left_open_rows,
             "roster_released_epics": released_epics,
             "roster_achieved_goals": achieved_goals,
+            "model_time_split": _build_model_time_split(metrics),
             "current_view": "sprint",
             "timezone_label": timezone_label,
         }
@@ -632,6 +633,37 @@ def _format_metrics_value(measure: str, value) -> str:
     if isinstance(value, float) and value == int(value):
         return str(int(value))
     return str(value)
+
+
+def _build_model_time_split(metrics: dict):
+    """Read the sprint-metrics' model_time_split null-tolerantly.
+
+    Returns None when the field is absent or null (the pinned 3.0.0 package
+    carries it as null for every sprint). Otherwise returns a dict with
+    planning_minutes, building_minutes and the two segment widths as
+    percentages of the bar.
+    """
+    split = metrics.get("model_time_split")
+    if not isinstance(split, dict):
+        return None
+    planning = split.get("refinement")
+    building = split.get("delivery")
+    if planning is None or building is None:
+        return None
+    total = planning + building
+    if total == 0:
+        return {
+            "planning_minutes": planning,
+            "building_minutes": building,
+            "planning_percent": 0,
+            "building_percent": 100,
+        }
+    return {
+        "planning_minutes": planning,
+        "building_minutes": building,
+        "planning_percent": int(round(planning / total * 100)),
+        "building_percent": int(round(building / total * 100)),
+    }
 
 
 def _changed_label(measure: str) -> str:

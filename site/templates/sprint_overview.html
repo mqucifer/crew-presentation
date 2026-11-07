@@ -243,4 +243,28 @@
 {% if timezone_label %}
 <div class="meta">Times are {{ timezone_label }} time</div>
 {% endif %}
+<section class="card" aria-labelledby="time-went-h">
+  <div class="card__head">
+    <h2 id="time-went-h">Where the time went</h2>
+  </div>
+  {% if model_time_split %}
+  <div class="card__body">
+    <div class="model-time-split">
+      <div class="model-time-split__label">Model time: planning against building</div>
+      <div class="model-time-split__bar">
+        <div class="model-time-split__planning" style="width:{{ model_time_split.planning_percent }}%"></div>
+        <div class="model-time-split__building" style="width:{{ model_time_split.building_percent }}%"></div>
+      </div>
+      <div class="model-time-split__values">
+        <span>Planning: <span class="num">{{ model_time_split.planning_minutes }}</span> min</span>
+        <span>Building: <span class="num">{{ model_time_split.building_minutes }}</span> min</span>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card__body">
+    <p>No model time recorded for this sprint</p>
+  </div>
+  {% endif %}
+</section>
 {% endblock %}
