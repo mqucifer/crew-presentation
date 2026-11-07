@@ -2005,6 +2005,10 @@ def test_sprint_overview_dora_values_shown():
         # The DORA values are rendered
         assert "14" in html, "release_frequency value '14' not in page"
         assert "45" in html, "mean_time_to_recovery_minutes value '45' not in page"
+        # The absence message is NOT shown when values are present
+        assert "no release data for this sprint" not in html, (
+            "absence line 'no release data for this sprint' should not appear when DORA values exist"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -2039,6 +2043,50 @@ def test_sprint_overview_dora_absent_shows_no_data():
         assert "no release data for this sprint" in html, (
             "absence line 'no release data for this sprint' not found"
         )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_overview_dora_all_null_shows_no_data():
+    """AC1: when dora exists but all four values are null, show 'no release data for this sprint'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "dora": {
+                    "release_frequency": None,
+                    "lead_time_days": None,
+                    "change_failure_count": None,
+                    "mean_time_to_recovery_minutes": None,
+                },
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The section heading is still present
+        assert "How releases went" in html, "DORA heading 'How releases went' not found"
+        # The absence message is shown
+        assert "no release data for this sprint" in html, (
+            "absence line 'no release data for this sprint' not found"
+        )
+        # None of the metric labels are rendered
+        assert "Releases this sprint" not in html, "metric label 'Releases this sprint' should not appear"
+        assert "Change to release" not in html, "metric label 'Change to release' should not appear"
+        assert "Releases that failed" not in html, "metric label 'Releases that failed' should not appear"
+        assert "Time to recover" not in html, "metric label 'Time to recover' should not appear"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -10441,6 +10489,311 @@ def test_points_delivered_no_percent_in_metrics_path():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_where_time_went_null_shows_no_value():
+    """AC1: model_time_split null → card shows 'Where the time went' heading and a no-value state, after 'How releases went'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": None,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The heading is present
+        assert "Where the time went" in html, "heading 'Where the time went' not found"
+        # It is positioned after 'How releases went'
+        dora_pos = html.index("How releases went")
+        time_pos = html.index("Where the time went")
+        assert time_pos > dora_pos, "'Where the time went' must come after 'How releases went'"
+        # The card shows a no-value state, not empty, not 0
+        assert "No model time recorded for this sprint" in html, (
+            "no-value state 'No model time recorded for this sprint' not found"
+        )
+        # No placeholder note in the card head
+        assert "placeholders until the package carries values" not in html, (
+            "card head must not carry 'placeholders until the package carries values'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_where_time_went_shows_split_bar_and_minutes():
+    """AC2: model_time_split 90/270 → split bar with 25%/75% segments, 'Planning: 90 min' and 'Building: 270 min'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": {"refinement": 90, "delivery": 270},
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The label is present
+        assert "Model time: planning against building" in html, (
+            "label 'Model time: planning against building' not found"
+        )
+        # The split bar has two segments with correct widths
+        planning_bar = re.search(
+            r'class="model-time-split__planning" style="width:(\d+)%"', html
+        )
+        building_bar = re.search(
+            r'class="model-time-split__building" style="width:(\d+)%"', html
+        )
+        assert planning_bar, "planning bar segment not found"
+        assert building_bar, "building bar segment not found"
+        assert planning_bar.group(1) == "25", (
+            f"planning segment width is {planning_bar.group(1)}%, expected 25%"
+        )
+        assert building_bar.group(1) == "75", (
+            f"building segment width is {building_bar.group(1)}%, expected 75%"
+        )
+        # Planning comes before building in the DOM
+        assert planning_bar.start() < building_bar.start(), (
+            "planning segment must come before building segment"
+        )
+        # The minute lines
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        assert "90" in card and "min" in card, "planning minutes '90 min' not in card"
+        assert "270" in card and "min" in card, "building minutes '270 min' not in card"
+        # Planning line comes before Building line
+        planning_line = card.index("Planning:")
+        building_line = card.index("Building:")
+        assert planning_line < building_line, "'Planning:' must come before 'Building:'"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_where_time_went_uses_only_planning_and_building():
+    """AC3: 'refinement' and 'delivery' appear nowhere in the card; every number carries 'min'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": {"refinement": 90, "delivery": 270},
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        # 'refinement' and 'delivery' appear nowhere in the card
+        assert "refinement" not in card.lower(), (
+            "'refinement' must not appear in the card"
+        )
+        assert "delivery" not in card.lower(), (
+            "'delivery' must not appear in the card"
+        )
+        # Check the specific minute lines
+        assert re.search(r'Planning:.*?90.*?min', card), (
+            "'Planning: 90 min' pattern not found"
+        )
+        assert re.search(r'Building:.*?270.*?min', card), (
+            "'Building: 270 min' pattern not found"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_where_time_went_zero_planning():
+    """AC4: planning=0, building=120 → 'Planning: 0 min', 'Building: 120 min', planning bar empty, building fills whole bar."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": {"refinement": 0, "delivery": 120},
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        # Planning: 0 min
+        assert re.search(r'Planning:.*?0.*?min', card), (
+            "'Planning: 0 min' not found"
+        )
+        # Building: 120 min
+        assert re.search(r'Building:.*?120.*?min', card), (
+            "'Building: 120 min' not found"
+        )
+        # Planning segment is empty (width 0%)
+        planning_bar = re.search(
+            r'class="model-time-split__planning" style="width:(\d+)%"', card
+        )
+        assert planning_bar, "planning bar segment not found"
+        assert planning_bar.group(1) == "0", (
+            f"planning segment width is {planning_bar.group(1)}%, expected 0%"
+        )
+        # Building segment fills the whole bar (width 100%)
+        building_bar = re.search(
+            r'class="model-time-split__building" style="width:(\d+)%"', card
+        )
+        assert building_bar, "building bar segment not found"
+        assert building_bar.group(1) == "100", (
+            f"building segment width is {building_bar.group(1)}%, expected 100%"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_where_time_went_fits_375px():
+    """AC5: at 375px the card shows heading, bar and minute lines; no horizontal scroll from the card."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": {"refinement": 90, "delivery": 270},
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        # The heading is present
+        assert "Where the time went" in card
+        # The bar is present
+        assert "model-time-split__bar" in card
+        # Both minute lines are present
+        assert "Planning:" in card
+        assert "Building:" in card
+        # The CSS uses flex-wrap for the values container
+        css = (REPO_ROOT / "site" / "css" / "site.css").read_text()
+        assert "flex-wrap: wrap" in css, (
+            "model-time-split__values must use flex-wrap for narrow viewports"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_where_time_went_css_uses_tokens_only():
+    """AC6: the new card's CSS uses design-system tokens only: no raw colour in the model-time-split section."""
+    site_css = (REPO_ROOT / "site" / "css" / "site.css").read_text()
+    # Find the model-time-split section
+    mts_start = site_css.index("Model time split")
+    mts_end = site_css.index("/* DORA measures grid */")
+    mts_section = site_css[mts_start:mts_end]
+    # No raw hex or rgb in the model-time-split section
+    assert not re.search(r"#[0-9a-fA-F]{3,8}", mts_section), (
+        "model-time-split CSS contains a raw hex colour"
+    )
+    assert not re.search(r"rgba?\(\s*\d", mts_section), (
+        "model-time-split CSS contains a raw rgb/rgba colour"
+    )
+
+
+def test_readme_sprint_overview_mentions_where_time_went():
+    """AC7: the README's 'Sprint overview' bullet mentions the 'Where the time went' card showing the model time split between planning and building in minutes."""
+    readme = (REPO_ROOT / "README.md").read_text()
+    # Find the 'Sprint overview' bullet
+    sprint_line = next(
+        line for line in readme.splitlines() if "Sprint overview" in line
+    )
+    # The bullet (possibly multi-line) must mention the card
+    # Gather the full bullet: from 'Sprint overview' to the next bullet or end of section
+    lines = readme.splitlines()
+    idx = lines.index(sprint_line)
+    bullet = sprint_line
+    for i in range(idx + 1, len(lines)):
+        if lines[i].startswith("- **") or lines[i].startswith("## "):
+            break
+        bullet += " " + lines[i]
+    assert "Where the time went" in bullet, (
+        "README 'Sprint overview' bullet must mention 'Where the time went'"
+    )
+    assert "planning" in bullet.lower() and "building" in bullet.lower(), (
+        "README 'Sprint overview' bullet must mention planning and building"
+    )
+    assert "minutes" in bullet.lower(), (
+        "README 'Sprint overview' bullet must mention minutes"
+    )
+
+
 def test_replay_player_controls_and_sections_populated():
     """AC1: at page load with at least one event, the page contains play/pause,
     speed buttons (1×, 30×, 60×), skip-idle, a timeline scrubber, and each of
@@ -10950,4 +11303,102 @@ def test_readme_what_the_site_shows_mentions_orientation():
     assert "before any measure" in section_text, (
         "README 'What the site shows' section does not say the orientation "
         "appears before any measure"
+    )
+
+
+def test_sprint_page_shows_timezone_line():
+    """AC1: a sprint page shows a line stating the timezone, taken from
+    the package's timezone field."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    # Add the timezone to the package's delivery-history.json
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["timezone"] = "America/Chicago"
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Times are Chicago time" in html, (
+            "sprint page does not state the timezone: "
+            "expected 'Times are Chicago time' in page"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_page_timezone_names_package_zone_not_chicago():
+    """AC2: the timezone line names the zone from the package, not a
+    hardcoded or guessed one."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["timezone"] = "America/Denver"
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Times are Denver time" in html, (
+            "sprint page should name the package's zone (Denver), not Chicago"
+        )
+        assert "Times are Chicago time" not in html, (
+            "sprint page must not name a zone the package does not carry"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_page_timezone_line_present_without_clock_times():
+    """AC3: the timezone line is present even when no decisions or
+    send-backs are recorded (no clock times on the page)."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 0,
+                "points_delivered": 0,
+                "first_attempt_numerator": 0,
+                "first_attempt_denominator": 0,
+                "escalation_count": 0,
+                "cycle_time_minutes": None,
+            }
+        },
+    )
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["timezone"] = "America/Chicago"
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Times are Chicago time" in html, (
+            "timezone line must be present even when no clock times are shown"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changelog_fragment_mentions_timezone():
+    """AC4: the changelog fragment tells the reader that the sprint page now
+    states which timezone its times are in."""
+    fragment = REPO_ROOT / "changes" / "324.added.md"
+    assert fragment.is_file(), "changelog fragment changes/324.added.md not found"
+    text = fragment.read_text().lower()
+    assert "timezone" in text, (
+        "changelog fragment should mention the timezone"
+    )
+    assert "sprint" in text, (
+        "changelog fragment should mention the sprint page"
     )
