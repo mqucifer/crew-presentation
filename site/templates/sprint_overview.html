@@ -211,7 +211,7 @@
     <h2 id="dora-h">How releases went</h2>
     <span class="meta">DORA's four measures</span>
   </div>
-  {% if metrics.dora %}
+  {% if metrics.dora and (metrics.dora.release_frequency is not none or metrics.dora.lead_time_days is not none or metrics.dora.change_failure_count is not none or metrics.dora.mean_time_to_recovery_minutes is not none) %}
   <div class="card__body dora-grid">
     <div class="dora-metric">
       <div class="meta">Releases this sprint</div>
@@ -240,6 +240,9 @@
   </div>
   {% endif %}
 </section>
+{% if timezone_label %}
+<div class="meta">Times are {{ timezone_label }} time</div>
+{% endif %}
 <section class="card" aria-labelledby="time-went-h">
   <div class="card__head">
     <h2 id="time-went-h">Where the time went</h2>

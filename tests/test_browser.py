@@ -2005,6 +2005,10 @@ def test_sprint_overview_dora_values_shown():
         # The DORA values are rendered
         assert "14" in html, "release_frequency value '14' not in page"
         assert "45" in html, "mean_time_to_recovery_minutes value '45' not in page"
+        # The absence message is NOT shown when values are present
+        assert "no release data for this sprint" not in html, (
+            "absence line 'no release data for this sprint' should not appear when DORA values exist"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -2039,6 +2043,50 @@ def test_sprint_overview_dora_absent_shows_no_data():
         assert "no release data for this sprint" in html, (
             "absence line 'no release data for this sprint' not found"
         )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_overview_dora_all_null_shows_no_data():
+    """AC1: when dora exists but all four values are null, show 'no release data for this sprint'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "dora": {
+                    "release_frequency": None,
+                    "lead_time_days": None,
+                    "change_failure_count": None,
+                    "mean_time_to_recovery_minutes": None,
+                },
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The section heading is still present
+        assert "How releases went" in html, "DORA heading 'How releases went' not found"
+        # The absence message is shown
+        assert "no release data for this sprint" in html, (
+            "absence line 'no release data for this sprint' not found"
+        )
+        # None of the metric labels are rendered
+        assert "Releases this sprint" not in html, "metric label 'Releases this sprint' should not appear"
+        assert "Change to release" not in html, "metric label 'Change to release' should not appear"
+        assert "Releases that failed" not in html, "metric label 'Releases that failed' should not appear"
+        assert "Time to recover" not in html, "metric label 'Time to recover' should not appear"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -11250,4 +11298,102 @@ def test_readme_what_the_site_shows_mentions_orientation():
     assert "before any measure" in section_text, (
         "README 'What the site shows' section does not say the orientation "
         "appears before any measure"
+    )
+
+
+def test_sprint_page_shows_timezone_line():
+    """AC1: a sprint page shows a line stating the timezone, taken from
+    the package's timezone field."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    # Add the timezone to the package's delivery-history.json
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["timezone"] = "America/Chicago"
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Times are Chicago time" in html, (
+            "sprint page does not state the timezone: "
+            "expected 'Times are Chicago time' in page"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_page_timezone_names_package_zone_not_chicago():
+    """AC2: the timezone line names the zone from the package, not a
+    hardcoded or guessed one."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["timezone"] = "America/Denver"
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Times are Denver time" in html, (
+            "sprint page should name the package's zone (Denver), not Chicago"
+        )
+        assert "Times are Chicago time" not in html, (
+            "sprint page must not name a zone the package does not carry"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_page_timezone_line_present_without_clock_times():
+    """AC3: the timezone line is present even when no decisions or
+    send-backs are recorded (no clock times on the page)."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 0,
+                "points_delivered": 0,
+                "first_attempt_numerator": 0,
+                "first_attempt_denominator": 0,
+                "escalation_count": 0,
+                "cycle_time_minutes": None,
+            }
+        },
+    )
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["timezone"] = "America/Chicago"
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Times are Chicago time" in html, (
+            "timezone line must be present even when no clock times are shown"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changelog_fragment_mentions_timezone():
+    """AC4: the changelog fragment tells the reader that the sprint page now
+    states which timezone its times are in."""
+    fragment = REPO_ROOT / "changes" / "324.added.md"
+    assert fragment.is_file(), "changelog fragment changes/324.added.md not found"
+    text = fragment.read_text().lower()
+    assert "timezone" in text, (
+        "changelog fragment should mention the timezone"
+    )
+    assert "sprint" in text, (
+        "changelog fragment should mention the sprint page"
     )
