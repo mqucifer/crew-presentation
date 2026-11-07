@@ -6,12 +6,6 @@ builds its section here from them (towncrier, Keep a Changelog). Entries still u
 
 <!-- towncrier release notes start -->
 
-## [Unreleased]
-
-### Fixed
-
-- The "How releases went" card on the sprint overview showed four bare dashes when the package's DORA object was present but carried no values (all four measures null), instead of the plain sentence "no release data for this sprint" that sprints with no DORA object at all already showed; an all-null DORA object now renders the same absence message, so the no-data state reads one way regardless of whether the empty object is present (mqucifer/crew-presentation#305)
-
 ## [0.4.1] - 2026-11-05
 
 ### Fixed
