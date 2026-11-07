@@ -39,8 +39,9 @@ what each page shows, before any measure.
   at the sprint's end (each story with its state — waiting, blocked or
   refused — and how long it has been in that state), why work didn't land
   first time, a 'Where the time went' card showing how the sprint's model time
-  split between planning and building (with both numbers in minutes), and
-  decisions the crew made.
+  split between planning and building (with both numbers in minutes) and how
+  much of the sprint passed with no session running, against the sprint's
+  total time, in minutes, and decisions the crew made.
 - **Replay** — the crew's work on a day, played back: who did what, and how the
   board moved.
 - **Story journey** — a story's life cycle, in detail, from a Goal to merged.

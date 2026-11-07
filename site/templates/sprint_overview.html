@@ -247,8 +247,8 @@
   <div class="card__head">
     <h2 id="time-went-h">Where the time went</h2>
   </div>
-  {% if model_time_split %}
   <div class="card__body">
+    {% if model_time_split %}
     <div class="model-time-split">
       <div class="model-time-split__label">Model time: planning against building</div>
       <div class="model-time-split__bar">
@@ -260,11 +260,25 @@
         <span>Building: <span class="num">{{ model_time_split.building_minutes }}</span> min</span>
       </div>
     </div>
-  </div>
-  {% else %}
-  <div class="card__body">
+    {% else %}
     <p>No model time recorded for this sprint</p>
+    {% endif %}
+    {% if idle_time %}
+    <div class="idle-time">
+      <div class="idle-time__label">Time with no session running</div>
+      <div class="idle-time__bar">
+        <div class="idle-time__fill" style="width:{{ idle_time.idle_percent }}%"></div>
+      </div>
+      <div class="idle-time__values">
+        <span class="num">{{ idle_time.idle_minutes }}</span> min of the sprint's <span class="num">{{ idle_time.sprint_total_minutes }}</span> min
+      </div>
+    </div>
+    {% else %}
+    <div class="idle-time">
+      <div class="idle-time__label">Time with no session running</div>
+      <p class="meta">No value yet</p>
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
 </section>
 {% endblock %}

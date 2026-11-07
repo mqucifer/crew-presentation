@@ -10789,6 +10789,208 @@ def test_readme_sprint_overview_mentions_where_time_went():
     )
 
 
+def test_idle_time_shows_bar_and_minutes():
+    """AC1: idle 120 of 480 → bar fill covers one quarter, line reads '120 min of the sprint's 480 min'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": {"refinement": 90, "delivery": 270},
+                "idle": {"idle_minutes": 120, "sprint_duration_minutes": 480},
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        # The idle block label is present
+        assert "Time with no session running" in card, (
+            "label 'Time with no session running' not found in card"
+        )
+        # The idle bar has the correct fill width (25%)
+        idle_bar = re.search(
+            r'class="idle-time__fill" style="width:(\d+)%"', card
+        )
+        assert idle_bar, "idle-time__fill bar segment not found"
+        assert idle_bar.group(1) == "25", (
+            f"idle fill width is {idle_bar.group(1)}%, expected 25%"
+        )
+        # The line reads '120 min of the sprint's 480 min'
+        idle_values = re.search(
+            r'class="idle-time__values">(.*?)</div>', card, re.DOTALL
+        )
+        assert idle_values, "idle-time__values not found"
+        values_text = re.sub(r"<[^>]+>", "", idle_values.group(1))
+        assert "120" in values_text, (
+            f"idle minutes '120' not in values line: {values_text!r}"
+        )
+        assert "480" in values_text, (
+            f"sprint total '480' not in values line: {values_text!r}"
+        )
+        assert "min" in values_text, (
+            f"'min' unit not in values line: {values_text!r}"
+        )
+        # Both numbers carry the 'min' unit
+        assert values_text.count("min") >= 2, (
+            f"both numbers must carry the 'min' unit: {values_text!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_idle_time_null_shows_no_value():
+    """AC2: idle null → the block shows an explicit 'no value yet' state beneath its label."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": None,
+                "idle": None,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        # The idle block label is present
+        assert "Time with no session running" in card, (
+            "label 'Time with no session running' not found in card"
+        )
+        # The 'no value yet' state is shown
+        assert "No value yet" in card, (
+            "'No value yet' state not found in idle block"
+        )
+        # No bracketed placeholder text from the design mock
+        assert "[IDLE]" not in card, (
+            "bracketed placeholder '[IDLE]' must not appear"
+        )
+        assert "[SPRINT]" not in card, (
+            "bracketed placeholder '[SPRINT]' must not appear"
+        )
+        # No empty body (the block has content beyond just the label)
+        assert "idle-time" in card, (
+            "idle-time block element not found"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_idle_time_fully_idle():
+    """AC3: idle 240 of 240 → bar filled completely, line reads '240 min of the sprint's 240 min'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": {"refinement": 90, "delivery": 270},
+                "idle": {"idle_minutes": 240, "sprint_duration_minutes": 240},
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        # The idle bar is filled completely (100%)
+        idle_bar = re.search(
+            r'class="idle-time__fill" style="width:(\d+)%"', card
+        )
+        assert idle_bar, "idle-time__fill bar segment not found"
+        assert idle_bar.group(1) == "100", (
+            f"idle fill width is {idle_bar.group(1)}%, expected 100%"
+        )
+        # The line reads '240 min of the sprint's 240 min'
+        idle_values = re.search(
+            r'class="idle-time__values">(.*?)</div>', card, re.DOTALL
+        )
+        assert idle_values, "idle-time__values not found"
+        values_text = re.sub(r"<[^>]+>", "", idle_values.group(1))
+        assert "240" in values_text, (
+            f"minutes '240' not in values line: {values_text!r}"
+        )
+        assert "min" in values_text, (
+            f"'min' unit not in values line: {values_text!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_readme_sprint_overview_mentions_idle_time():
+    """AC4: the README's 'Sprint overview' bullet mentions how much of the sprint passed with no session running, against the sprint's total time, in minutes."""
+    readme = (REPO_ROOT / "README.md").read_text()
+    lines = readme.splitlines()
+    sprint_line = next(
+        line for line in lines if "Sprint overview" in line
+    )
+    idx = lines.index(sprint_line)
+    bullet = sprint_line
+    for i in range(idx + 1, len(lines)):
+        if lines[i].startswith("- **") or lines[i].startswith("## "):
+            break
+        bullet += " " + lines[i]
+    assert "no session running" in bullet.lower(), (
+        "README 'Sprint overview' bullet must mention 'no session running'"
+    )
+    assert "total time" in bullet.lower(), (
+        "README 'Sprint overview' bullet must mention 'total time'"
+    )
+    assert "minutes" in bullet.lower(), (
+        "README 'Sprint overview' bullet must mention minutes"
+    )
+
+
 def test_replay_player_controls_and_sections_populated():
     """AC1: at page load with at least one event, the page contains play/pause,
     speed buttons (1×, 30×, 60×), skip-idle, a timeline scrubber, and each of
