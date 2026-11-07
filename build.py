@@ -133,6 +133,7 @@ def _render_pages(pkg: Path) -> dict:
     analysis_stories = index.get("analysis", {}).get("stories", [])
     analysis_sprints = index.get("analysis", {}).get("sprints", [])
     analysis_by_sprint: dict[str, dict] = {a["sprint"]: a for a in analysis_sprints}
+    timezone_label = _timezone_label(index["timezone"]) if index.get("timezone") else None
 
     cards_by_key: dict[tuple, dict] = {}
     for card in cards:
@@ -270,6 +271,7 @@ def _render_pages(pkg: Path) -> dict:
             "roster_released_epics": released_epics,
             "roster_achieved_goals": achieved_goals,
             "current_view": "sprint",
+            "timezone_label": timezone_label,
         }
         pages[slug] = sprint_template.render(**context)
         default_sprint_slug = slug
@@ -396,6 +398,16 @@ def main() -> None:
 def _slug(name: str) -> str:
     """A sprint name as a filename: lowercase, spaces to hyphens, .html extension."""
     return name.lower().replace(" ", "-") + ".html"
+
+
+def _timezone_label(tz: str) -> str:
+    """A human-readable zone name from an IANA timezone identifier.
+
+    'America/Chicago' becomes 'Chicago'; 'UTC' stays 'UTC'.
+    """
+    if "/" in tz:
+        return tz.rsplit("/", 1)[-1]
+    return tz
 
 
 def _stories_from_roster(metrics: dict, cards: list[dict]) -> list[dict]:

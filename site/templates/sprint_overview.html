@@ -240,4 +240,7 @@
   </div>
   {% endif %}
 </section>
+{% if timezone_label %}
+<div class="meta">Times are {{ timezone_label }} time</div>
+{% endif %}
 {% endblock %}
