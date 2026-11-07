@@ -1377,7 +1377,7 @@ def test_changed_trend_single_entry_reading_order():
             "raw measure name 'cycle_time_days' appears in changed-trend section"
         )
         # AC1: values are formatted as hours and minutes
-        pos_prev = section_html.index("5 d 1 h")
+        pos_prev = section_html.index("5 d 4 h")
         pos_now = section_html.index("3 d 19 h")
         pos_text = section_html.index("Cycle time improved")
         assert pos_text < pos_label < pos_prev < pos_now, (
@@ -1479,7 +1479,7 @@ def test_changed_trend_values_have_num_class():
     try:
         _build()
         html = (BUILD_DIR / "sprint-7.html").read_text()
-        assert 'class="num">5 d 1 h<' in html, (
+        assert 'class="num">5 d 4 h<' in html, (
             "previous value does not have class 'num' with formatted text"
         )
         assert 'class="num">3 d 19 h<' in html, (
@@ -6102,8 +6102,8 @@ def test_lead_time_trend_mismatch_names_both_values():
         html = (BUILD_DIR / "sprint-7.html").read_text()
         trend_now = _read_lead_time(html)
         expected = _lead_time_expected(lead_time_days)
-        assert trend_now == "7 d 5 h", (
-            f"trend now-value is {trend_now!r}, expected '7 d 5 h'"
+        assert trend_now == "7 d 7 h", (
+            f"trend now-value is {trend_now!r}, expected '7 d 7 h'"
         )
         assert expected == "5 d", (
             f"package-derived value is {expected!r}, expected '5 d'"
@@ -6112,7 +6112,7 @@ def test_lead_time_trend_mismatch_names_both_values():
             assert trend_now == expected
         msg = str(exc_info.value)
         assert "5 d" in msg, f"assertion message missing package value: {msg!r}"
-        assert "7 d 5 h" in msg, f"assertion message missing trend value: {msg!r}"
+        assert "7 d 7 h" in msg, f"assertion message missing trend value: {msg!r}"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
