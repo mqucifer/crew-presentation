@@ -147,7 +147,7 @@ def test_setup_fails_on_missing_release(monkeypatch, tmp_path):
     assert not index, f"index file present after failed setup: {index}"
 
 
-SUPPORTED_MAJOR_VERSIONS = (1, 2, 3)
+SUPPORTED_MAJOR_VERSIONS = (1, 2, 3, 4)
 
 
 def _package_dir() -> Path:
@@ -232,19 +232,69 @@ def test_non_conforming_file_fails_with_file_name():
 
 def test_unsupported_major_version_fails_with_version():
     """AC3: a package on an unsupported major version fails, naming the version."""
-    manifest = {"schema_version": "4.0.0"}
+    manifest = {"schema_version": "5.0.0"}
 
     with pytest.raises(ValueError) as exc_info:
         _check_schema_version(manifest)
 
     message = str(exc_info.value)
-    assert "4" in message
+    assert "5" in message
     assert "cannot display" in message
 
 
 def test_check_schema_version_accepts_major_2():
     """AC1: a manifest on schema major 2 passes the version gate without raising."""
     _check_schema_version({"schema_version": "2.0.0"})
+
+
+def test_check_schema_version_accepts_major_4():
+    """AC2: a manifest on schema major 4 passes the version gate without raising."""
+    _check_schema_version({"schema_version": "4.0.0"})
+
+
+def test_build_succeeds_on_well_formed_major_4_package():
+    """AC1: a well-formed 4.0.0 package completes the build and writes the expected pages."""
+    tag = "delivery-history-TEST-4"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "4.0.0", "package": "delivery-history", "date": "2026-11-05"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "delivery-history.json").write_text(json.dumps({}))
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"build.py should succeed for a well-formed 4.0.0 package:\n"
+            f"{result.stdout}\n{result.stderr}"
+        )
+        build_dir = REPO_ROOT / "build"
+        assert (build_dir / "replay.html").is_file(), (
+            "replay page not written for 4.0.0 package"
+        )
+        assert (build_dir / "story-journey.html").is_file(), (
+            "story-journey page not written for 4.0.0 package"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
 
 
 def test_build_fails_on_unsupported_major_version():
@@ -255,7 +305,7 @@ def test_build_fails_on_unsupported_major_version():
 
     (pkg_dir / "manifest.json").write_text(
         json.dumps(
-            {"schema_version": "4.0.0", "package": "delivery-history", "date": "2026-01-01"}
+            {"schema_version": "5.0.0", "package": "delivery-history", "date": "2026-01-01"}
         )
     )
     (pkg_dir / "manifest.schema.json").write_text(
@@ -278,7 +328,7 @@ def test_build_fails_on_unsupported_major_version():
         )
         assert result.returncode != 0, "build.py should fail for unsupported major version"
         output = result.stdout + result.stderr
-        assert "4" in output, f"output should name the major version: {output}"
+        assert "5" in output, f"output should name the major version: {output}"
         assert "cannot display" in output, (
             f"output should say the version is unsupported: {output}"
         )
@@ -630,6 +680,624 @@ def test_build_fails_on_non_conforming_data_file():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original_tag)
         shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def _sent_back_package(sent_back_events: list[dict], sprint_name: str = "Sprint 1") -> dict:
+    """A minimal 3.0.0 package index with the given sent_back events."""
+    return {
+        "package": "delivery-history",
+        "schema_version": "3.0.0",
+        "date": "2026-11-06",
+        "timezone": "America/Chicago",
+        "crew_repository": "crew",
+        "repositories": ["crew-presentation"],
+        "sprints": [
+            {"name": sprint_name, "start": "2026-11-06", "end": "2026-11-06"}
+        ],
+        "cards": [],
+        "periods": [
+            {
+                "sprint": sprint_name,
+                "start": "2026-11-06",
+                "end": "2026-11-06",
+                "file": "events/2026-11-06.json",
+                "events": len(sent_back_events),
+            }
+        ],
+        "sprint_metrics": {
+            "release": "3.0.0",
+            "answers": {
+                sprint_name: {
+                    "cycle_time_days": 0,
+                    "lead_time_days": 0,
+                    "throughput": 1,
+                    "wip_violations": 0,
+                    "blocked_aging_days": 0,
+                    "escalation_rate_percent": 0,
+                    "points_delivered": 1,
+                    "first_attempt_numerator": 1,
+                    "first_attempt_denominator": 1,
+                    "escalation_count": 0,
+                    "superseded_count": 0,
+                    "superseded_points": 0,
+                    "first_attempt_rate_percent": 100,
+                    "failure_breakdown": [],
+                    "top_failure_causes": {},
+                    "superseded_breakdown": None,
+                    "flags": None,
+                    "prior": None,
+                    "delta": None,
+                    "cycle_time_minutes": 30,
+                    "lead_time_minutes": 30,
+                }
+            },
+        },
+    }
+
+
+def _build_with_sent_back(events: list[dict]) -> str:
+    """Build a site from a package carrying the given events; return the sprint page."""
+    tag = "delivery-history-TEST-SENTBACK"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-11-06"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    index = _sent_back_package(events)
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(parents=True, exist_ok=True)
+    (events_dir / "2026-11-06.json").write_text(json.dumps({"events": events}))
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"build.py should succeed:\n{result.stdout}\n{result.stderr}"
+        )
+        page = (REPO_ROOT / "build" / "sprint-1.html").read_text()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+    return page
+
+
+def test_sent_back_card_shows_count_and_rows():
+    """AC1: the card head's count equals the number of rows, one per sent_back event."""
+    events = [
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T10:00:00Z",
+            "repo": "crew-presentation",
+            "card": {"repo": "crew-presentation", "number": 100},
+            "sent_from": "review",
+            "sent_to": "build",
+            "rule": "gate.review_changes_requested",
+            "round": 1,
+            "counts": {"findings": 1},
+        },
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T11:00:00Z",
+            "repo": "crew-presentation",
+            "card": {"repo": "crew-presentation", "number": 101},
+            "sent_from": "gate",
+            "sent_to": "build",
+            "rule": "gate.findings_at_done",
+            "round": 1,
+            "counts": {"findings": 2},
+        },
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T12:00:00Z",
+            "repo": "crew-presentation",
+            "card": {"repo": "crew-presentation", "number": 102},
+            "sent_from": "ci",
+            "sent_to": "build",
+            "rule": "gate.ci_before_review",
+            "round": 1,
+            "counts": {"jobs": 1},
+        },
+    ]
+    page = _build_with_sent_back(events)
+    assert 'id="sent-back-h"' in page, "'Sent back' card heading not found"
+    assert "3 times" in page, "card head count should be '3 times'"
+    # One row per sent_back event
+    assert page.count('class="sent-back-row"') == 3, (
+        "expected 3 sent-back rows, one per event"
+    )
+
+
+def test_sent_back_row_shows_card_number_steps_reason_time():
+    """AC2: a row shows the card number, steps in the board's words, a plain reason, and the time."""
+    events = [
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T22:48:00Z",
+            "repo": "crew-presentation",
+            "card": {"repo": "crew-presentation", "number": 136},
+            "sent_from": "review",
+            "sent_to": "build",
+            "rule": "gate.review_changes_requested",
+            "round": 1,
+            "counts": {"findings": 1},
+        },
+    ]
+    page = _build_with_sent_back(events)
+    # Card number
+    assert "#136" in page, "card number not shown"
+    # Steps in the board's own words
+    assert "review" in page, "sent_from step not named in the board's words"
+    assert "building" in page, "sent_to step not named in the board's words"
+    # Plain sentence (not a raw rule code)
+    assert "asked for changes" in page, "reason should be a plain sentence"
+    # Time
+    assert "22:48" in page, "time not shown"
+
+
+def test_sent_back_no_raw_rule_code_on_page():
+    """AC3: no raw machine code (rule) appears on the page."""
+    events = [
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T10:00:00Z",
+            "repo": "crew-presentation",
+            "card": {"repo": "crew-presentation", "number": 100},
+            "sent_from": "gate",
+            "sent_to": "build",
+            "rule": "gate.findings_at_done",
+            "round": 1,
+            "counts": {"findings": 1},
+        },
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T11:00:00Z",
+            "repo": "crew-presentation",
+            "card": None,
+            "sent_from": "review",
+            "sent_to": "design",
+            "rule": "gate.design_refused",
+            "round": None,
+            "counts": {},
+        },
+    ]
+    page = _build_with_sent_back(events)
+    assert "gate.findings_at_done" not in page, "raw rule code visible on page"
+    assert "gate.design_refused" not in page, "raw rule code visible on page"
+    assert "sent_back" not in page.replace("Sent back", "").replace("sent-back", ""), (
+        "raw event kind visible on page"
+    )
+
+
+def test_sent_back_no_card_reads_as_design():
+    """AC4: a send-back with no card reads as the project's design being sent back."""
+    events = [
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T21:49:00Z",
+            "repo": "crew-presentation",
+            "card": None,
+            "sent_from": "review",
+            "sent_to": "design",
+            "rule": "gate.design_refused",
+            "round": None,
+            "counts": {},
+        },
+    ]
+    page = _build_with_sent_back(events)
+    # No card number shown
+    assert "sent-back-row__number" not in page, (
+        "no-card row should not show a story number"
+    )
+    # Reads as design sent back
+    assert "A design was refused at review" in page, (
+        "no-card row should read as the design being sent back"
+    )
+    assert "back to design" in page, "sent_to step not named"
+    # Time shown
+    assert "21:49" in page, "time not shown"
+
+
+def test_sent_back_unknown_step_still_renders():
+    """AC5: an unknown step name reads as a step, the row is not dropped."""
+    events = [
+        {
+            "kind": "sent_back",
+            "at": "2026-11-06T10:00:00Z",
+            "repo": "crew-presentation",
+            "card": {"repo": "crew-presentation", "number": 100},
+            "sent_from": "some_new_step",
+            "sent_to": "build",
+            "rule": "some_unknown_rule",
+            "round": 1,
+            "counts": {},
+        },
+    ]
+    page = _build_with_sent_back(events)
+    assert 'id="sent-back-h"' in page, "'Sent back' card heading not found"
+    assert "1 times" in page, "count should be 1"
+    assert page.count('class="sent-back-row"') == 1, "row should not be dropped"
+    # Unknown step reads as a step (underscores replaced with spaces)
+    assert "some new step" in page, "unknown step should read as a step"
+    # Known step renders in the board's own word
+    assert "building" in page, "known step should render in the board's word"
+
+
+def test_sent_back_empty_shows_plain_words():
+    """AC6: a sprint with no sent_back events says so in plain words, never blank or 0."""
+    events = [
+        {
+            "kind": "card_moved",
+            "at": "2026-11-06T09:00:00Z",
+            "card": {"repo": "crew-presentation", "number": 1},
+            "from_column": "Inbox (Goals)",
+            "to_column": "Sprint Backlog",
+            "by": "crew",
+        }
+    ]
+    page = _build_with_sent_back(events)
+    assert 'id="sent-back-h"' in page, "'Sent back' card heading not found"
+    # No count of 0
+    assert "0 times" not in page, "should not show a count of 0"
+    # Plain words saying no send-backs
+    assert "No send-backs recorded" in page, (
+        "should say in plain words that no send-backs are recorded"
+    )
+    # No rows
+    assert 'class="sent-back-row"' not in page, "no rows should be rendered"
+
+
+def test_sent_back_pinned_package_builds():
+    """AC7: the pinned package builds and the sent-back card is populated from events alone."""
+    result = subprocess.run(
+        [sys.executable, "build.py"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    assert result.returncode == 0, f"build failed:\n{result.stdout}\n{result.stderr}"
+    build_dir = REPO_ROOT / "build"
+    sprint_files = [
+        f for f in build_dir.iterdir()
+        if f.suffix == ".html" and f.name not in ("replay.html", "story-journey.html")
+    ]
+    assert sprint_files, "no sprint pages in build output"
+    # Every sprint page has the 'Sent back' card
+    for f in sprint_files:
+        page = f.read_text()
+        assert 'id="sent-back-h"' in page, (
+            f"{f.name}: 'Sent back' card heading not found"
+        )
+
+
+def _left_open_package(
+    events: list[dict], cards: list[dict], sprint_name: str = "Sprint 1"
+) -> dict:
+    """A minimal 3.0.0 package index with the given events and cards."""
+    return {
+        "package": "delivery-history",
+        "schema_version": "3.0.0",
+        "date": "2026-11-06",
+        "timezone": "America/Chicago",
+        "crew_repository": "crew",
+        "repositories": ["crew-presentation"],
+        "sprints": [
+            {"name": sprint_name, "start": "2026-11-06", "end": "2026-11-06"}
+        ],
+        "cards": cards,
+        "periods": [
+            {
+                "sprint": sprint_name,
+                "start": "2026-11-06",
+                "end": "2026-11-06",
+                "file": "events/2026-11-06.json",
+                "events": len(events),
+            }
+        ],
+        "sprint_metrics": {
+            "release": "3.0.0",
+            "answers": {
+                sprint_name: {
+                    "cycle_time_days": 0,
+                    "lead_time_days": 0,
+                    "throughput": 0,
+                    "wip_violations": 0,
+                    "blocked_aging_days": 0,
+                    "escalation_rate_percent": 0,
+                    "points_delivered": 0,
+                    "first_attempt_numerator": 0,
+                    "first_attempt_denominator": 0,
+                    "escalation_count": 0,
+                    "superseded_count": 0,
+                    "superseded_points": 0,
+                    "first_attempt_rate_percent": 0,
+                    "failure_breakdown": [],
+                    "top_failure_causes": {},
+                    "superseded_breakdown": None,
+                    "flags": None,
+                    "prior": None,
+                    "delta": None,
+                    "cycle_time_minutes": 0,
+                    "lead_time_minutes": 0,
+                }
+            },
+        },
+    }
+
+
+def _build_with_left_open(
+    events: list[dict], cards: list[dict]
+) -> str:
+    """Build a site from a package carrying the given events and cards; return the sprint page."""
+    tag = "delivery-history-TEST-LEFTOPEN"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-11-06"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    index = _left_open_package(events, cards)
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(parents=True, exist_ok=True)
+    (events_dir / "2026-11-06.json").write_text(json.dumps({"events": events}))
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"build.py should succeed:\n{result.stdout}\n{result.stderr}"
+        )
+        page = (REPO_ROOT / "build" / "sprint-1.html").read_text()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+    return page
+
+
+def test_left_open_shows_stories_not_done_at_sprint_end():
+    """AC1: stories not in Done at the sprint's end get rows; stories that reached Done do not; epics and goals do not."""
+    cards = [
+        {"repo": "crew-presentation", "number": 1, "type": "Story", "title": "Story one"},
+        {"repo": "crew-presentation", "number": 2, "type": "Story", "title": "Story two"},
+        {"repo": "crew-presentation", "number": 3, "type": "Epic", "title": "An epic"},
+        {"repo": "crew-presentation", "number": 4, "type": "Goal", "title": "A goal"},
+        {"repo": "crew-presentation", "number": 5, "type": "Story", "title": "Story five"},
+    ]
+    events = [
+        # Story 1 ends in In Progress
+        {"kind": "card_moved", "at": "2026-11-06T10:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 1},
+         "from_column": "Ready", "to_column": "In Progress"},
+        # Story 2 ends in Done
+        {"kind": "card_moved", "at": "2026-11-06T09:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 2},
+         "from_column": "Ready", "to_column": "In Progress"},
+        {"kind": "card_moved", "at": "2026-11-06T11:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 2},
+         "from_column": "In Progress", "to_column": "Done"},
+        # Epic 3 ends in Ready (should NOT get a row)
+        {"kind": "card_moved", "at": "2026-11-06T10:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 3},
+         "from_column": "Inbox (Goals)", "to_column": "Ready"},
+        # Goal 4 ends in Sprint Backlog (should NOT get a row)
+        {"kind": "card_moved", "at": "2026-11-06T10:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 4},
+         "from_column": "Inbox (Goals)", "to_column": "Sprint Backlog"},
+        # Story 5 ends in Reviewing (should get a row)
+        {"kind": "card_moved", "at": "2026-11-06T12:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 5},
+         "from_column": "In Progress", "to_column": "Reviewing"},
+    ]
+    page = _build_with_left_open(events, cards)
+    assert 'id="left-open-h"' in page, "'Left open at the end' card heading not found"
+    # Story 1 and Story 5 get rows
+    assert "#1" in page, "Story 1 should have a row"
+    assert "#5" in page, "Story 5 should have a row"
+    assert "Story one" in page, "Story 1 title should be shown"
+    assert "Story five" in page, "Story 5 title should be shown"
+    # Story 2 reached Done, so no row
+    assert "#2" not in page or "Story two" not in page, (
+        "Story 2 reached Done and should not have a row"
+    )
+    # Epic and Goal do not get rows
+    assert "An epic" not in page, "Epic should not have a row"
+    assert "A goal" not in page, "Goal should not have a row"
+    # Exactly 2 rows
+    assert page.count('class="left-open-row"') == 2, (
+        "expected exactly 2 left-open rows"
+    )
+
+
+def test_left_open_badge_blocked_for_blocked_column():
+    """AC2: a story in the Blocked column gets a 'Blocked' badge in the blocked tone."""
+    cards = [
+        {"repo": "crew-presentation", "number": 10, "type": "Story", "title": "Blocked story"},
+    ]
+    events = [
+        {"kind": "card_moved", "at": "2026-11-06T14:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 10},
+         "from_column": "In Progress", "to_column": "Blocked"},
+    ]
+    page = _build_with_left_open(events, cards)
+    assert 'data-tone="blocked"' in page, "blocked badge should use the blocked tone"
+    assert ">Blocked<" in page, "badge label should be 'Blocked'"
+
+
+def test_left_open_badge_refused_for_send_back_move():
+    """AC2: a story whose last move into its column was a send-back gets a 'Refused' badge in the blocked tone."""
+    cards = [
+        {"repo": "crew-presentation", "number": 20, "type": "Story", "title": "Refused story"},
+    ]
+    events = [
+        # The card_moved event and sent_back event at the same second
+        {"kind": "card_moved", "at": "2026-11-06T15:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 20},
+         "from_column": "Reviewing", "to_column": "In Progress"},
+        {"kind": "sent_back", "at": "2026-11-06T15:00:00Z",
+         "repo": "crew-presentation",
+         "card": {"repo": "crew-presentation", "number": 20},
+         "sent_from": "review", "sent_to": "build",
+         "rule": "gate.review_changes_requested",
+         "round": 1, "counts": {"findings": 1}},
+    ]
+    page = _build_with_left_open(events, cards)
+    assert 'data-tone="blocked"' in page, "refused badge should use the blocked tone"
+    assert ">Refused<" in page, "badge label should be 'Refused'"
+
+
+def test_left_open_badge_waiting_for_other_columns():
+    """AC2: a story in a column other than Blocked, not moved by a send-back, gets a 'Waiting' badge in the waiting tone."""
+    cards = [
+        {"repo": "crew-presentation", "number": 30, "type": "Story", "title": "Waiting story"},
+    ]
+    events = [
+        {"kind": "card_moved", "at": "2026-11-06T16:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 30},
+         "from_column": "Ready", "to_column": "In Progress"},
+    ]
+    page = _build_with_left_open(events, cards)
+    assert 'data-tone="waiting"' in page, "waiting badge should use the waiting tone"
+    assert ">Waiting<" in page, "badge label should be 'Waiting'"
+
+
+def test_left_open_row_shows_repo_number_title_and_duration():
+    """AC3: a row shows the story's repository, number, title, and duration with a unit."""
+    cards = [
+        {"repo": "crew-presentation", "number": 40, "type": "Story", "title": "Duration story"},
+    ]
+    events = [
+        # Moved at 10:00, sprint ends at 2026-11-07 00:00 UTC
+        # Duration = 14 hours
+        {"kind": "card_moved", "at": "2026-11-06T10:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 40},
+         "from_column": "Ready", "to_column": "In Progress"},
+    ]
+    page = _build_with_left_open(events, cards)
+    assert "crew-presentation" in page, "repository should be shown"
+    assert "#40" in page, "number should be shown"
+    assert "Duration story" in page, "title should be shown"
+    # Duration: 14 hours (sprint ends at 2026-11-07T00:00:00Z, moved at 2026-11-06T10:00:00Z)
+    assert "for 14 hours" in page, "duration should read 'for 14 hours'"
+
+
+def test_left_open_duration_counts_back_before_sprint_start():
+    """AC4: a story moved before the sprint started counts from that earlier move, not clamped at the sprint's start."""
+    cards = [
+        {"repo": "crew-presentation", "number": 50, "type": "Story", "title": "Early story"},
+    ]
+    events = [
+        # Moved at 2026-11-04T12:00:00Z (2 days before the sprint's end date 2026-11-06)
+        # Duration = 2026-11-07T00:00:00Z - 2026-11-04T12:00:00Z = 60 hours = 2 days 12 hours
+        # Should read "for 2 days"
+        {"kind": "card_moved", "at": "2026-11-04T12:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 50},
+         "from_column": "Ready", "to_column": "In Progress"},
+    ]
+    page = _build_with_left_open(events, cards)
+    # 60 hours = 2 days + 12 hours → "for 2 days"
+    assert "for 2 days" in page, (
+        "duration should count back from the earlier move, not clamp at sprint start"
+    )
+
+
+def test_left_open_empty_says_nothing_left_open():
+    """AC5: a sprint with every story in Done says so in plain words, never a blank card."""
+    cards = [
+        {"repo": "crew-presentation", "number": 60, "type": "Story", "title": "Done story"},
+    ]
+    events = [
+        {"kind": "card_moved", "at": "2026-11-06T09:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 60},
+         "from_column": "Ready", "to_column": "In Progress"},
+        {"kind": "card_moved", "at": "2026-11-06T12:00:00Z",
+         "card": {"repo": "crew-presentation", "number": 60},
+         "from_column": "In Progress", "to_column": "Done"},
+    ]
+    page = _build_with_left_open(events, cards)
+    assert 'id="left-open-h"' in page, "'Left open at the end' card heading should always be present"
+    assert "Nothing was left open" in page, (
+        "should say in plain words that nothing was left open"
+    )
+    assert 'class="left-open-row"' not in page, "no rows should be rendered"
+
+
+def test_left_open_pinned_package_builds():
+    """AC1 (pinned): the pinned package builds and every sprint page has the left-open card."""
+    result = subprocess.run(
+        [sys.executable, "build.py"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    assert result.returncode == 0, f"build failed:\n{result.stdout}\n{result.stderr}"
+    build_dir = REPO_ROOT / "build"
+    sprint_files = [
+        f for f in build_dir.iterdir()
+        if f.suffix == ".html" and f.name not in ("replay.html", "story-journey.html")
+    ]
+    assert sprint_files, "no sprint pages in build output"
+    for f in sprint_files:
+        page = f.read_text()
+        assert 'id="left-open-h"' in page, (
+            f"{f.name}: 'Left open at the end' card heading not found"
+        )
+
+
+def test_left_open_docs_mention_the_new_card():
+    """AC6: README's 'What the site shows' section and the changelog fragment tell the reader what the sprint page now shows."""
+    readme = (REPO_ROOT / "README.md").read_text()
+    # README's 'What the site shows' section mentions the left-open card
+    what_shows = readme[readme.index("## What the site shows"):]
+    assert "still open" in what_shows, (
+        "README's 'What the site shows' section should mention what was still open"
+    )
+    assert "waiting, blocked" in what_shows, (
+        "README should mention the three states: waiting, blocked or refused"
+    )
+    assert "refused" in what_shows, (
+        "README should mention the three states: waiting, blocked or refused"
+    )
+    # Changelog fragment exists and names the feature
+    fragment = REPO_ROOT / "changes" / "323.added.md"
+    assert fragment.is_file(), "changelog fragment changes/323.added.md not found"
+    text = fragment.read_text()
+    assert "open" in text.lower(), "changelog fragment should mention the left-open card"
 
 
 def test_placeholder_checks_contain_marker():

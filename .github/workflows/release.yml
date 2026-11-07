@@ -1,0 +1,75 @@
+# A merged release tags itself (mqucifer/crew-presentation#349).
+#
+# On a push to main, when no tag exists for pyproject.toml's version, this tags
+# `v<version>` and publishes a GitHub Release whose notes are that version's
+# CHANGELOG.md section. A rerun completes whatever is missing and changes nothing
+# already published. `workflow_dispatch` is a dry run. Copied from
+# mqucifer/sprint-metrics' release.yml without its container image steps: this
+# repo ships no image. deploy.yml builds the site from the latest tag.
+
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect version change
+        id: version-check
+        run: |
+          set -euo pipefail
+          current=$(grep '^version = ' pyproject.toml | sed 's/^version = "\(.*\)"$/\1/')
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+
+      - name: Dry-run — no side effects
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "Dry-run: would release version ${{ steps.version-check.outputs.current }} — no tags or releases created."
+
+      - name: Create git tag
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          tag="v${{ steps.version-check.outputs.current }}"
+          if [ -n "$(git ls-remote --tags origin "refs/tags/${tag}")" ]; then
+            echo "Tag ${tag} already exists — skipping."
+            exit 0
+          fi
+          git tag "${tag}"
+          git push origin "${tag}"
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${{ steps.version-check.outputs.current }}"
+          tag="v${version}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release ${tag} already exists — skipping."
+            exit 0
+          fi
+          if [ -f CHANGELOG.md ]; then
+            body=$(awk -v ver="$version" '
+              index($0, "## [" ver "]") == 1 { found=1; next }
+              found && /^## \[/ { exit }
+              found { print }
+            ' CHANGELOG.md)
+          else
+            body=""
+          fi
+          if [ -z "$body" ]; then
+            body="No changelog section found for version ${version}."
+          fi
+          gh release create "$tag" --title "$tag" --notes "$body"
+          echo "Created release $tag"
