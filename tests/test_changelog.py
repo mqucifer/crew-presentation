@@ -72,3 +72,20 @@ def test_entries_left_under_unreleased_from_before_the_fragments_break_no_rule()
     assert changelog_problems(text, []) == []
 
 
+def test_no_test_reads_a_specific_fragment_file():
+    """No test constructs a path to a specific fragment under changes/; a release
+    deletes fragments, so such a test would break after the next release."""
+    fragment_ref = re.compile(r'(?:"changes"|CHANGES)\s*/\s*"(\S+\.md)"')
+    for py_file in sorted((REPO_ROOT / "tests").rglob("*.py")):
+        text = py_file.read_text()
+        for match in fragment_ref.finditer(text):
+            name = match.group(1)
+            if name == "README.md":
+                continue
+            assert False, (
+                f"{py_file.name} references a specific fragment under the "
+                f"changes directory; a release deletes fragments, so this "
+                f"test would break"
+            )
+
+
