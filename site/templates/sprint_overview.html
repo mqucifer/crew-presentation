@@ -118,6 +118,12 @@
       {% endif %}
       {% else %}
       {% if epic_groups %}
+      <div class="attempt-legend">
+        <span><i class="swatch swatch--landed"></i> attempt that landed</span>
+        <span><i class="swatch swatch--missed"></i> missed, tried again</span>
+        <span><i class="swatch swatch--blocked"></i> blocked</span>
+        <span><i class="swatch swatch--crew-fix"></i> a fix to the crew merged</span>
+      </div>
       <div class="epic-groups">
         {% for group in epic_groups %}
         <div class="epic-group">
@@ -136,6 +142,8 @@
             <div class="story-row" {% if row.delivered %}data-delivered="true"{% endif %}>
               <a class="story-row__title" href="stories/{{ row.repo | replace('/', '-') }}-{{ row.number }}.html">{{ row.repo }}<span class="num meta">#{{ row.number }}</span> {{ row.title }}</a>
               {% if row.status %}<span class="badge" data-tone="{{ row.status_tone }}">{{ row.status }}</span>{% endif %}
+              {% if row.blocks %}<div class="blocks">{% for block in row.blocks %}<span class="attempt-block attempt-block--{{ block | replace('_', '-') }}"></span>{% endfor %}</div>{% endif %}
+              <span class="story-row__happened">{{ row.happened_line }}</span>
             </div>
             {% endfor %}
           </div>

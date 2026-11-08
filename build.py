@@ -202,7 +202,10 @@ def _render_pages(pkg: Path) -> dict:
                     }
                 )
         else:
-            epic_groups = _epic_groups(cards, sprint["name"], metrics.get("roster"))
+            sprint_events = _load_sprint_events(pkg, sprint["name"], index)
+            epic_groups = _epic_groups(
+                cards, sprint["name"], metrics.get("roster"), sprint_events
+            )
 
         analysis_changed = analysis_by_sprint.get(sprint["name"], {}).get(
             "changed", []
@@ -434,7 +437,165 @@ def _status_tone(status) -> str:
     return "waiting"
 
 
-def _epic_groups(cards: list[dict], sprint_name: str, roster) -> list[dict]:
+def _status_label(card: dict) -> str:
+    """The badge's label: the board's own words, with a superseded story
+    reading 'Closed, not planned' regardless of its Done status."""
+    if card.get("closed_as") == "not_planned":
+        return "Closed, not planned"
+    return card.get("status") or ""
+
+
+def _story_attempt_blocks(
+    events: list[dict] | None, repo, number
+) -> tuple[list[str], list[int], bool]:
+    """The story's attempt blocks, read from the sprint's events.
+
+    Returns (blocks, crew_fix_numbers, escalated) where blocks is a list of
+    block-type strings in the order the events record them:
+    'missed' for each attempt that did not land, 'blocked' for each time the
+    story was blocked, 'crew-fix' for each merged fix to the crew the story
+    references, and 'landed' for the attempt that landed.
+    """
+    if not events or repo is None or number is None:
+        return [], [], False
+
+    blocks: list[str] = []
+    crew_fix_numbers: list[int] = []
+    escalated = False
+    seen_sent_back_rounds: set = set()
+
+    for event in events:
+        kind = event.get("kind")
+
+        if kind == "attempt":
+            card = event.get("card")
+            if card and card.get("repo") == repo and card.get("number") == number:
+                blocks.append("missed")
+
+        elif kind == "card_moved":
+            card = event.get("card")
+            if (
+                card
+                and card.get("repo") == repo
+                and card.get("number") == number
+                and event.get("to_column") == "Blocked"
+            ):
+                blocks.append("blocked")
+
+        elif kind == "sent_back":
+            card = event.get("card")
+            if card and card.get("repo") == repo and card.get("number") == number:
+                round_val = event.get("round")
+                if round_val not in seen_sent_back_rounds:
+                    seen_sent_back_rounds.add(round_val)
+                    blocks.append("missed")
+
+        elif kind == "escalated":
+            card = event.get("card")
+            if card and card.get("repo") == repo and card.get("number") == number:
+                escalated = True
+
+        elif kind == "pull_merged":
+            crews_own = event.get("crews_own", False)
+            about = event.get("about") or []
+            closes = event.get("closes") or []
+            in_about = any(
+                ref.get("repo") == repo and ref.get("number") == number
+                for ref in about
+            )
+            in_closes = any(
+                ref.get("repo") == repo and ref.get("number") == number
+                for ref in closes
+            )
+            if crews_own and in_about:
+                blocks.append("crew-fix")
+                crew_fix_numbers.append(event.get("number", 0))
+            elif not crews_own and in_closes:
+                blocks.append("landed")
+
+    return blocks, crew_fix_numbers, escalated
+
+
+def _story_happened_line(
+    blocks: list[str],
+    card: dict,
+    delivered: bool,
+    crew_fix_numbers: list[int],
+    escalated: bool,
+) -> str:
+    """One plain-words line saying what happened to the story."""
+    if card.get("closed_as") == "not_planned":
+        return "Superseded (closed as not planned) and never built."
+
+    missed_count = blocks.count("missed")
+    blocked_count = blocks.count("blocked")
+    landed = "landed" in blocks
+
+    def _plural(n: int, singular: str, plural: str | None = None) -> str:
+        if n == 1:
+            return "once" if singular == "time" else singular
+        if n == 2:
+            return "twice" if singular == "time" else (plural or f"{singular}s")
+        return f"{n} {singular}s" if not plural else f"{n} {plural}"
+
+    if delivered:
+        if missed_count == 0 and not blocked_count and not crew_fix_numbers:
+            return "Landed first try."
+        parts: list[str] = []
+        if missed_count:
+            if missed_count == 1:
+                parts.append("missed once")
+            elif missed_count == 2:
+                parts.append("missed twice")
+            else:
+                parts.append(f"missed {missed_count} times")
+        if blocked_count:
+            if blocked_count == 1:
+                parts.append("was blocked once")
+            elif blocked_count == 2:
+                parts.append("was blocked twice")
+            else:
+                parts.append(f"was blocked {blocked_count} times")
+        if crew_fix_numbers:
+            names = " and ".join(f"crew#{n}" for n in crew_fix_numbers)
+            parts.append(f"{names} merged")
+        if escalated:
+            line = (", ".join(parts) + ", then landed after it was escalated.")
+        else:
+            line = (", ".join(parts) + ", then landed.") if parts else "Landed."
+        return line[0].upper() + line[1:]
+
+    # Not delivered
+    status = card.get("status") or ""
+    if status == "Blocked":
+        parts = []
+        if missed_count == 1:
+            parts.append("missed once")
+        elif missed_count == 2:
+            parts.append("missed twice")
+        elif missed_count > 2:
+            parts.append(f"missed {missed_count} times")
+        if blocked_count == 1:
+            parts.append("was blocked once first")
+        elif blocked_count == 2:
+            parts.append("was blocked twice first")
+        elif blocked_count > 2:
+            parts.append(f"was blocked {blocked_count} times first")
+        if parts:
+            return "Blocked now, " + " and ".join(parts) + "."
+        return "Blocked now."
+    if missed_count == 1:
+        return "Not delivered yet, missed once so far."
+    elif missed_count == 2:
+        return "Not delivered yet, missed twice so far."
+    elif missed_count > 2:
+        return f"Not delivered yet, missed {missed_count} times so far."
+    return "Not delivered yet."
+
+
+def _epic_groups(
+    cards: list[dict], sprint_name: str, roster, events: list[dict] | None = None
+) -> list[dict]:
     """Group the sprint's cards under their epics.
 
     Every card whose sprint is this sprint's name becomes a row, whatever its
@@ -510,14 +671,26 @@ def _epic_groups(cards: list[dict], sprint_name: str, roster) -> list[dict]:
             is_delivered = (card.get("number"), card.get("repo")) in delivered
             if is_delivered:
                 done_count += 1
+            blocks, crew_fix_numbers, escalated = _story_attempt_blocks(
+                events, card.get("repo"), card.get("number")
+            )
+            status_label = _status_label(card)
             rows.append(
                 {
                     "repo": card.get("repo") or "",
                     "number": card.get("number"),
                     "title": card.get("title") or "",
-                    "status": card.get("status") or "",
-                    "status_tone": _status_tone(card.get("status")),
+                    "status": status_label,
+                    "status_tone": _status_tone(status_label),
                     "delivered": is_delivered,
+                    "blocks": blocks,
+                    "happened_line": _story_happened_line(
+                        blocks,
+                        card,
+                        is_delivered,
+                        crew_fix_numbers,
+                        escalated,
+                    ),
                 }
             )
         group: dict = {
