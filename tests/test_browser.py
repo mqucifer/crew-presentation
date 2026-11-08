@@ -12042,7 +12042,7 @@ def test_all_measure_terms_explained_in_orientation_block():
             "failure",
             "recovery",
             "crew",
-            "DORA",
+            "dora",
         ]
 
         # Collect the text of all measure labels, changed-trend labels,
