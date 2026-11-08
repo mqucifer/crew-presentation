@@ -10202,6 +10202,242 @@ def test_announced_3_0_0_mock_shows_story_rows():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_epic_heading_shows_goal_parent_done_count_and_status():
+    """AC3: an epic heading names the epic's number and title, its Goal parent
+    (by number and title) when the epic has one, 'x of y stories done', and the
+    epic's status as a badge in the board's own words with a tone."""
+    tag = "delivery-history-EPIC-GOAL"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 1,
+            "points_delivered": 3,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": 1,
+            "cycle_time_days": 1.0,
+            "roster": {
+                "completed_stories": ["crew#7"],
+                "released_epics": None,
+                "achieved_goals": None,
+            },
+        }
+    }
+    cards = [
+        {
+            "repo": "crew",
+            "number": 2,
+            "type": "Goal",
+            "title": "A walking skeleton",
+            "sprint": None,
+            "status": "In Progress",
+        },
+        {
+            "repo": "crew",
+            "number": 5,
+            "type": "Epic",
+            "title": "The skeleton",
+            "parent": 2,
+            "sprint": None,
+            "status": "In Progress",
+        },
+        {
+            "repo": "crew",
+            "number": 7,
+            "type": "Story",
+            "title": "Story seven",
+            "parent": 5,
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "closed_as": "completed",
+        },
+        {
+            "repo": "crew",
+            "number": 8,
+            "type": "Story",
+            "title": "Story eight",
+            "parent": 5,
+            "sprint": "Sprint 6",
+            "status": "In Progress",
+        },
+    ]
+    _make_fake_package(tag, metrics=metrics, cards=cards, schema_version="3.0.0")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The epic heading names the epic's number and title.
+        assert "The skeleton" in html, "epic title not found"
+        assert "epic #5" in html, "epic #5 not named in its heading"
+        # The epic has a Goal parent, named by number and title.
+        assert "Goal crew#2" in html, "Goal's number not named in the epic heading"
+        assert "A walking skeleton" in html, "Goal's title not named in the epic heading"
+        # The done count: 1 of the 2 story rows is roster-delivered.
+        assert "1 of 2 stories done" in html, "done count '1 of 2 stories done' not found"
+        # The epic's status is a badge in the board's own words with a tone.
+        assert re.search(
+            r'class="badge" data-tone="active">In Progress<', html
+        ), "epic 'In Progress' badge not found"
+        # Both story rows appear, grouped under the epic.
+        row_count = html.count('class="story-row"')
+        assert row_count == 2, f"expected 2 story rows, got {row_count}"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_epic_without_goal_parent_reads_not_part_of_a_goal():
+    """AC4: an epic with no Goal parent (parent null) reads 'not part of a Goal'
+    in its heading — never a blank or an invented name — and still carries the
+    done count and the epic's status badge."""
+    tag = "delivery-history-EPIC-NOGOAL"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 1,
+            "points_delivered": 3,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": 1,
+            "cycle_time_days": 1.0,
+            "roster": {
+                "completed_stories": ["crew#7"],
+                "released_epics": None,
+                "achieved_goals": None,
+            },
+        }
+    }
+    cards = [
+        {
+            "repo": "crew",
+            "number": 5,
+            "type": "Epic",
+            "title": "The skeleton",
+            "parent": None,
+            "sprint": None,
+            "status": "In Progress",
+        },
+        {
+            "repo": "crew",
+            "number": 7,
+            "type": "Story",
+            "title": "Story seven",
+            "parent": 5,
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "closed_as": "completed",
+        },
+        {
+            "repo": "crew",
+            "number": 8,
+            "type": "Story",
+            "title": "Story eight",
+            "parent": 5,
+            "sprint": "Sprint 6",
+            "status": "In Progress",
+        },
+    ]
+    _make_fake_package(tag, metrics=metrics, cards=cards, schema_version="3.0.0")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The epic has no Goal parent, so it reads 'not part of a Goal'.
+        assert "not part of a Goal" in html, "'not part of a Goal' not found"
+        # The heading still names the epic and carries the done count...
+        assert "epic #5" in html, "epic #5 not named in its heading"
+        assert "The skeleton" in html, "epic title not found"
+        assert "1 of 2 stories done" in html, "done count '1 of 2 stories done' not found"
+        # ...and the epic's status badge.
+        assert re.search(
+            r'class="badge" data-tone="active">In Progress<', html
+        ), "epic 'In Progress' badge not found"
+        # No Goal name is invented in its place.
+        assert "Goal crew#" not in html, "a Goal name was invented"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_epic_groups_no_clipping_at_phone_and_desktop_width():
+    """AC7: with the 3.0.0 mock (no analysis), the story-by-story section's ten
+    rows and both epic headings are present and unclipped at 375px and 1280px,
+    in the section's current position on the page."""
+    base_dir = REPO_ROOT / "tests" / "fixtures" / "delivery-history-3.0.0"
+    mock_dir = base_dir / "mock"
+    assert mock_dir.is_dir(), "3.0.0 fixture mock not found"
+    tag = "delivery-history-3000-VP"
+    pkg_dir = PACKAGE_DIR / tag
+    shutil.copytree(mock_dir, pkg_dir)
+    # Schema files live at the base level, not in mock/
+    for schema_file in ("schema.json", "manifest.schema.json", "events.schema.json"):
+        shutil.copy2(base_dir / schema_file, pkg_dir / schema_file)
+    # Add a roster to the mock's Sprint 6 answer, as real packages carry them.
+    dh_path = pkg_dir / "delivery-history.json"
+    dh = json.loads(dh_path.read_text())
+    answers = dh["sprint_metrics"]["answers"]
+    answers["Sprint 6"]["roster"] = {
+        "completed_stories": [
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ],
+        "released_epics": None,
+        "achieved_goals": None,
+    }
+    dh_path.write_text(json.dumps(dh))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            for width in (375, 1280):
+                context = browser.new_context(viewport={"width": width, "height": 900})
+                page = context.new_page()
+                _intercept_design_system(page)
+                page.goto(f"file://{page_path}")
+                page.wait_for_load_state("domcontentloaded")
+
+                # All ten rows and both epic headings are present.
+                rows = page.locator(".story-row")
+                assert rows.count() == 10, (
+                    f"expected 10 rows at {width}px, got {rows.count()}"
+                )
+                headings = page.locator(".epic-group__head h3")
+                assert headings.count() == 2, (
+                    f"expected 2 epic headings at {width}px, got {headings.count()}"
+                )
+                # No horizontal overflow on the section itself.
+                section_overflow = page.evaluate(
+                    """
+                    (() => {
+                        const el = document.querySelector('.sprint-chart');
+                        return el.scrollWidth > el.clientWidth;
+                    })()
+                    """
+                )
+                assert not section_overflow, (
+                    f"sprint-chart overflows horizontally at {width}px"
+                )
+                # Each epic heading is unclipped (scrollWidth == clientWidth).
+                for i in range(headings.count()):
+                    clipped = headings.nth(i).evaluate(
+                        "(el) => el.scrollWidth > el.clientWidth"
+                    )
+                    assert not clipped, f"epic heading {i} clipped at {width}px"
+
+                context.close()
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_analysis_stories_still_render_attempt_chart():
     """AC5: when the package has analysis.stories populated with delivered
     stories, the attempt chart shows them with blocks and pattern-based
