@@ -103,11 +103,14 @@ def _validate_events_file(data, events_schema, file_label: str) -> None:
 
     # Build a structural schema: same top-level constraints, but events.items
     # is permissive so the oneOf is not evaluated here.
+    # Carry over array-level keywords (minItems, uniqueItems, etc.) from the
+    # original events property so they are not silently dropped.
+    orig_events = events_schema.get("properties", {}).get("events", {})
     structural_schema = {
         **events_schema,
         "properties": {
             **events_schema.get("properties", {}),
-            "events": {"type": "array", "items": {"type": "object"}, "title": "Events"},
+            "events": {**orig_events, "items": {"type": "object"}, "title": "Events"},
         },
     }
 

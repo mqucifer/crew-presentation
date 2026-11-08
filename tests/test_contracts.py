@@ -708,6 +708,109 @@ def test_build_fails_on_non_conforming_data_file():
         shutil.rmtree(pkg_dir, ignore_errors=True)
 
 
+def test_build_fails_on_non_conforming_events_file():
+    """AC3: build.py exits non-zero and names the events file that failed to conform.
+
+    The events schema carries a discriminator, so build's fast path selects
+    the branch by kind. An event missing a field its kind requires is
+    rejected, not accepted on trust.
+    """
+    tag = "delivery-history-TEST-EVENTS"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["sprints"],
+                "properties": {"sprints": {"type": "array"}},
+            }
+        )
+    )
+    # Events schema with a discriminator: the fast path will route each event
+    # to its branch. The CardMoved branch requires both "kind" and "at".
+    events_schema = {
+        "type": "object",
+        "required": ["events"],
+        "properties": {
+            "events": {
+                "type": "array",
+                "items": {
+                    "discriminator": {
+                        "propertyName": "kind",
+                        "mapping": {"card_moved": "#/$defs/CardMoved"},
+                    },
+                    "oneOf": [{"$ref": "#/$defs/CardMoved"}],
+                },
+            }
+        },
+        "$defs": {
+            "CardMoved": {
+                "type": "object",
+                "required": ["kind", "at"],
+                "properties": {
+                    "kind": {"const": "card_moved"},
+                    "at": {"type": "string"},
+                },
+            }
+        },
+    }
+    (pkg_dir / "events.schema.json").write_text(json.dumps(events_schema))
+    (pkg_dir / "delivery-history.json").write_text(
+        json.dumps({"sprints": [], "cards": []})
+    )
+
+    # An events file whose event is missing the "at" field required by CardMoved.
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir()
+    (events_dir / "2026-01-01.json").write_text(
+        json.dumps(
+            {
+                "package": "delivery-history",
+                "schema_version": "3.0.0",
+                "sprint": "Sprint 1",
+                "start": "2026-01-01",
+                "end": "2026-01-01",
+                "events": [
+                    {"kind": "card_moved"},  # missing "at"
+                ],
+            }
+        )
+    )
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode != 0, "build.py should fail for non-conforming events file"
+        output = result.stdout + result.stderr
+        assert "events/2026-01-01.json" in output, (
+            f"output should name the failing events file: {output}"
+        )
+        assert "does not conform" in output, (
+            f"output should say the file does not conform: {output}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
 def _sent_back_package(sent_back_events: list[dict], sprint_name: str = "Sprint 1") -> dict:
     """A minimal 3.0.0 package index with the given sent_back events."""
     return {
