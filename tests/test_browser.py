@@ -12428,7 +12428,27 @@ def test_all_measure_terms_explained_in_orientation_block():
     label or section heading is either absent from those positions or its
     meaning is stated in the 'What this is' block."""
     tag = "delivery-history-TEST"
-    _make_fake_package(tag, ["Sprint 6"])
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 0,
+                "cycle_time_days": 2.0,
+                "dora": {
+                    "release_frequency": 2,
+                    "lead_time_days": 3.5,
+                    "change_failure_count": 0,
+                    "change_failure_rate_percent": 0,
+                    "mean_time_to_recovery_minutes": None,
+                },
+            }
+        },
+    )
     original = DELIVERY_HISTORY_TAG.read_text()
     DELIVERY_HISTORY_TAG.write_text(tag + "\n")
     try:
