@@ -80,6 +80,7 @@
   <section class="card sprint-chart" aria-labelledby="split-h">
     <div class="card__head">
       <h2 id="split-h">{% if has_analysis %}Stories delivered this sprint{% else %}What got done, story by story{% endif %}</h2>
+      {% if not has_analysis %}<span class="meta">by epic · time worked and model time per story</span>{% endif %}
     </div>
     <div class="card__body">
       {% if has_analysis %}
@@ -130,7 +131,7 @@
           <div class="epic-group__head">
             {% if group.is_epic %}
             <h3 class="epic-group__title">{{ group.epic_title }}</h3>
-            <span class="meta num">epic #{{ group.epic_number }} · {% if group.has_goal %}Goal {{ group.goal_repo }}#{{ group.goal_number }} {{ group.goal_title }}{% else %}not part of a Goal{% endif %}{% if group.has_roster %} · {{ group.done_count }} of {{ group.total_count }} stories done{% endif %}</span>
+            <span class="meta num">epic #{{ group.epic_number }} · {% if group.has_goal %}Goal {{ group.goal_repo }}#{{ group.goal_number }} {{ group.goal_title }}{% else %}not part of a Goal{% endif %}{% if group.has_roster %} · {{ group.done_count }} of {{ group.total_count }} stories done{% endif %}{% if group.epic_time_display %} · {{ group.epic_time_display }}{% endif %}</span>
             {% if group.epic_status %}<span class="badge" data-tone="{{ group.epic_status_tone }}">{{ group.epic_status }}</span>{% endif %}
             {% else %}
             <h3 class="epic-group__title">not part of an epic</h3>
@@ -143,6 +144,7 @@
               <a class="story-row__title" href="stories/{{ row.repo | replace('/', '-') }}-{{ row.number }}.html">{{ row.repo }}<span class="num meta">#{{ row.number }}</span> {{ row.title }}</a>
               {% if row.status %}<span class="badge" data-tone="{{ row.status_tone }}">{{ row.status }}</span>{% endif %}
               {% if row.blocks %}<div class="blocks">{% for block in row.blocks %}<span class="attempt-block attempt-block--{{ block | replace('_', '-') }}"></span>{% endfor %}</div>{% endif %}
+              <span class="story-row__time num">{{ row.time_cell }}</span>
               <span class="story-row__happened">{{ row.happened_line }}</span>
             </div>
             {% endfor %}

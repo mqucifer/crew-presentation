@@ -274,7 +274,7 @@ def _render_pages(pkg: Path) -> dict:
         else:
             sprint_events = _load_sprint_events(pkg, sprint["name"], index)
             epic_groups = _epic_groups(
-                cards, sprint["name"], metrics.get("roster"), sprint_events
+                cards, sprint["name"], metrics.get("roster"), sprint_events, metrics
             )
 
         analysis_changed = analysis_by_sprint.get(sprint["name"], {}).get(
@@ -664,7 +664,11 @@ def _story_happened_line(
 
 
 def _epic_groups(
-    cards: list[dict], sprint_name: str, roster, events: list[dict] | None = None
+    cards: list[dict],
+    sprint_name: str,
+    roster,
+    events: list[dict] | None = None,
+    metrics: dict | None = None,
 ) -> list[dict]:
     """Group the sprint's cards under their epics.
 
@@ -679,6 +683,11 @@ def _epic_groups(
     carries no roster). roster.completed_stories marks which of the rows are
     delivered; it never decides which rows appear. A roster entry that names
     no card in the sprint adds no row and is counted nowhere.
+
+    metrics is the sprint answer's full dict (or None). Its working_time,
+    session_stories and session_epics fields feed each row's time cell and
+    each epic heading's time display; the site reads those values and never
+    sums them.
     """
     cards_by_key: dict[tuple, dict] = {}
     for card in cards:
@@ -745,6 +754,7 @@ def _epic_groups(
                 events, card.get("repo"), card.get("number")
             )
             status_label = _status_label(card)
+            card_id = f"{card.get('repo')}#{card.get('number')}"
             rows.append(
                 {
                     "repo": card.get("repo") or "",
@@ -754,6 +764,7 @@ def _epic_groups(
                     "status_tone": _status_tone(status_label),
                     "delivered": is_delivered,
                     "blocks": blocks,
+                    "time_cell": _story_time_cell(is_delivered, card, card_id, metrics),
                     "happened_line": _story_happened_line(
                         blocks,
                         card,
@@ -774,6 +785,7 @@ def _epic_groups(
             "epic_title": None,
             "epic_status": None,
             "epic_status_tone": None,
+            "epic_time_display": "",
             "has_goal": False,
             "goal_repo": None,
             "goal_number": None,
@@ -789,6 +801,7 @@ def _epic_groups(
                 else None
             )
             has_goal = goal_card is not None and goal_card.get("type") == "Goal"
+            epic_card_id = f"{repo}#{parent}"
             group.update(
                 {
                     "is_epic": True,
@@ -797,6 +810,7 @@ def _epic_groups(
                     "epic_title": epic_card.get("title") or "",
                     "epic_status": epic_card.get("status") or "",
                     "epic_status_tone": _status_tone(epic_card.get("status")),
+                    "epic_time_display": _epic_time_display(epic_card_id, metrics),
                     "has_goal": has_goal,
                     "goal_repo": goal_card.get("repo") if has_goal else None,
                     "goal_number": goal_card.get("number") if has_goal else None,
@@ -805,6 +819,70 @@ def _epic_groups(
             )
         result.append(group)
     return result
+
+
+def _story_time_cell(is_delivered: bool, card: dict, card_id: str, metrics: dict | None) -> str:
+    """The story row's time cell: working and model time for delivered stories,
+    a state word for undelivered ones.
+
+    A delivered story reads '<working> · <model> min model' when the answer
+    carries both values, or 'no time recorded' when either is absent.
+    An undelivered story reads 'not delivered' while open, or 'never built'
+    when closed as not planned.
+    """
+    if not is_delivered:
+        if card.get("closed_as") == "not_planned":
+            return "never built"
+        return "not delivered"
+    working = None
+    model = None
+    if metrics:
+        wt = metrics.get("working_time")
+        if isinstance(wt, dict):
+            stories = wt.get("stories")
+            if isinstance(stories, dict):
+                val = stories.get(card_id)
+                if val is not None:
+                    working = val
+        ss = metrics.get("session_stories")
+        if isinstance(ss, dict):
+            entry = ss.get(card_id)
+            if isinstance(entry, dict):
+                val = entry.get("model_minutes")
+                if val is not None:
+                    model = val
+    if working is not None and model is not None:
+        return f"{_format_minutes(working)} \u00b7 {_format_minutes(model)} model"
+    return "no time recorded"
+
+
+def _epic_time_display(epic_card_id: str, metrics: dict | None) -> str:
+    """The epic heading's time display: '<worked> worked, <model> model'.
+
+    Read from the answer's session_epics entry for the epic. The site never
+    sums its own figure; when the answer carries no entry, an empty string is
+    returned and the template shows no time.
+    """
+    if not metrics:
+        return ""
+    se = metrics.get("session_epics")
+    if not isinstance(se, dict):
+        return ""
+    entry = se.get(epic_card_id)
+    if not isinstance(entry, dict):
+        return ""
+    session_minutes = entry.get("session_minutes")
+    model_minutes = entry.get("model_minutes")
+    if session_minutes is None and model_minutes is None:
+        return ""
+    parts = []
+    if session_minutes is not None:
+        parts.append(f"{_format_minutes(session_minutes)} worked")
+    if model_minutes is not None:
+        parts.append(f"{_format_minutes(model_minutes)} model")
+    if not parts:
+        return ""
+    return ", ".join(parts)
 
 
 def _normalize_failure_causes(raw) -> list[dict]:
