@@ -1406,6 +1406,12 @@ def _format_event_description(event: dict) -> str | None:
     if kind == "sent_back":
         sent_to = event.get("sent_to")
         return f"Sent back to {sent_to}" if sent_to else "Sent back"
+    if kind == "step_started":
+        step = _step_display(event.get("step", ""))
+        return f"{step} started" if step else "Step started"
+    if kind == "step_ended":
+        step = _step_display(event.get("step", ""))
+        return f"{step} ended" if step else "Step ended"
     # Fallback: humanize the kind (replace underscores with spaces, capitalise)
     return kind.replace("_", " ").capitalize() if kind else "Event"
 
