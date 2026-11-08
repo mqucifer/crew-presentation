@@ -11503,3 +11503,86 @@ def test_changelog_fragment_mentions_timezone():
     assert "sprint" in text, (
         "changelog fragment should mention the sprint page"
     )
+
+
+def _orientation_full_text(html: str) -> str:
+    """Extract all text from the orientation section, tags stripped."""
+    section = _orientation_section(html)
+    return re.sub(r"<[^>]+>", "", section)
+
+
+def test_all_measure_terms_explained_in_orientation_block():
+    """AC1: every term a visitor meets in a measure label, 'What changed' line
+    label or section heading is either absent from those positions or its
+    meaning is stated in the 'What this is' block."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        orientation_text = _orientation_full_text(html).lower()
+
+        # Fixed list of terms a visitor meets in labels and headings
+        terms = [
+            "sprint",
+            "story",
+            "point",
+            "delivered",
+            "first attempt",
+            "first-attempt",
+            "cycle time",
+            "lead time",
+            "release",
+            "failure",
+            "recovery",
+            "crew",
+            "DORA",
+        ]
+
+        # Collect the text of all measure labels, changed-trend labels,
+        # section headings, and DORA meta labels from the page.
+        label_texts: list[str] = []
+
+        # Stat labels (.stat__label)
+        label_texts.extend(re.findall(
+            r'class="stat__label"[^>]*>([^<]+)<', html
+        ))
+
+        # 'What changed' line labels: text before the colon in .changed-trend-values
+        for m in re.finditer(
+            r'class="changed-trend-values"[^>]*>([^:]+):', html
+        ):
+            label_texts.append(m.group(1))
+
+        # Section headings (h2)
+        label_texts.extend(re.findall(r"<h2[^>]*>([^<]+)</h2>", html))
+
+        # DORA section: all .meta text within it (descriptions and labels)
+        dora_match = re.search(
+            r'<section[^>]*aria-labelledby="dora-h"[^>]*>(.*?)</section>',
+            html, re.DOTALL,
+        )
+        if dora_match:
+            dora_html = dora_match.group(1)
+            label_texts.extend(
+                re.findall(r'<div class="meta">(.*?)</div>', dora_html)
+            )
+
+        all_label_text = " ".join(label_texts).lower()
+
+        for term in terms:
+            if term in all_label_text:
+                # The label may use a hyphenated form (e.g. 'first-attempt')
+                # while the block uses the spaced form ('first attempt').
+                spaced = term.replace("-", " ")
+                assert term in orientation_text or spaced in orientation_text, (
+                    f"term {term!r} appears in a measure label or heading on "
+                    f"the sprint page but is not explained in the "
+                    f"'What this is' block"
+                )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
