@@ -1461,11 +1461,11 @@ def test_placeholder_checks_contain_marker():
     assert ".stat__value" in source, (
         "AC1: no assertion on .stat__value elements"
     )
-    assert "stories delivered" in source, (
-        "AC1: no assertion on the 'stories delivered' label"
+    assert "Stories delivered" in source, (
+        "AC1: no assertion on the 'Stories delivered' label"
     )
-    assert "first-attempt pass" in source, (
-        "AC1: no assertion on the 'first-attempt pass' label"
+    assert "Landed first try" in source, (
+        "AC1: no assertion on the 'Landed first try' label"
     )
     assert "--color-bg" in source, (
         "AC1: no assertion that design-system CSS was loaded"
