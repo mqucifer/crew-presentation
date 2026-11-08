@@ -6,6 +6,29 @@ builds its section here from them (towncrier, Keep a Changelog). Entries still u
 
 <!-- towncrier release notes start -->
 
+## [0.5.0] - 2026-11-08
+
+### Added
+
+- The sprint page now lists every send-back of the sprint — which step sent it back, which step it went back to, why, and when — with the sprint's total count in the card head. (mqucifer/crew-presentation#297)
+- Each story on the sprint page now shows its attempt blocks (landed, missed,
+  blocked, crew fix merged) against the legend, its status in the board's own
+  words with a tone, and a plain-words line of what happened to it. (mqucifer/crew-presentation#298)
+- The sprint page now shows what was still open at the sprint's end: every story not done, with its state (waiting, blocked or refused) and how long it has been in that state. (mqucifer/crew-presentation#323)
+- The sprint page now states which timezone its times are in, from the package's own timezone field. (mqucifer/crew-presentation#324)
+- Every page now opens with a "What this is" explanation of what the crew is and what each page shows, before any measure. (mqucifer/crew-presentation#329)
+- The sprint page's 'What this is' block now explains every term a visitor meets in measure labels and section headings: sprint, story, points, delivered, first attempt, cycle time, lead time, release, failure, recovery, and DORA. (mqucifer/crew-presentation#331)
+- Each page's top navigation now includes an 'About the crew' item that takes you to the 'What this is' explanation, alongside the Sprint, story-journey and replay views (mqucifer/crew-presentation#352)
+- The sprint page now lists the sprint's stories under their epics, with each epic's done count and status, each story carrying its status, a line of what happened to it and its time (mqucifer/crew-presentation#353)
+- The 'Where the time went' card now shows a 'Time with no session running' block beneath the model-time split: a bar with the idle share of the sprint's total time, and a line giving both figures in minutes.
+- The sprint page now shows a 'Where the time went' card, below the DORA card, with the model-time split between planning and building as a proportional bar and both numbers in minutes.
+
+### Fixed
+
+- The replay page now has a working player: play/pause, speed control (1×, 30×, 60×), skip-idle, a timeline scrubber, an event ticker, and a who's-working panel, all driven by the page's embedded replay data. (mqucifer/crew-presentation#305)
+- The sprint overview's "How releases went" card showed four bare dashes when the DORA object existed but all four measures were null; it now shows "no release data for this sprint", consistent with the no-DORA-object case (mqucifer/crew-presentation#305) (mqucifer/crew-presentation#307)
+- Accept schema major version 4 in the version gate; build and validate packages on schema 4.0.0. (mqucifer/crew-presentation#319)
+
 ## [0.4.1] - 2026-11-05
 
 ### Fixed
