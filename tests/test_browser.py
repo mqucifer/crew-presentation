@@ -636,7 +636,8 @@ def test_cycle_time_is_fourth_stat():
             r'<span class="stat__value[^"]*">(.*?)</span>', stats, re.DOTALL
         )
         labels = re.findall(
-            r'<span class="stat__label">(.*?)</span>', stats, re.DOTALL
+            r'<span class="stat__label">([^<]*)</span>\s*<span class="stat__value',
+            stats,
         )
         # The third stat (index 2) should be cycle time (Start to delivered)
         assert len(values) >= 3, f"expected at least 3 stats, got {len(values)}"

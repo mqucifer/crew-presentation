@@ -12,27 +12,27 @@
   <div class="stat">
     <span class="stat__label">Stories delivered</span>
     <span class="stat__value num">{{ stats.throughput }}</span>
-    <span class="stat__sub meta">{{ stats.points_sub }}</span>
+    <span class="stat__label">{{ stats.points_sub }}</span>
   </div>
   <div class="stat">
     <span class="stat__label">Landed first try</span>
     <span class="stat__value num">{{ stats.first_try }}</span>
-    <span class="stat__sub meta">{{ stats.first_try_rate }}</span>
+    <span class="stat__label">{{ stats.first_try_rate }}</span>
   </div>
   <div class="stat">
     <span class="stat__label">Start to delivered</span>
     <span class="stat__value num">{{ stats.cycle_time }}</span>
-    <span class="stat__sub meta">cycle time</span>
+    <span class="stat__label">cycle time</span>
   </div>
   <div class="stat">
     <span class="stat__label">Filed to delivered</span>
     <span class="stat__value num">{{ stats.lead_time }}</span>
-    <span class="stat__sub meta">lead time</span>
+    <span class="stat__label">lead time</span>
   </div>
   <div class="stat">
     <span class="stat__label">Days blocked</span>
     <span class="stat__value num">{{ stats.days_blocked }}</span>
-    <span class="stat__sub meta">{{ stats.superseded_sub }}</span>
+    <span class="stat__label">{{ stats.superseded_sub }}</span>
   </div>
 </section>
 {% if changed %}
