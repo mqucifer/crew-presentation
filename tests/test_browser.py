@@ -12496,6 +12496,34 @@ def test_all_measure_terms_explained_in_orientation_block():
 
         all_label_text = " ".join(label_texts).lower()
 
+        # The DORA card must render its measure labels, not the absence line.
+        assert "releases this sprint" in all_label_text, (
+            "DORA card's measure label 'Releases this sprint' not found; "
+            "the fixture's DORA values should make the card render its "
+            "labels rather than the absence line"
+        )
+        assert "lead time for changes" in all_label_text, (
+            "DORA card's measure label 'lead time for changes' not found; "
+            "the fixture's DORA values should make the card render its "
+            "labels rather than the absence line"
+        )
+        assert "no release data for this sprint" not in html, (
+            "the absence line 'no release data for this sprint' is rendered; "
+            "the fixture's DORA values should make the card render its "
+            "labels instead"
+        )
+
+        # Both 'sprint' and 'lead time' must be present in the collected
+        # label text so the per-term check below fires for them.
+        assert "sprint" in all_label_text, (
+            "'sprint' not found in the collected label text; the per-term "
+            "check below would silently skip it"
+        )
+        assert "lead time" in all_label_text, (
+            "'lead time' not found in the collected label text; the "
+            "per-term check below would silently skip it"
+        )
+
         for term in terms:
             if term in all_label_text:
                 # The label may use a hyphenated form (e.g. 'first-attempt')
