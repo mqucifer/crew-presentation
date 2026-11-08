@@ -1,1 +1,0 @@
-The 'Where the time went' card now shows a 'Time with no session running' block beneath the model-time split: a bar with the idle share of the sprint's total time, and a line giving both figures in minutes.
