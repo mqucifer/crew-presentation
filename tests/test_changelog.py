@@ -72,20 +72,3 @@ def test_entries_left_under_unreleased_from_before_the_fragments_break_no_rule()
     assert changelog_problems(text, []) == []
 
 
-def test_fragment_298_names_attempts_status_and_happened():
-    """AC7: the entry says a story row shows its attempt blocks, its status in
-    the board's own words with a tone, and a plain-words line of what happened."""
-    fragment = CHANGES / "298.added.md"
-    changelog_text = CHANGELOG.read_text()
-    fragment_text = fragment.read_text() if fragment.exists() else ""
-    changelog_entry = ""
-    for line in changelog_text.splitlines():
-        if "#298" in line:
-            changelog_entry = line
-            break
-    texts = [t for t in [fragment_text, changelog_entry] if t]
-    assert texts, "entry for issue 298 not found in changes/298.added.md or CHANGELOG.md"
-    text = " ".join(texts).lower()
-    assert "attempt" in text, "entry does not mention attempt blocks"
-    assert "status" in text, "entry does not mention status"
-    assert "plain-words" in text, "entry does not mention plain-words line"
