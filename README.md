@@ -35,7 +35,9 @@ story-journey and replay views.
 
 - **Sprint overview** — one page per sprint: the sprint's figures (stories
   delivered, first-attempt pass, cycle time, points delivered), what changed
-  between sprints, the stories delivered story by story, every send-back of
+  between sprints, the sprint's stories story by story, grouped under their
+  epics with each epic's done count and status, each story carrying its status,
+  a line of what happened to it and its time, every send-back of
   the sprint (which step sent it back, which step it went back to, why, and
   when, with the sprint's total count in the card head), what was still open
   at the sprint's end (each story with its state — waiting, blocked or

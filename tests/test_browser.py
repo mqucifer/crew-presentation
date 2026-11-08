@@ -9346,7 +9346,8 @@ def test_stats_grid_two_columns_at_767px():
 
 
 def test_attempt_section_empty_renders_no_stories():
-    """AC1: when a sprint delivered zero stories, the attempt section says so in plain language."""
+    """AC1: when the sprint has no stories (no analysis, no cards in the
+    sprint), the story-by-story section says so in plain language."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -9367,13 +9368,16 @@ def test_attempt_section_empty_renders_no_stories():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        # The section contains the exact empty-state message
-        assert "No stories were delivered this sprint" in html, (
-            "'No stories were delivered this sprint' not found in attempt section"
+        # The section carries the story-by-story heading and its empty state.
+        assert "What got done, story by story" in html, (
+            "story-by-story heading not found"
         )
-        # No attempt-row elements
-        assert 'class="attempt-row"' not in html, (
-            "attempt-row elements found for empty stories"
+        assert "No stories in this sprint" in html, (
+            "'No stories in this sprint' not found in story-by-story section"
+        )
+        # No story rows
+        assert 'class="story-row"' not in html, (
+            "story-row elements found for an empty sprint"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -9874,11 +9878,10 @@ def test_decided_from_analysis_preserved():
 
 
 def test_story_list_from_roster_when_no_analysis():
-    """AC1: when the package has no analysis, the story list comes from
-    sprint_metrics' roster.completed_stories, not from card fields.
-
-    The row count equals the throughput stat; cards not in the roster
-    do not appear even if they have status Done.
+    """AC2: when the package has no analysis, every card of the sprint is a
+    row, whatever its status — the roster only marks which of the rows are
+    delivered, it never decides which rows appear. A parentless story sits
+    under the 'not part of an epic' group and is never dropped.
     """
     tag = "delivery-history-TEST"
     cards = [
@@ -9939,27 +9942,42 @@ def test_story_list_from_roster_when_no_analysis():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        # Exactly 2 story-row elements (the roster's two entries)
+        # All four sprint cards are rows, whatever their status; the roster's
+        # two entries don't decide which rows appear.
         row_count = html.count('class="story-row"')
-        assert row_count == 2, f"expected 2 story rows, got {row_count}"
-        # The stat shows the throughput value
+        assert row_count == 4, f"expected 4 story rows (all sprint cards), got {row_count}"
+        # The stat still shows the answer's throughput value, unchanged by the list.
         assert ">2</span>" in html, "stat value '2' not found"
-        # Cards not in the roster do not appear
-        assert "#112" not in html, "card #112 not in roster should not appear"
-        assert "#113" not in html, "card #113 not in roster should not appear"
-        # Each roster entry links to the story's page and shows its title
-        for num, title in [(110, "Story one"), (111, "Story two")]:
+        # Every card, roster-named or not, links to its story page and shows its title.
+        for num, title in [
+            (110, "Story one"),
+            (111, "Story two"),
+            (112, "Story three not in roster"),
+            (113, "Story four not in roster"),
+        ]:
             link = f'href="stories/sprint-metrics-{num}.html"'
             assert link in html, f"link for card #{num} not found"
             assert title in html, f"title {title!r} not found"
+        # All four cards are parentless, so they group under 'not part of an epic'.
+        assert "not part of an epic" in html, (
+            "'not part of an epic' group not found for parentless stories"
+        )
+        # The roster names two of the four delivered: the group's done count.
+        assert "2 of 4 stories done" in html, "done count '2 of 4 stories done' not found"
+        # Exactly the two roster-named cards are marked delivered.
+        delivered_count = html.count('data-delivered="true"')
+        assert delivered_count == 2, (
+            f"expected 2 delivered rows, got {delivered_count}"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
 def test_roster_entry_without_matching_card_shows_reference():
-    """AC2: a roster entry with no matching card still shows a row with
-    its reference, rather than being dropped."""
+    """AC1: a roster entry that names no matching card adds no row and is
+    counted nowhere — the roster never invents a row for a card that isn't in
+    the sprint."""
     tag = "delivery-history-TEST"
     metrics = {
         "Sprint 6": {
@@ -9981,12 +9999,15 @@ def test_roster_entry_without_matching_card_shows_reference():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        # Exactly 1 story-row element
+        # No card of the sprint matches the roster entry, so no row appears.
         row_count = html.count('class="story-row"')
-        assert row_count == 1, f"expected 1 story row, got {row_count}"
-        # The row shows the reference
-        assert "qa-suite" in html, "repo 'qa-suite' not found in story row"
-        assert "#999" in html, "number '#999' not found in story row"
+        assert row_count == 0, f"expected 0 story rows, got {row_count}"
+        # The reference is neither a row nor a done count anywhere in the section.
+        assert "qa-suite" not in html, "repo 'qa-suite' should not appear"
+        assert "#999" not in html, "number '#999' should not appear"
+        # The section shows the story-by-story heading and its empty state.
+        assert "What got done, story by story" in html
+        assert "No stories in this sprint" in html
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -10022,9 +10043,9 @@ def test_no_attempt_elements_when_no_analysis():
 
 
 def test_null_roster_shows_empty_message():
-    """AC3: when the roster is null (or missing), the page shows
-    'No stories were delivered this sprint' and zero story rows,
-    even if cards have status Done."""
+    """AC6: when the roster is null (or missing), no row is marked delivered
+    and the epic headings carry no done count — the site never invents a zero.
+    The sprint's cards still appear as rows, whatever their status."""
     tag = "delivery-history-TEST"
     cards = [
         {
@@ -10071,8 +10092,23 @@ def test_null_roster_shows_empty_message():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        assert "No stories were delivered this sprint" in html
-        assert 'class="story-row"' not in html, "no rows expected with null roster"
+        # All three sprint cards still appear as rows, whatever their status.
+        row_count = html.count('class="story-row"')
+        assert row_count == 3, f"expected 3 story rows, got {row_count}"
+        # They are parentless, so they group under 'not part of an epic'.
+        assert "not part of an epic" in html
+        # No roster: no row is marked delivered.
+        assert 'data-delivered="true"' not in html, "no row should be delivered"
+        # No done count anywhere in the story-by-story section: the site never
+        # invents a zero. (Scoped to the section — the stats row may show its
+        # own '0 of 0' first-attempt measure, which is a different number.)
+        section = re.search(
+            r'<section[^>]*class="card sprint-chart".*?</section>', html, re.DOTALL
+        )
+        assert section, "story-by-story section not found"
+        section_html = section.group(0)
+        assert "0 of" not in section_html, "'0 of' should not appear in the section"
+        assert "stories done" not in section_html, "no done count in the section"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -10124,13 +10160,283 @@ def test_announced_3_0_0_mock_shows_story_rows():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        # Sprint 6's roster has 5 entries, matching its throughput of 5
+        # AC1: every Sprint 6 card is a row, whatever its status, type or closed
+        # state — ten cards in the package, ten rows, not the roster's five.
         row_count = html.count('class="story-row"')
-        assert row_count == 5, (
-            f"expected 5 story rows from 3.0.0 mock roster, got {row_count}"
+        assert row_count == 10, (
+            f"expected 10 story rows (all Sprint 6 cards), got {row_count}"
         )
-        # The not_planned card (130) is not in the roster and does not appear
-        assert "#130" not in html, "not_planned card should not appear"
+        # The section's card head is the story-by-story heading, not the chart's.
+        assert "What got done, story by story" in html, (
+            "story-by-story heading not found"
+        )
+        # AC1: the rows are grouped under their epic's heading. Epic 123 holds
+        # cards 125-131 and epic 124 holds 132, 133, 136, in package order.
+        for number in (125, 126, 127, 128, 129, 130, 131, 132, 133, 136):
+            assert f"#{number}" in html, f"card #{number} has no row"
+        # The closed-not-planned (130) and blocked (131) cards still have rows.
+        assert "#130" in html, "closed-not-planned card 130 should have a row"
+        assert "#131" in html, "blocked card 131 should have a row"
+        # AC5: the answer's throughput (5) and the section's done counts disagree;
+        # both are shown as-is. The stat row still reads the answer's throughput.
+        assert ">5</span>" in html, "stat row should read the answer's throughput of 5"
+        assert "stories delivered" in html, "stat label 'stories delivered' not found"
+        assert "4 of 7 stories done" in html, "epic 123 done count not found"
+        assert "1 of 3 stories done" in html, "epic 124 done count not found"
+        # AC4: both epics have no Goal parent, so each reads 'not part of a Goal'.
+        assert "not part of a Goal" in html, "'not part of a Goal' not found"
+        # AC3: each epic's status is a badge in the board's own words with a tone.
+        assert re.search(
+            r'class="badge" data-tone="active">In Progress<', html
+        ), "epic 123 'In Progress' badge not found"
+        assert re.search(
+            r'class="badge" data-tone="waiting">Ready<', html
+        ), "epic 124 'Ready' badge not found"
+        # AC1: the roster names five cards delivered; exactly five rows are marked.
+        delivered_count = html.count('data-delivered="true"')
+        assert delivered_count == 5, (
+            f"expected 5 delivered rows, got {delivered_count}"
+        )
+        # Epic 123's group comes before epic 124's, in the package's card order.
+        assert html.index("epic #123") < html.index("epic #124"), (
+            "epic 123 group should precede epic 124's"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_epic_heading_shows_goal_parent_done_count_and_status():
+    """AC3: an epic heading names the epic's number and title, its Goal parent
+    (by number and title) when the epic has one, 'x of y stories done', and the
+    epic's status as a badge in the board's own words with a tone."""
+    tag = "delivery-history-EPIC-GOAL"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 1,
+            "points_delivered": 3,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": 1,
+            "cycle_time_days": 1.0,
+            "roster": {
+                "completed_stories": ["crew#7"],
+                "released_epics": None,
+                "achieved_goals": None,
+            },
+        }
+    }
+    cards = [
+        {
+            "repo": "crew",
+            "number": 2,
+            "type": "Goal",
+            "title": "A walking skeleton",
+            "sprint": None,
+            "status": "In Progress",
+        },
+        {
+            "repo": "crew",
+            "number": 5,
+            "type": "Epic",
+            "title": "The skeleton",
+            "parent": 2,
+            "sprint": None,
+            "status": "In Progress",
+        },
+        {
+            "repo": "crew",
+            "number": 7,
+            "type": "Story",
+            "title": "Story seven",
+            "parent": 5,
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "closed_as": "completed",
+        },
+        {
+            "repo": "crew",
+            "number": 8,
+            "type": "Story",
+            "title": "Story eight",
+            "parent": 5,
+            "sprint": "Sprint 6",
+            "status": "In Progress",
+        },
+    ]
+    _make_fake_package(tag, metrics=metrics, cards=cards, schema_version="3.0.0")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The epic heading names the epic's number and title.
+        assert "The skeleton" in html, "epic title not found"
+        assert "epic #5" in html, "epic #5 not named in its heading"
+        # The epic has a Goal parent, named by number and title.
+        assert "Goal crew#2" in html, "Goal's number not named in the epic heading"
+        assert "A walking skeleton" in html, "Goal's title not named in the epic heading"
+        # The done count: 1 of the 2 story rows is roster-delivered.
+        assert "1 of 2 stories done" in html, "done count '1 of 2 stories done' not found"
+        # The epic's status is a badge in the board's own words with a tone.
+        assert re.search(
+            r'class="badge" data-tone="active">In Progress<', html
+        ), "epic 'In Progress' badge not found"
+        # Both story rows appear, grouped under the epic.
+        row_count = html.count('class="story-row"')
+        assert row_count == 2, f"expected 2 story rows, got {row_count}"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_epic_without_goal_parent_reads_not_part_of_a_goal():
+    """AC4: an epic with no Goal parent (parent null) reads 'not part of a Goal'
+    in its heading — never a blank or an invented name — and still carries the
+    done count and the epic's status badge."""
+    tag = "delivery-history-EPIC-NOGOAL"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 1,
+            "points_delivered": 3,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": 1,
+            "cycle_time_days": 1.0,
+            "roster": {
+                "completed_stories": ["crew#7"],
+                "released_epics": None,
+                "achieved_goals": None,
+            },
+        }
+    }
+    cards = [
+        {
+            "repo": "crew",
+            "number": 5,
+            "type": "Epic",
+            "title": "The skeleton",
+            "parent": None,
+            "sprint": None,
+            "status": "In Progress",
+        },
+        {
+            "repo": "crew",
+            "number": 7,
+            "type": "Story",
+            "title": "Story seven",
+            "parent": 5,
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "closed_as": "completed",
+        },
+        {
+            "repo": "crew",
+            "number": 8,
+            "type": "Story",
+            "title": "Story eight",
+            "parent": 5,
+            "sprint": "Sprint 6",
+            "status": "In Progress",
+        },
+    ]
+    _make_fake_package(tag, metrics=metrics, cards=cards, schema_version="3.0.0")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The epic has no Goal parent, so it reads 'not part of a Goal'.
+        assert "not part of a Goal" in html, "'not part of a Goal' not found"
+        # The heading still names the epic and carries the done count...
+        assert "epic #5" in html, "epic #5 not named in its heading"
+        assert "The skeleton" in html, "epic title not found"
+        assert "1 of 2 stories done" in html, "done count '1 of 2 stories done' not found"
+        # ...and the epic's status badge.
+        assert re.search(
+            r'class="badge" data-tone="active">In Progress<', html
+        ), "epic 'In Progress' badge not found"
+        # No Goal name is invented in its place.
+        assert "Goal crew#" not in html, "a Goal name was invented"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_epic_groups_no_clipping_at_phone_and_desktop_width():
+    """AC7: with the 3.0.0 mock (no analysis), the story-by-story section's ten
+    rows and both epic headings are present and unclipped at 375px and 1280px,
+    in the section's current position on the page."""
+    base_dir = REPO_ROOT / "tests" / "fixtures" / "delivery-history-3.0.0"
+    mock_dir = base_dir / "mock"
+    assert mock_dir.is_dir(), "3.0.0 fixture mock not found"
+    tag = "delivery-history-3000-VP"
+    pkg_dir = PACKAGE_DIR / tag
+    shutil.copytree(mock_dir, pkg_dir)
+    # Schema files live at the base level, not in mock/
+    for schema_file in ("schema.json", "manifest.schema.json", "events.schema.json"):
+        shutil.copy2(base_dir / schema_file, pkg_dir / schema_file)
+    # Add a roster to the mock's Sprint 6 answer, as real packages carry them.
+    dh_path = pkg_dir / "delivery-history.json"
+    dh = json.loads(dh_path.read_text())
+    answers = dh["sprint_metrics"]["answers"]
+    answers["Sprint 6"]["roster"] = {
+        "completed_stories": [
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ],
+        "released_epics": None,
+        "achieved_goals": None,
+    }
+    dh_path.write_text(json.dumps(dh))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            for width in (375, 1280):
+                context = browser.new_context(viewport={"width": width, "height": 900})
+                page = context.new_page()
+                _intercept_design_system(page)
+                page.goto(f"file://{page_path}")
+                page.wait_for_load_state("domcontentloaded")
+
+                # All ten rows and both epic headings are present.
+                rows = page.locator(".story-row")
+                assert rows.count() == 10, (
+                    f"expected 10 rows at {width}px, got {rows.count()}"
+                )
+                headings = page.locator(".epic-group__head h3")
+                assert headings.count() == 2, (
+                    f"expected 2 epic headings at {width}px, got {headings.count()}"
+                )
+                # No horizontal overflow on the section itself.
+                section_overflow = page.evaluate(
+                    """
+                    (() => {
+                        const el = document.querySelector('.sprint-chart');
+                        return el.scrollWidth > el.clientWidth;
+                    })()
+                    """
+                )
+                assert not section_overflow, (
+                    f"sprint-chart overflows horizontally at {width}px"
+                )
+                # Each epic heading is unclipped (scrollWidth == clientWidth).
+                for i in range(headings.count()):
+                    clipped = headings.nth(i).evaluate(
+                        "(el) => el.scrollWidth > el.clientWidth"
+                    )
+                    assert not clipped, f"epic heading {i} clipped at {width}px"
+
+                context.close()
+            browser.close()
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -10377,7 +10683,9 @@ def test_roster_zero_goals_shows_no_goals():
 
 
 def test_roster_zero_both_story_in_chart_no_empty_body():
-    """AC3: when both epics and goals are 0, story title is in chart/list, no empty card__body."""
+    """AC1: with no analysis, the sprint's story appears as a row in the
+    story-by-story section (under its epic, or 'not part of an epic'), so the
+    card body is never empty."""
     tag = "delivery-history-ROSTER-Z"
     metrics = {
         "Sprint 6": {
@@ -10420,26 +10728,19 @@ def test_roster_zero_both_story_in_chart_no_empty_body():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        # Story title must appear in attempt-chart or story-list
-        in_chart = (
+        # Story title must appear as a row in the story-by-story section, under
+        # its epic group (or 'not part of an epic').
+        in_row = (
             re.search(
-                r'<div class="attempt-chart">.*?Write the sprint report as JSON.*?</div>\s*</div>',
+                r'<div class="story-row"[^>]*>.*?Write the sprint report as JSON.*?</div>',
                 html,
                 re.DOTALL,
             )
             is not None
         )
-        in_list = (
-            re.search(
-                r'<ul class="story-list">.*?Write the sprint report as JSON.*?</ul>',
-                html,
-                re.DOTALL,
-            )
-            is not None
-        )
-        assert in_chart or in_list, (
-            "Story title 'Write the sprint report as JSON' not found in "
-            "attempt-chart or story-list"
+        assert in_row, (
+            "Story title 'Write the sprint report as JSON' not found in a "
+            "story row of the story-by-story section"
         )
         # No section element has a div.card__body with empty textContent
         for section_match in re.finditer(r"<section[^>]*>(.*?)</section>", html, re.DOTALL):
