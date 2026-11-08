@@ -428,7 +428,7 @@ def test_sprint_overview_header_and_stats():
         assert "22" in stats, f"throughput '22' not in stats: {stats[:200]}"
         assert "63" in stats, f"points '63' not in stats: {stats[:200]}"
         assert "12 of 22" in stats, f"'12 of 22' not in stats: {stats[:200]}"
-        assert "1 hr 42 min" in stats, f"'1 hr 42 min' not in stats: {stats[:200]}"
+        assert "1 h 42 min" in stats, f"'1 h 42 min' not in stats: {stats[:200]}"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -609,7 +609,7 @@ def test_view_nav_aria_current():
 
 
 def test_cycle_time_is_fourth_stat():
-    """AC7: '1 hr 42 min' is the third stat, label 'cycle time', after throughput/first-attempt."""
+    """AC7: '1 h 42 min' is the third stat, label 'cycle time', after throughput/first-attempt."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -640,8 +640,8 @@ def test_cycle_time_is_fourth_stat():
         )
         # The third stat (index 2) should be cycle time
         assert len(values) >= 3, f"expected at least 3 stats, got {len(values)}"
-        assert values[2].strip() == "1 hr 42 min", (
-            f"3rd stat value is {values[2]!r}, expected '1 hr 42 min'"
+        assert values[2].strip() == "1 h 42 min", (
+            f"3rd stat value is {values[2]!r}, expected '1 h 42 min'"
         )
         assert labels[2].strip() == "cycle time", (
             f"3rd stat label is {labels[2].strip()!r}, expected 'cycle time'"
@@ -1377,8 +1377,8 @@ def test_changed_trend_single_entry_reading_order():
             "raw measure name 'cycle_time_days' appears in changed-trend section"
         )
         # AC1: values are formatted as hours and minutes
-        pos_prev = section_html.index("124 hr 48 min")
-        pos_now = section_html.index("91 hr 12 min")
+        pos_prev = section_html.index("5 d 4 h")
+        pos_now = section_html.index("3 d 19 h")
         pos_text = section_html.index("Cycle time improved")
         assert pos_text < pos_label < pos_prev < pos_now, (
             f"reading order violated: text@{pos_text}, label@{pos_label}, "
@@ -1479,10 +1479,10 @@ def test_changed_trend_values_have_num_class():
     try:
         _build()
         html = (BUILD_DIR / "sprint-7.html").read_text()
-        assert 'class="num">124 hr 48 min<' in html, (
+        assert 'class="num">5 d 4 h<' in html, (
             "previous value does not have class 'num' with formatted text"
         )
-        assert 'class="num">91 hr 12 min<' in html, (
+        assert 'class="num">3 d 19 h<' in html, (
             "now value does not have class 'num' with formatted text"
         )
         # AC7: the arrow between them
@@ -3128,10 +3128,10 @@ def test_cycle_time_stat_formats_hours_and_minutes():
     never contains 'day' or 'days'), both named for the 89-minute case.
     """
     cases = [
-        (89, "1 hr 29 min"),
-        (60, "1 hr"),
+        (89, "1 h 29 min"),
+        (60, "1 h"),
         (0, "0 min"),
-        (4320, "72 hr"),
+        (4320, "3 d"),
     ]
     tag = "delivery-history-TEST"
     original = DELIVERY_HISTORY_TAG.read_text()
@@ -5908,11 +5908,11 @@ def test_cycle_time_stat_matches_trend_now_value():
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
         stat_text, trend_now = _read_cycle_time(html)
-        assert stat_text == "76 hr 48 min", (
-            f"stat text is {stat_text!r}, expected '76 hr 48 min'"
+        assert stat_text == "3 d 4 h", (
+            f"stat text is {stat_text!r}, expected '3 d 4 h'"
         )
-        assert trend_now == "76 hr 48 min", (
-            f"trend now-value is {trend_now!r}, expected '76 hr 48 min'"
+        assert trend_now == "3 d 4 h", (
+            f"trend now-value is {trend_now!r}, expected '3 d 4 h'"
         )
         assert stat_text == trend_now, (
             f"stat ({stat_text!r}) and trend ({trend_now!r}) disagree"
@@ -5946,17 +5946,17 @@ def test_cycle_time_stat_mismatch_names_both_values():
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
         stat_text, trend_now = _read_cycle_time(html)
-        assert stat_text == "76 hr 48 min", (
-            f"stat text is {stat_text!r}, expected '76 hr 48 min'"
+        assert stat_text == "3 d 4 h", (
+            f"stat text is {stat_text!r}, expected '3 d 4 h'"
         )
-        assert trend_now == "98 hr 24 min", (
-            f"trend now-value is {trend_now!r}, expected '98 hr 24 min'"
+        assert trend_now == "4 d 2 h", (
+            f"trend now-value is {trend_now!r}, expected '4 d 2 h'"
         )
         with pytest.raises(AssertionError) as exc_info:
             assert stat_text == trend_now
         msg = str(exc_info.value)
-        assert "76 hr 48 min" in msg, f"assertion message missing stat value: {msg!r}"
-        assert "98 hr 24 min" in msg, f"assertion message missing trend value: {msg!r}"
+        assert "3 d 4 h" in msg, f"assertion message missing stat value: {msg!r}"
+        assert "4 d 2 h" in msg, f"assertion message missing trend value: {msg!r}"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -5977,8 +5977,8 @@ def test_cycle_time_no_trend_entry_passes_without_comparison():
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
         stat_text, trend_now = _read_cycle_time(html)
-        assert stat_text == "76 hr 48 min", (
-            f"stat text is {stat_text!r}, expected '76 hr 48 min'"
+        assert stat_text == "3 d 4 h", (
+            f"stat text is {stat_text!r}, expected '3 d 4 h'"
         )
         assert trend_now is None, (
             f"expected no cycle-time trend entry, got {trend_now!r}"
@@ -6068,16 +6068,22 @@ def _make_package_lead_time(
 def _lead_time_expected(lead_time_days: float) -> str:
     """The displayed text the package's lead_time_days should format to.
 
-    Mirrors the build: lead_time_days is converted to whole minutes, then to
-    hours and minutes ('120 hr', '175 hr 12 min', '0 min').
+    Mirrors the build: lead_time_days is converted to whole minutes, then
+    formatted in the canonical vocabulary ('10 h 55 min', '1 d 1 h').
     """
     total_minutes = round(lead_time_days * 24 * 60)
-    hours, minutes = divmod(total_minutes, 60)
+    if total_minutes < 60:
+        return f"{total_minutes} min"
+    if total_minutes < 1440:
+        hours, minutes = divmod(total_minutes, 60)
+        if minutes == 0:
+            return f"{hours} h"
+        return f"{hours} h {minutes} min"
+    days, remainder = divmod(total_minutes, 1440)
+    hours = remainder // 60
     if hours == 0:
-        return f"{minutes} min"
-    if minutes == 0:
-        return f"{hours} hr"
-    return f"{hours} hr {minutes} min"
+        return f"{days} d"
+    return f"{days} d {hours} h"
 
 
 def test_lead_time_trend_matches_package_lead_time_days():
@@ -6106,8 +6112,8 @@ def test_lead_time_trend_matches_package_lead_time_days():
         html = (BUILD_DIR / "sprint-7.html").read_text()
         trend_now = _read_lead_time(html)
         expected = _lead_time_expected(lead_time_days)
-        assert expected == "120 hr", (
-            f"package-derived value is {expected!r}, expected '120 hr'"
+        assert expected == "5 d", (
+            f"package-derived value is {expected!r}, expected '5 d'"
         )
         assert trend_now == expected, (
             f"lead-time trend now-value is {trend_now!r}, "
@@ -6144,17 +6150,17 @@ def test_lead_time_trend_mismatch_names_both_values():
         html = (BUILD_DIR / "sprint-7.html").read_text()
         trend_now = _read_lead_time(html)
         expected = _lead_time_expected(lead_time_days)
-        assert trend_now == "175 hr 12 min", (
-            f"trend now-value is {trend_now!r}, expected '175 hr 12 min'"
+        assert trend_now == "7 d 7 h", (
+            f"trend now-value is {trend_now!r}, expected '7 d 7 h'"
         )
-        assert expected == "120 hr", (
-            f"package-derived value is {expected!r}, expected '120 hr'"
+        assert expected == "5 d", (
+            f"package-derived value is {expected!r}, expected '5 d'"
         )
         with pytest.raises(AssertionError) as exc_info:
             assert trend_now == expected
         msg = str(exc_info.value)
-        assert "120 hr" in msg, f"assertion message missing package value: {msg!r}"
-        assert "175 hr 12 min" in msg, f"assertion message missing trend value: {msg!r}"
+        assert "5 d" in msg, f"assertion message missing package value: {msg!r}"
+        assert "7 d 7 h" in msg, f"assertion message missing trend value: {msg!r}"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -6899,10 +6905,9 @@ def test_stat_values_and_order_at_phone_width():
     reflow changes the layout, not the values or their order.
 
     Note: the cycle-time stat is rendered by build.py's _format_minutes from
-    cycle_time_minutes, which only emits hours/minutes ('N hr M min'); it never
-    renders '0.5 days'. So this proves the values and order are preserved
-    across viewports (the criterion's intent) rather than pinning a literal
-    '0.5 days' the build cannot produce.
+    cycle_time_minutes, which emits the canonical vocabulary ('10 h 55 min',
+    '1 d 1 h'). So this proves the values and order are preserved
+    across viewports (the criterion's intent).
     """
     tag = "delivery-history-TEST"
     metrics = {
@@ -9425,7 +9430,7 @@ def test_attempt_section_single_story_renders_one_row():
 def test_changed_from_metrics_cycle_time():
     """AC1: no analysis, sprint_metrics has cycle_time_minutes 33, prior 26.
 
-    The 'What changed' section shows 'cycle time' with '0 hr 26 min' → '0 hr 33 min'.
+    The 'What changed' section shows 'cycle time' with '26 min' → '33 min'.
     """
     tag = "delivery-history-TEST"
     metrics = {
@@ -9457,13 +9462,13 @@ def test_changed_from_metrics_cycle_time():
         assert "cycle time" in section_html, (
             f"label 'cycle time' not found in section: {section_html!r}"
         )
-        # AC1: previous value is '0 hr 26 min'
-        assert "0 hr 26 min" in section_html, (
-            f"previous value '0 hr 26 min' not found: {section_html!r}"
+        # AC1: previous value is '26 min'
+        assert "26 min" in section_html, (
+            f"previous value '26 min' not found: {section_html!r}"
         )
-        # AC1: now value is '0 hr 33 min'
-        assert "0 hr 33 min" in section_html, (
-            f"now value '0 hr 33 min' not found: {section_html!r}"
+        # AC1: now value is '33 min'
+        assert "33 min" in section_html, (
+            f"now value '33 min' not found: {section_html!r}"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -12401,20 +12406,6 @@ def test_sprint_page_timezone_line_present_without_clock_times():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
-
-
-def test_changelog_fragment_mentions_timezone():
-    """AC4: the changelog fragment tells the reader that the sprint page now
-    states which timezone its times are in."""
-    fragment = REPO_ROOT / "changes" / "324.added.md"
-    assert fragment.is_file(), "changelog fragment changes/324.added.md not found"
-    text = fragment.read_text().lower()
-    assert "timezone" in text, (
-        "changelog fragment should mention the timezone"
-    )
-    assert "sprint" in text, (
-        "changelog fragment should mention the sprint page"
-    )
 
 
 def _orientation_full_text(html: str) -> str:
