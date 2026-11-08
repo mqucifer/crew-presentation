@@ -102,6 +102,28 @@ def test_placeholder_comment_reports_no_rules(tmp_path):
     assert result.pairs == []
 
 
+def test_nav_label_contrast_meets_minimum_both_themes():
+    """AC4: the 'About the crew' nav label (--color-text-dim) against its
+    background (--color-bg) meets 4.5:1 in both themes, proven by the check."""
+    tokens = token_check.parse_tokens(_design_css().read_text())
+    light_dim = tokens["light"]["--color-text-dim"]
+    dark_dim = tokens["dark"]["--color-text-dim"]
+    light_bg = tokens["light"]["--color-bg"]
+    dark_bg = tokens["dark"]["--color-bg"]
+
+    light_ratio = token_check.contrast_ratio(light_dim, light_bg)
+    dark_ratio = token_check.contrast_ratio(dark_dim, dark_bg)
+
+    assert light_ratio >= 4.5, (
+        f"--color-text-dim ({light_dim}) on --color-bg ({light_bg}) light theme "
+        f"contrast is {light_ratio:.2f}:1, expected >= 4.5:1"
+    )
+    assert dark_ratio >= 4.5, (
+        f"--color-text-dim ({dark_dim}) on --color-bg ({dark_bg}) dark theme "
+        f"contrast is {dark_ratio:.2f}:1, expected >= 4.5:1"
+    )
+
+
 def _design_css() -> Path:
     """Return the path to the design-system CSS fetched by setup into ./.package/."""
     from tools.setup import design_system_css, DESIGN_SYSTEM_VERSION_FILE

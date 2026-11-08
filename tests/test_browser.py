@@ -562,7 +562,7 @@ def test_header_meta_line_and_document_order():
 
 
 def test_view_nav_aria_current():
-    """AC6: view nav has three links in order; Sprint has aria-current=page, others don't."""
+    """AC6: view nav has four links in order; Sprint has aria-current=page, others don't."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -584,10 +584,10 @@ def test_view_nav_aria_current():
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
         view_nav = _view_nav(html)
-        # Three links in order
+        # Four links in order
         links = re.findall(r"<a[^>]*>(.*?)</a>", view_nav)
-        assert links == ["Sprint", "A story's journey", "Replay"], (
-            f"view nav links are {links}, expected ['Sprint', \"A story's journey\", 'Replay']"
+        assert links == ["Sprint", "A story's journey", "Replay", "About the crew"], (
+            f"view nav links are {links}, expected ['Sprint', \"A story's journey\", 'Replay', 'About the crew']"
         )
         # Sprint link has aria-current="page"
         sprint_link = re.search(
@@ -595,7 +595,7 @@ def test_view_nav_aria_current():
         )
         assert sprint_link, "Sprint link does not have aria-current='page'"
         # Other links do NOT have aria-current
-        for text in ("A story's journey", "Replay"):
+        for text in ("A story's journey", "Replay", "About the crew"):
             link_match = re.search(
                 rf'<a[^>]*>{re.escape(text)}</a>', view_nav
             )
@@ -7183,8 +7183,8 @@ def test_view_nav_links_at_least_44px_at_phone_width():
                 "Array.from(document.querySelectorAll('nav.nav a'))"
                 ".map(el => el.getBoundingClientRect().height)"
             )
-            assert len(heights) == 3, (
-                f"expected 3 view-nav links, got {len(heights)}"
+            assert len(heights) == 4, (
+                f"expected 4 view-nav links, got {len(heights)}"
             )
             for h in heights:
                 assert h >= 44, f"view-nav link height {h} < 44px"
@@ -7264,8 +7264,8 @@ def test_view_nav_no_horizontal_overflow_at_phone_width():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
-def test_view_nav_exactly_three_links_in_order_at_phone_width():
-    """AC4: at 375px, nav.nav has exactly 3 links 'Sprint', "A story's journey", 'Replay'."""
+def test_view_nav_exactly_four_links_in_order_at_phone_width():
+    """AC4: at 375px, nav.nav has exactly 4 links 'Sprint', "A story's journey", 'Replay', 'About the crew'."""
     tag = "delivery-history-TEST"
     _make_fake_package(tag, ["Sprint 6"])
     original = DELIVERY_HISTORY_TAG.read_text()
@@ -7288,7 +7288,7 @@ def test_view_nav_exactly_three_links_in_order_at_phone_width():
                 "Array.from(document.querySelectorAll('nav.nav a'))"
                 ".map(el => el.textContent.trim())"
             )
-            assert texts == ["Sprint", "A story's journey", "Replay"], (
+            assert texts == ["Sprint", "A story's journey", "Replay", "About the crew"], (
                 f"view-nav links are {texts}, expected the desktop set and order"
             )
 
@@ -7356,11 +7356,117 @@ def test_view_nav_links_at_least_40px_at_desktop_width():
                 "Array.from(document.querySelectorAll('nav.nav a'))"
                 ".map(el => el.getBoundingClientRect().height)"
             )
-            assert len(heights) == 3, (
-                f"expected 3 view-nav links, got {len(heights)}"
+            assert len(heights) == 4, (
+                f"expected 4 view-nav links, got {len(heights)}"
             )
             for h in heights:
                 assert h >= 40, f"view-nav link height {h} < 40px on desktop"
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_view_nav_about_crew_link_jumps_to_orientation():
+    """AC1: clicking 'About the crew' makes the URL carry #orientation-h and
+    the orientation block sits at or near the top of the viewport."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 1440, "height": 900})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Click the 'About the crew' link
+            page.click("nav.nav a:has-text('About the crew')")
+            page.wait_for_load_state("domcontentloaded")
+
+            # The URL carries the block's anchor
+            assert page.url.endswith("#orientation-h"), (
+                f"URL after click is {page.url!r}, expected to end with '#orientation-h'"
+            )
+
+            # The orientation block sits at or near the top of the viewport
+            top = page.evaluate(
+                "document.getElementById('orientation-h').getBoundingClientRect().top"
+            )
+            assert top <= 200, (
+                f"'What this is' heading top is at {top}px, expected <= 200px from viewport top"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_view_nav_about_crew_focus_ring():
+    """AC3: tabbing to 'About the crew' shows the site's visible focus ring
+    (outline-style not none, outline-width > 0), exactly like the other nav items."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector("nav.nav a")
+
+            def _focus_outline(link_text):
+                """Focus a nav link by text and return its (outlineStyle, outlineWidth)."""
+                page.evaluate(
+                    f"Array.from(document.querySelectorAll('nav.nav a'))"
+                    f".find(el => el.textContent.trim() === {link_text!r}).focus()"
+                )
+                style = page.evaluate(
+                    f"getComputedStyle(Array.from(document.querySelectorAll('nav.nav a'))"
+                    f".find(el => el.textContent.trim() === {link_text!r})).outlineStyle"
+                )
+                width = page.evaluate(
+                    f"getComputedStyle(Array.from(document.querySelectorAll('nav.nav a'))"
+                    f".find(el => el.textContent.trim() === {link_text!r})).outlineWidth"
+                )
+                return style, width
+
+            # Focus the 'About the crew' link and read its outline
+            about_style, about_width = _focus_outline("About the crew")
+            assert about_style != "none", (
+                f"'About the crew' outline-style is {about_style!r}, expected not 'none'"
+            )
+            assert float(about_width.rstrip("px")) > 0, (
+                f"'About the crew' outline-width is {about_width!r}, expected > 0px"
+            )
+
+            # Focus the Sprint link and read its outline; they must match
+            sprint_style, sprint_width = _focus_outline("Sprint")
+            assert about_style == sprint_style, (
+                f"'About the crew' outline-style {about_style!r} differs from "
+                f"Sprint's {sprint_style!r}"
+            )
+            assert about_width == sprint_width, (
+                f"'About the crew' outline-width {about_width!r} differs from "
+                f"Sprint's {sprint_width!r}"
+            )
 
             browser.close()
     finally:
