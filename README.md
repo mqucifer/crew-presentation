@@ -33,19 +33,22 @@ what each page shows, before any measure. Each page's top navigation offers an
 'About the crew' item that takes you to that explanation, alongside the
 story-journey and replay views.
 
-- **Sprint overview** — one page per sprint: the sprint's figures (stories
-  delivered, first-attempt pass, cycle time, points delivered), what changed
-  between sprints, the sprint's stories story by story, grouped under their
-  epics with each epic's done count and status, each story carrying its status,
-  a line of what happened to it and its time, every send-back of
-  the sprint (which step sent it back, which step it went back to, why, and
-  when, with the sprint's total count in the card head), what was still open
-  at the sprint's end (each story with its state — waiting, blocked or
-  refused — and how long it has been in that state), why work didn't land
-  first time, a 'Where the time went' card showing how the sprint's model time
-  split between planning and building (with both numbers in minutes) and how
-  much of the sprint passed with no session running, against the sprint's
-  total time, in minutes, and decisions the crew made.
+- **Sprint overview** — one page per sprint: the sprint's headline totals
+  (stories delivered with their points, the stories that landed first try
+  with the share in percent, the time from start to delivered, the time
+  from filed to delivered, and the days blocked with what was superseded —
+  every number with its unit), what changed between sprints, the sprint's
+  stories story by story, grouped under their epics with each epic's
+  done count and status, each story carrying its status, a line of
+  what happened to it and its time, every send-back of the sprint (which
+  step sent it back, which step it went back to, why, and when, with the
+  sprint's total count in the card head), what was still open at the
+  sprint's end (each story with its state — waiting, blocked or refused
+  — and how long it has been in that state), why work didn't land first
+  time, a 'Where the time went' card showing how the sprint's model time
+  split between planning and building (with both numbers in minutes) and
+  how much of the sprint passed with no session running, against the
+  sprint's total time, in minutes, and decisions the crew made.
 - **Replay** — the crew's work on a day, played back: who did what, and how the
   board moved.
 - **Story journey** — a story's life cycle, in detail, from a Goal to merged.
