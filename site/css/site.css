@@ -100,6 +100,10 @@
   flex-shrink: 0;
 }
 
+.attempt-block--missed {
+  background: var(--stage-1);
+}
+
 .attempt-block--refused {
   background: var(--stage-1);
 }
@@ -146,6 +150,10 @@
 
 .swatch--landed {
   background: var(--tone-done-text);
+}
+
+.swatch--missed {
+  background: var(--stage-1);
 }
 
 .swatch--refused {
@@ -206,6 +214,72 @@
 
 .attempt-status--progress {
   color: var(--color-text-dim);
+}
+
+/* Story by story: the sprint's stories grouped under their epics */
+.epic-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.epic-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.epic-group__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.epic-group__title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.epic-group__head .meta {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.epic-group__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.story-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.story-row__title {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.story-row .blocks {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.story-row__happened {
+  font-size: 13px;
+  color: var(--color-text-dim);
+  flex-basis: 100%;
 }
 
 /* Failure-causes bar chart */
@@ -467,6 +541,73 @@ section ul li a {
 
 .cost-grid__value {
   font-size: 32px;
+}
+
+/* Model time split: planning against building */
+.model-time-split {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.model-time-split__label {
+  font-size: 15px;
+}
+
+.model-time-split__bar {
+  height: 14px;
+  border-radius: 4px;
+  background: var(--color-surface-raised);
+  display: flex;
+  overflow: hidden;
+}
+
+.model-time-split__planning {
+  background: var(--stage-1);
+}
+
+.model-time-split__building {
+  background: var(--stage-3);
+}
+
+.model-time-split__values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Idle time: time with no session running */
+.idle-time {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.idle-time__label {
+  font-size: 15px;
+}
+
+.idle-time__bar {
+  height: 14px;
+  border-radius: 4px;
+  background: var(--color-surface-raised);
+  display: flex;
+  overflow: hidden;
+}
+
+.idle-time__fill {
+  background: var(--color-text-dim);
+}
+
+.idle-time__values {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  font-variant-numeric: tabular-nums;
 }
 
 /* DORA measures grid */

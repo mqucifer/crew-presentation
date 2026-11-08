@@ -106,7 +106,7 @@ C4Component
     Container(site, "The deployed site", "Static HTML, CSS and JavaScript on GitHub Pages", "Built from the delivery-history package the tag names")
 
     Component(base, "base.html, the shared layout", "Jinja2, rendered at build time", "Header and navigation between the three views, the theme, the design-system stylesheet link at its pinned jsDelivr URL, and the site's own CSS")
-    Component(overview, "The sprint overview pages", "HTML", "One per sprint: the sprint's totals, the attempt chart story by story, the measures that changed, why work did not land first time, and what the crew decided")
+    Component(overview, "The sprint overview pages", "HTML", "One per sprint: the sprint's totals, the sprint's stories story by story (the attempt chart when the package carries analysis, the stories grouped under their epics with each epic's done count and status otherwise), the measures that changed, why work did not land first time, and what the crew decided")
     Component(journey, "The story journey pages", "HTML", "One per story card: the card's repository, number and title; the journey itself is not drawn yet")
     Component(replay, "The replay page", "HTML with embedded JSON", "The sprint's board in its opening state, rendered at build time; the sprint's events and cards are embedded as JSON for the player")
     Component(root, "The root page, index.html", "HTML", "Written by the deploy workflow, not by the build: redirects to the newest sprint's page")

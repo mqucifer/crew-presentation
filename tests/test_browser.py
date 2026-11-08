@@ -562,7 +562,7 @@ def test_header_meta_line_and_document_order():
 
 
 def test_view_nav_aria_current():
-    """AC6: view nav has three links in order; Sprint has aria-current=page, others don't."""
+    """AC6: view nav has four links in order; Sprint has aria-current=page, others don't."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -584,10 +584,10 @@ def test_view_nav_aria_current():
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
         view_nav = _view_nav(html)
-        # Three links in order
+        # Four links in order
         links = re.findall(r"<a[^>]*>(.*?)</a>", view_nav)
-        assert links == ["Sprint", "A story's journey", "Replay"], (
-            f"view nav links are {links}, expected ['Sprint', \"A story's journey\", 'Replay']"
+        assert links == ["Sprint", "A story's journey", "Replay", "About the crew"], (
+            f"view nav links are {links}, expected ['Sprint', \"A story's journey\", 'Replay', 'About the crew']"
         )
         # Sprint link has aria-current="page"
         sprint_link = re.search(
@@ -595,7 +595,7 @@ def test_view_nav_aria_current():
         )
         assert sprint_link, "Sprint link does not have aria-current='page'"
         # Other links do NOT have aria-current
-        for text in ("A story's journey", "Replay"):
+        for text in ("A story's journey", "Replay", "About the crew"):
             link_match = re.search(
                 rf'<a[^>]*>{re.escape(text)}</a>', view_nav
             )
@@ -2005,6 +2005,10 @@ def test_sprint_overview_dora_values_shown():
         # The DORA values are rendered
         assert "14" in html, "release_frequency value '14' not in page"
         assert "45" in html, "mean_time_to_recovery_minutes value '45' not in page"
+        # The absence message is NOT shown when values are present
+        assert "no release data for this sprint" not in html, (
+            "absence line 'no release data for this sprint' should not appear when DORA values exist"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -2039,6 +2043,50 @@ def test_sprint_overview_dora_absent_shows_no_data():
         assert "no release data for this sprint" in html, (
             "absence line 'no release data for this sprint' not found"
         )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_overview_dora_all_null_shows_no_data():
+    """AC1: when dora exists but all four values are null, show 'no release data for this sprint'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "dora": {
+                    "release_frequency": None,
+                    "lead_time_days": None,
+                    "change_failure_count": None,
+                    "mean_time_to_recovery_minutes": None,
+                },
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The section heading is still present
+        assert "How releases went" in html, "DORA heading 'How releases went' not found"
+        # The absence message is shown
+        assert "no release data for this sprint" in html, (
+            "absence line 'no release data for this sprint' not found"
+        )
+        # None of the metric labels are rendered
+        assert "Releases this sprint" not in html, "metric label 'Releases this sprint' should not appear"
+        assert "Change to release" not in html, "metric label 'Change to release' should not appear"
+        assert "Releases that failed" not in html, "metric label 'Releases that failed' should not appear"
+        assert "Time to recover" not in html, "metric label 'Time to recover' should not appear"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -7140,8 +7188,8 @@ def test_view_nav_links_at_least_44px_at_phone_width():
                 "Array.from(document.querySelectorAll('nav.nav a'))"
                 ".map(el => el.getBoundingClientRect().height)"
             )
-            assert len(heights) == 3, (
-                f"expected 3 view-nav links, got {len(heights)}"
+            assert len(heights) == 4, (
+                f"expected 4 view-nav links, got {len(heights)}"
             )
             for h in heights:
                 assert h >= 44, f"view-nav link height {h} < 44px"
@@ -7221,8 +7269,8 @@ def test_view_nav_no_horizontal_overflow_at_phone_width():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
-def test_view_nav_exactly_three_links_in_order_at_phone_width():
-    """AC4: at 375px, nav.nav has exactly 3 links 'Sprint', "A story's journey", 'Replay'."""
+def test_view_nav_exactly_four_links_in_order_at_phone_width():
+    """AC4: at 375px, nav.nav has exactly 4 links 'Sprint', "A story's journey", 'Replay', 'About the crew'."""
     tag = "delivery-history-TEST"
     _make_fake_package(tag, ["Sprint 6"])
     original = DELIVERY_HISTORY_TAG.read_text()
@@ -7245,7 +7293,7 @@ def test_view_nav_exactly_three_links_in_order_at_phone_width():
                 "Array.from(document.querySelectorAll('nav.nav a'))"
                 ".map(el => el.textContent.trim())"
             )
-            assert texts == ["Sprint", "A story's journey", "Replay"], (
+            assert texts == ["Sprint", "A story's journey", "Replay", "About the crew"], (
                 f"view-nav links are {texts}, expected the desktop set and order"
             )
 
@@ -7313,11 +7361,117 @@ def test_view_nav_links_at_least_40px_at_desktop_width():
                 "Array.from(document.querySelectorAll('nav.nav a'))"
                 ".map(el => el.getBoundingClientRect().height)"
             )
-            assert len(heights) == 3, (
-                f"expected 3 view-nav links, got {len(heights)}"
+            assert len(heights) == 4, (
+                f"expected 4 view-nav links, got {len(heights)}"
             )
             for h in heights:
                 assert h >= 40, f"view-nav link height {h} < 40px on desktop"
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_view_nav_about_crew_link_jumps_to_orientation():
+    """AC1: clicking 'About the crew' makes the URL carry #orientation-h and
+    the orientation block sits at or near the top of the viewport."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            context = browser.new_context(viewport={"width": 1440, "height": 900})
+            page = context.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_load_state("domcontentloaded")
+
+            # Click the 'About the crew' link
+            page.click("nav.nav a:has-text('About the crew')")
+            page.wait_for_load_state("domcontentloaded")
+
+            # The URL carries the block's anchor
+            assert page.url.endswith("#orientation-h"), (
+                f"URL after click is {page.url!r}, expected to end with '#orientation-h'"
+            )
+
+            # The orientation block sits at or near the top of the viewport
+            top = page.evaluate(
+                "document.getElementById('orientation-h').getBoundingClientRect().top"
+            )
+            assert top <= 200, (
+                f"'What this is' heading top is at {top}px, expected <= 200px from viewport top"
+            )
+
+            browser.close()
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_view_nav_about_crew_focus_ring():
+    """AC3: tabbing to 'About the crew' shows the site's visible focus ring
+    (outline-style not none, outline-width > 0), exactly like the other nav items."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            _intercept_design_system(page)
+            page.goto(f"file://{page_path}")
+            page.wait_for_selector("nav.nav a")
+
+            def _focus_outline(link_text):
+                """Focus a nav link by text and return its (outlineStyle, outlineWidth)."""
+                page.evaluate(
+                    f"Array.from(document.querySelectorAll('nav.nav a'))"
+                    f".find(el => el.textContent.trim() === {link_text!r}).focus()"
+                )
+                style = page.evaluate(
+                    f"getComputedStyle(Array.from(document.querySelectorAll('nav.nav a'))"
+                    f".find(el => el.textContent.trim() === {link_text!r})).outlineStyle"
+                )
+                width = page.evaluate(
+                    f"getComputedStyle(Array.from(document.querySelectorAll('nav.nav a'))"
+                    f".find(el => el.textContent.trim() === {link_text!r})).outlineWidth"
+                )
+                return style, width
+
+            # Focus the 'About the crew' link and read its outline
+            about_style, about_width = _focus_outline("About the crew")
+            assert about_style != "none", (
+                f"'About the crew' outline-style is {about_style!r}, expected not 'none'"
+            )
+            assert float(about_width.rstrip("px")) > 0, (
+                f"'About the crew' outline-width is {about_width!r}, expected > 0px"
+            )
+
+            # Focus the Sprint link and read its outline; they must match
+            sprint_style, sprint_width = _focus_outline("Sprint")
+            assert about_style == sprint_style, (
+                f"'About the crew' outline-style {about_style!r} differs from "
+                f"Sprint's {sprint_style!r}"
+            )
+            assert about_width == sprint_width, (
+                f"'About the crew' outline-width {about_width!r} differs from "
+                f"Sprint's {sprint_width!r}"
+            )
 
             browser.close()
     finally:
@@ -9197,7 +9351,8 @@ def test_stats_grid_two_columns_at_767px():
 
 
 def test_attempt_section_empty_renders_no_stories():
-    """AC1: when a sprint delivered zero stories, the attempt section says so in plain language."""
+    """AC1: when the sprint has no stories (no analysis, no cards in the
+    sprint), the story-by-story section says so in plain language."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -9218,13 +9373,16 @@ def test_attempt_section_empty_renders_no_stories():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        # The section contains the exact empty-state message
-        assert "No stories were delivered this sprint" in html, (
-            "'No stories were delivered this sprint' not found in attempt section"
+        # The section carries the story-by-story heading and its empty state.
+        assert "What got done, story by story" in html, (
+            "story-by-story heading not found"
         )
-        # No attempt-row elements
-        assert 'class="attempt-row"' not in html, (
-            "attempt-row elements found for empty stories"
+        assert "No stories in this sprint" in html, (
+            "'No stories in this sprint' not found in story-by-story section"
+        )
+        # No story rows
+        assert 'class="story-row"' not in html, (
+            "story-row elements found for an empty sprint"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -9725,11 +9883,10 @@ def test_decided_from_analysis_preserved():
 
 
 def test_story_list_from_roster_when_no_analysis():
-    """AC1: when the package has no analysis, the story list comes from
-    sprint_metrics' roster.completed_stories, not from card fields.
-
-    The row count equals the throughput stat; cards not in the roster
-    do not appear even if they have status Done.
+    """AC2: when the package has no analysis, every card of the sprint is a
+    row, whatever its status — the roster only marks which of the rows are
+    delivered, it never decides which rows appear. A parentless story sits
+    under the 'not part of an epic' group and is never dropped.
     """
     tag = "delivery-history-TEST"
     cards = [
@@ -9790,27 +9947,42 @@ def test_story_list_from_roster_when_no_analysis():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        # Exactly 2 story-row elements (the roster's two entries)
+        # All four sprint cards are rows, whatever their status; the roster's
+        # two entries don't decide which rows appear.
         row_count = html.count('class="story-row"')
-        assert row_count == 2, f"expected 2 story rows, got {row_count}"
-        # The stat shows the throughput value
+        assert row_count == 4, f"expected 4 story rows (all sprint cards), got {row_count}"
+        # The stat still shows the answer's throughput value, unchanged by the list.
         assert ">2</span>" in html, "stat value '2' not found"
-        # Cards not in the roster do not appear
-        assert "#112" not in html, "card #112 not in roster should not appear"
-        assert "#113" not in html, "card #113 not in roster should not appear"
-        # Each roster entry links to the story's page and shows its title
-        for num, title in [(110, "Story one"), (111, "Story two")]:
+        # Every card, roster-named or not, links to its story page and shows its title.
+        for num, title in [
+            (110, "Story one"),
+            (111, "Story two"),
+            (112, "Story three not in roster"),
+            (113, "Story four not in roster"),
+        ]:
             link = f'href="stories/sprint-metrics-{num}.html"'
             assert link in html, f"link for card #{num} not found"
             assert title in html, f"title {title!r} not found"
+        # All four cards are parentless, so they group under 'not part of an epic'.
+        assert "not part of an epic" in html, (
+            "'not part of an epic' group not found for parentless stories"
+        )
+        # The roster names two of the four delivered: the group's done count.
+        assert "2 of 4 stories done" in html, "done count '2 of 4 stories done' not found"
+        # Exactly the two roster-named cards are marked delivered.
+        delivered_count = html.count('data-delivered="true"')
+        assert delivered_count == 2, (
+            f"expected 2 delivered rows, got {delivered_count}"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
 def test_roster_entry_without_matching_card_shows_reference():
-    """AC2: a roster entry with no matching card still shows a row with
-    its reference, rather than being dropped."""
+    """AC1: a roster entry that names no matching card adds no row and is
+    counted nowhere — the roster never invents a row for a card that isn't in
+    the sprint."""
     tag = "delivery-history-TEST"
     metrics = {
         "Sprint 6": {
@@ -9832,20 +10004,24 @@ def test_roster_entry_without_matching_card_shows_reference():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        # Exactly 1 story-row element
+        # No card of the sprint matches the roster entry, so no row appears.
         row_count = html.count('class="story-row"')
-        assert row_count == 1, f"expected 1 story row, got {row_count}"
-        # The row shows the reference
-        assert "qa-suite" in html, "repo 'qa-suite' not found in story row"
-        assert "#999" in html, "number '#999' not found in story row"
+        assert row_count == 0, f"expected 0 story rows, got {row_count}"
+        # The reference is neither a row nor a done count anywhere in the section.
+        assert "qa-suite" not in html, "repo 'qa-suite' should not appear"
+        assert "#999" not in html, "number '#999' should not appear"
+        # The section shows the story-by-story heading and its empty state.
+        assert "What got done, story by story" in html
+        assert "No stories in this sprint" in html
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
 def test_no_attempt_elements_when_no_analysis():
-    """AC2: when the package has no analysis, the page has no .attempt-block,
-    .attempt-status, or .attempt-legend element."""
+    """AC2: when the package has no analysis, the page has no .attempt-block or
+    .attempt-status element, but it does carry the attempt-legend and each row
+    carries a status badge."""
     tag = "delivery-history-TEST"
     cards = [
         {
@@ -9864,18 +10040,19 @@ def test_no_attempt_elements_when_no_analysis():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        assert "attempt-block" not in html, "attempt-block element found without analysis"
+        assert "attempt-block" not in html, "attempt-block element found without events"
         assert "attempt-status" not in html, "attempt-status element found without analysis"
-        assert "attempt-legend" not in html, "attempt-legend element found without analysis"
+        assert "attempt-legend" in html, "attempt-legend not found without analysis"
+        assert 'class="badge"' in html, "status badge not found on story row"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
 def test_null_roster_shows_empty_message():
-    """AC3: when the roster is null (or missing), the page shows
-    'No stories were delivered this sprint' and zero story rows,
-    even if cards have status Done."""
+    """AC6: when the roster is null (or missing), no row is marked delivered
+    and the epic headings carry no done count — the site never invents a zero.
+    The sprint's cards still appear as rows, whatever their status."""
     tag = "delivery-history-TEST"
     cards = [
         {
@@ -9922,8 +10099,23 @@ def test_null_roster_shows_empty_message():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        assert "No stories were delivered this sprint" in html
-        assert 'class="story-row"' not in html, "no rows expected with null roster"
+        # All three sprint cards still appear as rows, whatever their status.
+        row_count = html.count('class="story-row"')
+        assert row_count == 3, f"expected 3 story rows, got {row_count}"
+        # They are parentless, so they group under 'not part of an epic'.
+        assert "not part of an epic" in html
+        # No roster: no row is marked delivered.
+        assert 'data-delivered="true"' not in html, "no row should be delivered"
+        # No done count anywhere in the story-by-story section: the site never
+        # invents a zero. (Scoped to the section — the stats row may show its
+        # own '0 of 0' first-attempt measure, which is a different number.)
+        section = re.search(
+            r'<section[^>]*class="card sprint-chart".*?</section>', html, re.DOTALL
+        )
+        assert section, "story-by-story section not found"
+        section_html = section.group(0)
+        assert "0 of" not in section_html, "'0 of' should not appear in the section"
+        assert "stories done" not in section_html, "no done count in the section"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -9975,13 +10167,690 @@ def test_announced_3_0_0_mock_shows_story_rows():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        # Sprint 6's roster has 5 entries, matching its throughput of 5
+        # AC1: every Sprint 6 card is a row, whatever its status, type or closed
+        # state — ten cards in the package, ten rows, not the roster's five.
         row_count = html.count('class="story-row"')
-        assert row_count == 5, (
-            f"expected 5 story rows from 3.0.0 mock roster, got {row_count}"
+        assert row_count == 10, (
+            f"expected 10 story rows (all Sprint 6 cards), got {row_count}"
         )
-        # The not_planned card (130) is not in the roster and does not appear
-        assert "#130" not in html, "not_planned card should not appear"
+        # The section's card head is the story-by-story heading, not the chart's.
+        assert "What got done, story by story" in html, (
+            "story-by-story heading not found"
+        )
+        # AC1: the rows are grouped under their epic's heading. Epic 123 holds
+        # cards 125-131 and epic 124 holds 132, 133, 136, in package order.
+        for number in (125, 126, 127, 128, 129, 130, 131, 132, 133, 136):
+            assert f"#{number}" in html, f"card #{number} has no row"
+        # The closed-not-planned (130) and blocked (131) cards still have rows.
+        assert "#130" in html, "closed-not-planned card 130 should have a row"
+        assert "#131" in html, "blocked card 131 should have a row"
+        # AC5: the answer's throughput (5) and the section's done counts disagree;
+        # both are shown as-is. The stat row still reads the answer's throughput.
+        assert ">5</span>" in html, "stat row should read the answer's throughput of 5"
+        assert "stories delivered" in html, "stat label 'stories delivered' not found"
+        assert "4 of 7 stories done" in html, "epic 123 done count not found"
+        assert "1 of 3 stories done" in html, "epic 124 done count not found"
+        # AC4: both epics have no Goal parent, so each reads 'not part of a Goal'.
+        assert "not part of a Goal" in html, "'not part of a Goal' not found"
+        # AC3: each epic's status is a badge in the board's own words with a tone.
+        assert re.search(
+            r'class="badge" data-tone="active">In Progress<', html
+        ), "epic 123 'In Progress' badge not found"
+        assert re.search(
+            r'class="badge" data-tone="waiting">Ready<', html
+        ), "epic 124 'Ready' badge not found"
+        # AC1: the roster names five cards delivered; exactly five rows are marked.
+        delivered_count = html.count('data-delivered="true"')
+        assert delivered_count == 5, (
+            f"expected 5 delivered rows, got {delivered_count}"
+        )
+        # Epic 123's group comes before epic 124's, in the package's card order.
+        assert html.index("epic #123") < html.index("epic #124"), (
+            "epic 123 group should precede epic 124's"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _build_3_0_0_mock_sprint_6(roster_completed=None):
+    """Build the 3.0.0 mock fixture's sprint-6 page with a given roster.
+
+    Returns (html, pkg_dir) where pkg_dir is the package directory (for cleanup).
+    """
+    base_dir = REPO_ROOT / "tests" / "fixtures" / "delivery-history-3.0.0"
+    mock_dir = base_dir / "mock"
+    tag = "delivery-history-3000-TEST"
+    pkg_dir = PACKAGE_DIR / tag
+    shutil.copytree(mock_dir, pkg_dir)
+    for schema_file in ("schema.json", "manifest.schema.json", "events.schema.json"):
+        shutil.copy2(base_dir / schema_file, pkg_dir / schema_file)
+    if roster_completed is not None:
+        dh_path = pkg_dir / "delivery-history.json"
+        dh = json.loads(dh_path.read_text())
+        answers = dh["sprint_metrics"]["answers"]
+        answers["Sprint 6"]["roster"] = {
+            "completed_stories": roster_completed,
+            "released_epics": None,
+            "achieved_goals": None,
+        }
+        answers["Sprint 5"]["roster"] = {
+            "completed_stories": [],
+            "released_epics": None,
+            "achieved_goals": None,
+        }
+        dh_path.write_text(json.dumps(dh))
+    return tag, pkg_dir
+
+
+def test_story_rows_show_attempt_blocks_from_events():
+    """AC1: each row shows the story's attempt blocks, read from the sprint's
+    events, in the order the events record them."""
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6(
+        roster_completed=[
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ]
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        # Extract each story row's blocks by finding the row for each card number.
+        def row_blocks(card_number):
+            # Find the start of this card's row in the HTML
+            marker = f'sprint-metrics<span class="num meta">#{card_number}</span>'
+            row_start = html.find(marker)
+            assert row_start != -1, f"row for card #{card_number} not found"
+            # Find the end of this row (next story-row or end of section)
+            next_row = html.find('class="story-row"', row_start + len(marker))
+            if next_row == -1:
+                next_row = len(html)
+            row_html = html[row_start:next_row]
+            blocks_match = re.search(
+                r'<div class="blocks">(.*?)</div>', row_html, re.DOTALL
+            )
+            if not blocks_match:
+                return []
+            return re.findall(r'attempt-block--(\S+)"', blocks_match.group(1))
+
+        # AC1: story 127 shows three missed, one blocked, two crew-fix, one landed
+        blocks_127 = row_blocks(127)
+        assert blocks_127 == [
+            "missed",
+            "missed",
+            "missed",
+            "blocked",
+            "crew-fix",
+            "crew-fix",
+            "landed",
+        ], f"story 127 blocks: {blocks_127}"
+
+        # AC1: story 126 shows one missed and one landed
+        blocks_126 = row_blocks(126)
+        assert blocks_126 == ["missed", "landed"], f"story 126 blocks: {blocks_126}"
+
+        # AC1: story 125 and 128 each show one landed
+        blocks_125 = row_blocks(125)
+        assert blocks_125 == ["landed"], f"story 125 blocks: {blocks_125}"
+        blocks_128 = row_blocks(128)
+        assert blocks_128 == ["landed"], f"story 128 blocks: {blocks_128}"
+
+        # AC1: story 131 shows one missed and one blocked
+        blocks_131 = row_blocks(131)
+        assert blocks_131 == ["missed", "blocked"], f"story 131 blocks: {blocks_131}"
+
+        # AC1: story 132 and 136 each show one missed and no landed
+        blocks_132 = row_blocks(132)
+        assert blocks_132 == ["missed"], f"story 132 blocks: {blocks_132}"
+        blocks_136 = row_blocks(136)
+        assert blocks_136 == ["missed"], f"story 136 blocks: {blocks_136}"
+
+        # AC1: the legend's four items
+        legend_match = re.search(
+            r'<div class="attempt-legend">(.*?)</div>', html, re.DOTALL
+        )
+        assert legend_match, "attempt-legend div not found"
+        legend_html = legend_match.group(1)
+        for label in (
+            "attempt that landed",
+            "missed, tried again",
+            "blocked",
+            "a fix to the crew merged",
+        ):
+            assert label in legend_html, f"legend item {label!r} not found"
+        swatch_count = legend_html.count('class="swatch')
+        assert swatch_count == 4, f"expected 4 legend swatches, got {swatch_count}"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_story_rows_show_status_badges():
+    """AC2: each row's status badge uses the board's own words with a tone;
+    a story closed as not planned reads 'Closed, not planned'."""
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6(
+        roster_completed=[
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ]
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        def row_badge(card_number):
+            pattern = (
+                rf'sprint-metrics<span class="num meta">#{card_number}</span>'
+                r'.*?class="badge" data-tone="(\w+)">([^<]+)<'
+            )
+            match = re.search(pattern, html, re.DOTALL)
+            assert match, f"badge for card #{card_number} not found"
+            return match.group(2), match.group(1)
+
+        # AC2: Done stories
+        for num in (125, 126, 127, 128, 133):
+            label, tone = row_badge(num)
+            assert label == "Done", f"story {num} badge label: {label!r}"
+            assert tone == "done", f"story {num} badge tone: {tone!r}"
+
+        # AC2: In Progress
+        label, tone = row_badge(129)
+        assert label == "In Progress", f"story 129 badge label: {label!r}"
+        assert tone == "active", f"story 129 badge tone: {tone!r}"
+
+        # AC2: Ready
+        label, tone = row_badge(132)
+        assert label == "Ready", f"story 132 badge label: {label!r}"
+
+        # AC2: Reviewing
+        label, tone = row_badge(136)
+        assert label == "Reviewing", f"story 136 badge label: {label!r}"
+        assert tone == "active", f"story 136 badge tone: {tone!r}"
+
+        # AC2: Blocked
+        label, tone = row_badge(131)
+        assert label == "Blocked", f"story 131 badge label: {label!r}"
+        assert tone == "blocked", f"story 131 badge tone: {tone!r}"
+
+        # AC2: Closed, not planned (status Done, closed_as not_planned)
+        label, tone = row_badge(130)
+        assert label == "Closed, not planned", f"story 130 badge label: {label!r}"
+
+        # AC2: every badge carries both its word and its tone (data-tone attr)
+        badges = re.findall(r'class="badge" data-tone="[^"]+">[^<]+<', html)
+        assert len(badges) > 0, "no badges found"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_story_rows_show_happened_line():
+    """AC3: each row carries one plain-words line saying what happened;
+    machine codes are banned."""
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6(
+        roster_completed=[
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ]
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        def row_happened(card_number):
+            pattern = (
+                rf'sprint-metrics<span class="num meta">#{card_number}</span>'
+                r'.*?class="story-row__happened">([^<]+)<'
+            )
+            match = re.search(pattern, html, re.DOTALL)
+            assert match, f"happened line for card #{card_number} not found"
+            return match.group(1)
+
+        # AC3: story 133's line
+        line_133 = row_happened(133)
+        assert line_133 == "Missed twice, then landed after it was escalated.", (
+            f"story 133 line: {line_133!r}"
+        )
+
+        # AC3: story 125's line
+        line_125 = row_happened(125)
+        assert line_125 == "Landed first try.", f"story 125 line: {line_125!r}"
+
+        # AC3: story 127's line names the two merged crew fixes
+        line_127 = row_happened(127)
+        assert "crew#208 and crew#209" in line_127, (
+            f"story 127 line should name crew fixes: {line_127!r}"
+        )
+
+        # AC3: no machine codes in any badge, line or block label
+        for code in ("pull_merged", "work_started", "model_call"):
+            assert code not in html, (
+                f"machine code {code!r} appears in the section"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_not_delivered_vs_never_built_read_distinctly():
+    """AC4: 'not delivered' and 'never built' read distinctly."""
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6(
+        roster_completed=[
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ]
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        def row_happened(card_number):
+            pattern = (
+                rf'sprint-metrics<span class="num meta">#{card_number}</span>'
+                r'.*?class="story-row__happened">([^<]+)<'
+            )
+            match = re.search(pattern, html, re.DOTALL)
+            assert match, f"happened line for card #{card_number} not found"
+            return match.group(1)
+
+        # AC4: story 129 says not delivered yet
+        line_129 = row_happened(129)
+        assert "not delivered yet" in line_129.lower(), (
+            f"story 129 line should say not delivered: {line_129!r}"
+        )
+
+        # AC4: story 132 and 136 say not delivered yet and missed once so far
+        line_132 = row_happened(132)
+        assert "not delivered yet" in line_132.lower(), (
+            f"story 132 line: {line_132!r}"
+        )
+        assert "missed once" in line_132, f"story 132 line: {line_132!r}"
+
+        line_136 = row_happened(136)
+        assert "not delivered yet" in line_136.lower(), (
+            f"story 136 line: {line_136!r}"
+        )
+        assert "missed once" in line_136, f"story 136 line: {line_136!r}"
+
+        # AC4: story 131 says blocked now and missed once and was blocked once first
+        line_131 = row_happened(131)
+        assert "blocked now" in line_131.lower(), f"story 131 line: {line_131!r}"
+        assert "missed once" in line_131, f"story 131 line: {line_131!r}"
+        assert "was blocked once" in line_131, f"story 131 line: {line_131!r}"
+
+        # AC4: story 130's badge reads 'Closed, not planned' and its line says
+        # superseded and never built
+        line_130 = row_happened(130)
+        assert "superseded" in line_130.lower(), f"story 130 line: {line_130!r}"
+        assert "never built" in line_130, f"story 130 line: {line_130!r}"
+        badge_130 = re.search(
+            r'sprint-metrics<span class="num meta">#130</span>'
+            r'.*?class="badge" data-tone="[^"]+">([^<]+)<',
+            html,
+            re.DOTALL,
+        )
+        assert badge_130, "story 130 badge not found"
+        assert badge_130.group(1) == "Closed, not planned", (
+            f"story 130 badge: {badge_130.group(1)!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_story_with_no_events_gets_row_and_line():
+    """AC5: a story with no events in the sprint still gets a row and a line;
+    it says not delivered yet, shows no attempt blocks, and no machine wording."""
+    tag = "delivery-history-NOEVENTS"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-11-06"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    index = {
+        "package": "delivery-history",
+        "schema_version": "3.0.0",
+        "date": "2026-11-06",
+        "timezone": "America/Chicago",
+        "crew_repository": "crew",
+        "repositories": ["crew-presentation"],
+        "sprints": [
+            {"name": "Sprint 1", "start": "2026-11-06", "end": "2026-11-06"}
+        ],
+        "cards": [
+            {
+                "repo": "crew-presentation",
+                "number": 1,
+                "type": "Story",
+                "title": "Story without activity",
+                "url": "https://github.com/mqucifer/crew-presentation/issues/1",
+                "parent": None,
+                "points": 1,
+                "sprint": "Sprint 1",
+                "status": "In Progress",
+                "status_set": None,
+                "created": "2026-11-06T09:00:00Z",
+                "closed": None,
+                "technical": False,
+                "closed_as": None,
+                "superseded_because": None,
+            }
+        ],
+        "periods": [],
+        "sprint_metrics": {
+            "release": "3.0.0",
+            "answers": {
+                "Sprint 1": {
+                    "cycle_time_days": 0,
+                    "lead_time_days": 0,
+                    "throughput": 0,
+                    "wip_violations": 0,
+                    "blocked_aging_days": 0,
+                    "escalation_rate_percent": 0,
+                    "points_delivered": 0,
+                    "first_attempt_numerator": 0,
+                    "first_attempt_denominator": 0,
+                    "escalation_count": 0,
+                    "superseded_count": 0,
+                    "superseded_points": 0,
+                    "first_attempt_rate_percent": 0,
+                    "failure_breakdown": [],
+                    "top_failure_causes": {},
+                    "superseded_breakdown": None,
+                    "flags": None,
+                    "prior": None,
+                    "delta": None,
+                    "cycle_time_minutes": 0,
+                    "lead_time_minutes": 0,
+                    "roster": {"completed_stories": []},
+                }
+            },
+        },
+    }
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page = (BUILD_DIR / "sprint-1.html").read_text()
+        # The row exists
+        assert 'class="story-row"' in page, "story row not found"
+        assert "#1" in page, "card #1 not found"
+        # No attempt blocks
+        assert "attempt-block" not in page, "attempt blocks found for no-event story"
+        # The line says not delivered yet
+        assert "not delivered yet" in page.lower(), (
+            "happened line should say not delivered yet"
+        )
+        # No machine wording
+        for code in ("no events", "pull_merged", "work_started"):
+            assert code not in page, f"machine wording {code!r} found"
+        # The badge is not empty
+        assert 'class="badge"' in page, "badge not found"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_epic_heading_shows_goal_parent_done_count_and_status():
+    """AC3: an epic heading names the epic's number and title, its Goal parent
+    (by number and title) when the epic has one, 'x of y stories done', and the
+    epic's status as a badge in the board's own words with a tone."""
+    tag = "delivery-history-EPIC-GOAL"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 1,
+            "points_delivered": 3,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": 1,
+            "cycle_time_days": 1.0,
+            "roster": {
+                "completed_stories": ["crew#7"],
+                "released_epics": None,
+                "achieved_goals": None,
+            },
+        }
+    }
+    cards = [
+        {
+            "repo": "crew",
+            "number": 2,
+            "type": "Goal",
+            "title": "A walking skeleton",
+            "sprint": None,
+            "status": "In Progress",
+        },
+        {
+            "repo": "crew",
+            "number": 5,
+            "type": "Epic",
+            "title": "The skeleton",
+            "parent": 2,
+            "sprint": None,
+            "status": "In Progress",
+        },
+        {
+            "repo": "crew",
+            "number": 7,
+            "type": "Story",
+            "title": "Story seven",
+            "parent": 5,
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "closed_as": "completed",
+        },
+        {
+            "repo": "crew",
+            "number": 8,
+            "type": "Story",
+            "title": "Story eight",
+            "parent": 5,
+            "sprint": "Sprint 6",
+            "status": "In Progress",
+        },
+    ]
+    _make_fake_package(tag, metrics=metrics, cards=cards, schema_version="3.0.0")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The epic heading names the epic's number and title.
+        assert "The skeleton" in html, "epic title not found"
+        assert "epic #5" in html, "epic #5 not named in its heading"
+        # The epic has a Goal parent, named by number and title.
+        assert "Goal crew#2" in html, "Goal's number not named in the epic heading"
+        assert "A walking skeleton" in html, "Goal's title not named in the epic heading"
+        # The done count: 1 of the 2 story rows is roster-delivered.
+        assert "1 of 2 stories done" in html, "done count '1 of 2 stories done' not found"
+        # The epic's status is a badge in the board's own words with a tone.
+        assert re.search(
+            r'class="badge" data-tone="active">In Progress<', html
+        ), "epic 'In Progress' badge not found"
+        # Both story rows appear, grouped under the epic.
+        row_count = html.count('class="story-row"')
+        assert row_count == 2, f"expected 2 story rows, got {row_count}"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_epic_without_goal_parent_reads_not_part_of_a_goal():
+    """AC4: an epic with no Goal parent (parent null) reads 'not part of a Goal'
+    in its heading — never a blank or an invented name — and still carries the
+    done count and the epic's status badge."""
+    tag = "delivery-history-EPIC-NOGOAL"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 1,
+            "points_delivered": 3,
+            "first_attempt_numerator": 1,
+            "first_attempt_denominator": 1,
+            "cycle_time_days": 1.0,
+            "roster": {
+                "completed_stories": ["crew#7"],
+                "released_epics": None,
+                "achieved_goals": None,
+            },
+        }
+    }
+    cards = [
+        {
+            "repo": "crew",
+            "number": 5,
+            "type": "Epic",
+            "title": "The skeleton",
+            "parent": None,
+            "sprint": None,
+            "status": "In Progress",
+        },
+        {
+            "repo": "crew",
+            "number": 7,
+            "type": "Story",
+            "title": "Story seven",
+            "parent": 5,
+            "sprint": "Sprint 6",
+            "status": "Done",
+            "closed_as": "completed",
+        },
+        {
+            "repo": "crew",
+            "number": 8,
+            "type": "Story",
+            "title": "Story eight",
+            "parent": 5,
+            "sprint": "Sprint 6",
+            "status": "In Progress",
+        },
+    ]
+    _make_fake_package(tag, metrics=metrics, cards=cards, schema_version="3.0.0")
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The epic has no Goal parent, so it reads 'not part of a Goal'.
+        assert "not part of a Goal" in html, "'not part of a Goal' not found"
+        # The heading still names the epic and carries the done count...
+        assert "epic #5" in html, "epic #5 not named in its heading"
+        assert "The skeleton" in html, "epic title not found"
+        assert "1 of 2 stories done" in html, "done count '1 of 2 stories done' not found"
+        # ...and the epic's status badge.
+        assert re.search(
+            r'class="badge" data-tone="active">In Progress<', html
+        ), "epic 'In Progress' badge not found"
+        # No Goal name is invented in its place.
+        assert "Goal crew#" not in html, "a Goal name was invented"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_epic_groups_no_clipping_at_phone_and_desktop_width():
+    """AC7: with the 3.0.0 mock (no analysis), the story-by-story section's ten
+    rows and both epic headings are present and unclipped at 375px and 1280px,
+    in the section's current position on the page."""
+    base_dir = REPO_ROOT / "tests" / "fixtures" / "delivery-history-3.0.0"
+    mock_dir = base_dir / "mock"
+    assert mock_dir.is_dir(), "3.0.0 fixture mock not found"
+    tag = "delivery-history-3000-VP"
+    pkg_dir = PACKAGE_DIR / tag
+    shutil.copytree(mock_dir, pkg_dir)
+    # Schema files live at the base level, not in mock/
+    for schema_file in ("schema.json", "manifest.schema.json", "events.schema.json"):
+        shutil.copy2(base_dir / schema_file, pkg_dir / schema_file)
+    # Add a roster to the mock's Sprint 6 answer, as real packages carry them.
+    dh_path = pkg_dir / "delivery-history.json"
+    dh = json.loads(dh_path.read_text())
+    answers = dh["sprint_metrics"]["answers"]
+    answers["Sprint 6"]["roster"] = {
+        "completed_stories": [
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ],
+        "released_epics": None,
+        "achieved_goals": None,
+    }
+    dh_path.write_text(json.dumps(dh))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page_path = (BUILD_DIR / "sprint-6.html").resolve()
+
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            for width in (375, 1280):
+                context = browser.new_context(viewport={"width": width, "height": 900})
+                page = context.new_page()
+                _intercept_design_system(page)
+                page.goto(f"file://{page_path}")
+                page.wait_for_load_state("domcontentloaded")
+
+                # All ten rows and both epic headings are present.
+                rows = page.locator(".story-row")
+                assert rows.count() == 10, (
+                    f"expected 10 rows at {width}px, got {rows.count()}"
+                )
+                headings = page.locator(".epic-group__head h3")
+                assert headings.count() == 2, (
+                    f"expected 2 epic headings at {width}px, got {headings.count()}"
+                )
+                # No horizontal overflow on the section itself.
+                section_overflow = page.evaluate(
+                    """
+                    (() => {
+                        const el = document.querySelector('.sprint-chart');
+                        return el.scrollWidth > el.clientWidth;
+                    })()
+                    """
+                )
+                assert not section_overflow, (
+                    f"sprint-chart overflows horizontally at {width}px"
+                )
+                # Each epic heading is unclipped (scrollWidth == clientWidth).
+                for i in range(headings.count()):
+                    clipped = headings.nth(i).evaluate(
+                        "(el) => el.scrollWidth > el.clientWidth"
+                    )
+                    assert not clipped, f"epic heading {i} clipped at {width}px"
+
+                context.close()
+            browser.close()
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -10228,7 +11097,9 @@ def test_roster_zero_goals_shows_no_goals():
 
 
 def test_roster_zero_both_story_in_chart_no_empty_body():
-    """AC3: when both epics and goals are 0, story title is in chart/list, no empty card__body."""
+    """AC1: with no analysis, the sprint's story appears as a row in the
+    story-by-story section (under its epic, or 'not part of an epic'), so the
+    card body is never empty."""
     tag = "delivery-history-ROSTER-Z"
     metrics = {
         "Sprint 6": {
@@ -10271,26 +11142,19 @@ def test_roster_zero_both_story_in_chart_no_empty_body():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        # Story title must appear in attempt-chart or story-list
-        in_chart = (
+        # Story title must appear as a row in the story-by-story section, under
+        # its epic group (or 'not part of an epic').
+        in_row = (
             re.search(
-                r'<div class="attempt-chart">.*?Write the sprint report as JSON.*?</div>\s*</div>',
+                r'<div class="story-row"[^>]*>.*?Write the sprint report as JSON.*?</div>',
                 html,
                 re.DOTALL,
             )
             is not None
         )
-        in_list = (
-            re.search(
-                r'<ul class="story-list">.*?Write the sprint report as JSON.*?</ul>',
-                html,
-                re.DOTALL,
-            )
-            is not None
-        )
-        assert in_chart or in_list, (
-            "Story title 'Write the sprint report as JSON' not found in "
-            "attempt-chart or story-list"
+        assert in_row, (
+            "Story title 'Write the sprint report as JSON' not found in a "
+            "story row of the story-by-story section"
         )
         # No section element has a div.card__body with empty textContent
         for section_match in re.finditer(r"<section[^>]*>(.*?)</section>", html, re.DOTALL):
@@ -10439,6 +11303,513 @@ def test_points_delivered_no_percent_in_metrics_path():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_where_time_went_null_shows_no_value():
+    """AC1: model_time_split null → card shows 'Where the time went' heading and a no-value state, after 'How releases went'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": None,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The heading is present
+        assert "Where the time went" in html, "heading 'Where the time went' not found"
+        # It is positioned after 'How releases went'
+        dora_pos = html.index("How releases went")
+        time_pos = html.index("Where the time went")
+        assert time_pos > dora_pos, "'Where the time went' must come after 'How releases went'"
+        # The card shows a no-value state, not empty, not 0
+        assert "No model time recorded for this sprint" in html, (
+            "no-value state 'No model time recorded for this sprint' not found"
+        )
+        # No placeholder note in the card head
+        assert "placeholders until the package carries values" not in html, (
+            "card head must not carry 'placeholders until the package carries values'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_where_time_went_shows_split_bar_and_minutes():
+    """AC2: model_time_split 90/270 → split bar with 25%/75% segments, 'Planning: 90 min' and 'Building: 270 min'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": {"refinement": 90, "delivery": 270},
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The label is present
+        assert "Model time: planning against building" in html, (
+            "label 'Model time: planning against building' not found"
+        )
+        # The split bar has two segments with correct widths
+        planning_bar = re.search(
+            r'class="model-time-split__planning" style="width:(\d+)%"', html
+        )
+        building_bar = re.search(
+            r'class="model-time-split__building" style="width:(\d+)%"', html
+        )
+        assert planning_bar, "planning bar segment not found"
+        assert building_bar, "building bar segment not found"
+        assert planning_bar.group(1) == "25", (
+            f"planning segment width is {planning_bar.group(1)}%, expected 25%"
+        )
+        assert building_bar.group(1) == "75", (
+            f"building segment width is {building_bar.group(1)}%, expected 75%"
+        )
+        # Planning comes before building in the DOM
+        assert planning_bar.start() < building_bar.start(), (
+            "planning segment must come before building segment"
+        )
+        # The minute lines
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        assert "90" in card and "min" in card, "planning minutes '90 min' not in card"
+        assert "270" in card and "min" in card, "building minutes '270 min' not in card"
+        # Planning line comes before Building line
+        planning_line = card.index("Planning:")
+        building_line = card.index("Building:")
+        assert planning_line < building_line, "'Planning:' must come before 'Building:'"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_where_time_went_uses_only_planning_and_building():
+    """AC3: 'refinement' and 'delivery' appear nowhere in the card; every number carries 'min'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": {"refinement": 90, "delivery": 270},
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        # 'refinement' and 'delivery' appear nowhere in the card
+        assert "refinement" not in card.lower(), (
+            "'refinement' must not appear in the card"
+        )
+        assert "delivery" not in card.lower(), (
+            "'delivery' must not appear in the card"
+        )
+        # Check the specific minute lines
+        assert re.search(r'Planning:.*?90.*?min', card), (
+            "'Planning: 90 min' pattern not found"
+        )
+        assert re.search(r'Building:.*?270.*?min', card), (
+            "'Building: 270 min' pattern not found"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_where_time_went_zero_planning():
+    """AC4: planning=0, building=120 → 'Planning: 0 min', 'Building: 120 min', planning bar empty, building fills whole bar."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": {"refinement": 0, "delivery": 120},
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        # Planning: 0 min
+        assert re.search(r'Planning:.*?0.*?min', card), (
+            "'Planning: 0 min' not found"
+        )
+        # Building: 120 min
+        assert re.search(r'Building:.*?120.*?min', card), (
+            "'Building: 120 min' not found"
+        )
+        # Planning segment is empty (width 0%)
+        planning_bar = re.search(
+            r'class="model-time-split__planning" style="width:(\d+)%"', card
+        )
+        assert planning_bar, "planning bar segment not found"
+        assert planning_bar.group(1) == "0", (
+            f"planning segment width is {planning_bar.group(1)}%, expected 0%"
+        )
+        # Building segment fills the whole bar (width 100%)
+        building_bar = re.search(
+            r'class="model-time-split__building" style="width:(\d+)%"', card
+        )
+        assert building_bar, "building bar segment not found"
+        assert building_bar.group(1) == "100", (
+            f"building segment width is {building_bar.group(1)}%, expected 100%"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_where_time_went_fits_375px():
+    """AC5: at 375px the card shows heading, bar and minute lines; no horizontal scroll from the card."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": {"refinement": 90, "delivery": 270},
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        # The heading is present
+        assert "Where the time went" in card
+        # The bar is present
+        assert "model-time-split__bar" in card
+        # Both minute lines are present
+        assert "Planning:" in card
+        assert "Building:" in card
+        # The CSS uses flex-wrap for the values container
+        css = (REPO_ROOT / "site" / "css" / "site.css").read_text()
+        assert "flex-wrap: wrap" in css, (
+            "model-time-split__values must use flex-wrap for narrow viewports"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_where_time_went_css_uses_tokens_only():
+    """AC6: the new card's CSS uses design-system tokens only: no raw colour in the model-time-split section."""
+    site_css = (REPO_ROOT / "site" / "css" / "site.css").read_text()
+    # Find the model-time-split section
+    mts_start = site_css.index("Model time split")
+    mts_end = site_css.index("/* DORA measures grid */")
+    mts_section = site_css[mts_start:mts_end]
+    # No raw hex or rgb in the model-time-split section
+    assert not re.search(r"#[0-9a-fA-F]{3,8}", mts_section), (
+        "model-time-split CSS contains a raw hex colour"
+    )
+    assert not re.search(r"rgba?\(\s*\d", mts_section), (
+        "model-time-split CSS contains a raw rgb/rgba colour"
+    )
+
+
+def test_readme_sprint_overview_mentions_where_time_went():
+    """AC7: the README's 'Sprint overview' bullet mentions the 'Where the time went' card showing the model time split between planning and building in minutes."""
+    readme = (REPO_ROOT / "README.md").read_text()
+    # Find the 'Sprint overview' bullet
+    sprint_line = next(
+        line for line in readme.splitlines() if "Sprint overview" in line
+    )
+    # The bullet (possibly multi-line) must mention the card
+    # Gather the full bullet: from 'Sprint overview' to the next bullet or end of section
+    lines = readme.splitlines()
+    idx = lines.index(sprint_line)
+    bullet = sprint_line
+    for i in range(idx + 1, len(lines)):
+        if lines[i].startswith("- **") or lines[i].startswith("## "):
+            break
+        bullet += " " + lines[i]
+    assert "Where the time went" in bullet, (
+        "README 'Sprint overview' bullet must mention 'Where the time went'"
+    )
+    assert "planning" in bullet.lower() and "building" in bullet.lower(), (
+        "README 'Sprint overview' bullet must mention planning and building"
+    )
+    assert "minutes" in bullet.lower(), (
+        "README 'Sprint overview' bullet must mention minutes"
+    )
+
+
+def test_idle_time_shows_bar_and_minutes():
+    """AC1: idle 120 of 480 → bar fill covers one quarter, line reads '120 min of the sprint's 480 min'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": {"refinement": 90, "delivery": 270},
+                "idle": {"idle_minutes": 120, "sprint_duration_minutes": 480},
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        # The idle block label is present
+        assert "Time with no session running" in card, (
+            "label 'Time with no session running' not found in card"
+        )
+        # The idle bar has the correct fill width (25%)
+        idle_bar = re.search(
+            r'class="idle-time__fill" style="width:(\d+)%"', card
+        )
+        assert idle_bar, "idle-time__fill bar segment not found"
+        assert idle_bar.group(1) == "25", (
+            f"idle fill width is {idle_bar.group(1)}%, expected 25%"
+        )
+        # The line reads '120 min of the sprint's 480 min'
+        idle_values = re.search(
+            r'class="idle-time__values">(.*?)</div>', card, re.DOTALL
+        )
+        assert idle_values, "idle-time__values not found"
+        values_text = re.sub(r"<[^>]+>", "", idle_values.group(1))
+        assert "120" in values_text, (
+            f"idle minutes '120' not in values line: {values_text!r}"
+        )
+        assert "480" in values_text, (
+            f"sprint total '480' not in values line: {values_text!r}"
+        )
+        assert "min" in values_text, (
+            f"'min' unit not in values line: {values_text!r}"
+        )
+        # Both numbers carry the 'min' unit
+        assert values_text.count("min") >= 2, (
+            f"both numbers must carry the 'min' unit: {values_text!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_idle_time_null_shows_no_value():
+    """AC2: idle null → the block shows an explicit 'no value yet' state beneath its label."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": None,
+                "idle": None,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        # The idle block label is present
+        assert "Time with no session running" in card, (
+            "label 'Time with no session running' not found in card"
+        )
+        # The 'no value yet' state is shown
+        assert "No value yet" in card, (
+            "'No value yet' state not found in idle block"
+        )
+        # No bracketed placeholder text from the design mock
+        assert "[IDLE]" not in card, (
+            "bracketed placeholder '[IDLE]' must not appear"
+        )
+        assert "[SPRINT]" not in card, (
+            "bracketed placeholder '[SPRINT]' must not appear"
+        )
+        # No empty body (the block has content beyond just the label)
+        assert "idle-time" in card, (
+            "idle-time block element not found"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_idle_time_fully_idle():
+    """AC3: idle 240 of 240 → bar filled completely, line reads '240 min of the sprint's 240 min'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 22,
+                "points_delivered": 63,
+                "first_attempt_numerator": 12,
+                "first_attempt_denominator": 22,
+                "escalation_count": 1,
+                "cycle_time_minutes": 102,
+                "model_time_split": {"refinement": 90, "delivery": 270},
+                "idle": {"idle_minutes": 240, "sprint_duration_minutes": 240},
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        card_match = re.search(
+            r'<section class="card" aria-labelledby="time-went-h">(.*?)</section>',
+            html,
+            re.DOTALL,
+        )
+        assert card_match, "'Where the time went' card section not found"
+        card = card_match.group(1)
+        # The idle bar is filled completely (100%)
+        idle_bar = re.search(
+            r'class="idle-time__fill" style="width:(\d+)%"', card
+        )
+        assert idle_bar, "idle-time__fill bar segment not found"
+        assert idle_bar.group(1) == "100", (
+            f"idle fill width is {idle_bar.group(1)}%, expected 100%"
+        )
+        # The line reads '240 min of the sprint's 240 min'
+        idle_values = re.search(
+            r'class="idle-time__values">(.*?)</div>', card, re.DOTALL
+        )
+        assert idle_values, "idle-time__values not found"
+        values_text = re.sub(r"<[^>]+>", "", idle_values.group(1))
+        assert "240" in values_text, (
+            f"minutes '240' not in values line: {values_text!r}"
+        )
+        assert "min" in values_text, (
+            f"'min' unit not in values line: {values_text!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_readme_sprint_overview_mentions_idle_time():
+    """AC4: the README's 'Sprint overview' bullet mentions how much of the sprint passed with no session running, against the sprint's total time, in minutes."""
+    readme = (REPO_ROOT / "README.md").read_text()
+    lines = readme.splitlines()
+    sprint_line = next(
+        line for line in lines if "Sprint overview" in line
+    )
+    idx = lines.index(sprint_line)
+    bullet = sprint_line
+    for i in range(idx + 1, len(lines)):
+        if lines[i].startswith("- **") or lines[i].startswith("## "):
+            break
+        bullet += " " + lines[i]
+    assert "no session running" in bullet.lower(), (
+        "README 'Sprint overview' bullet must mention 'no session running'"
+    )
+    assert "total time" in bullet.lower(), (
+        "README 'Sprint overview' bullet must mention 'total time'"
+    )
+    assert "minutes" in bullet.lower(), (
+        "README 'Sprint overview' bullet must mention minutes"
+    )
 
 
 def test_replay_player_controls_and_sections_populated():
@@ -10951,3 +12322,184 @@ def test_readme_what_the_site_shows_mentions_orientation():
         "README 'What the site shows' section does not say the orientation "
         "appears before any measure"
     )
+
+
+def test_sprint_page_shows_timezone_line():
+    """AC1: a sprint page shows a line stating the timezone, taken from
+    the package's timezone field."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    # Add the timezone to the package's delivery-history.json
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["timezone"] = "America/Chicago"
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Times are Chicago time" in html, (
+            "sprint page does not state the timezone: "
+            "expected 'Times are Chicago time' in page"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_page_timezone_names_package_zone_not_chicago():
+    """AC2: the timezone line names the zone from the package, not a
+    hardcoded or guessed one."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["timezone"] = "America/Denver"
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Times are Denver time" in html, (
+            "sprint page should name the package's zone (Denver), not Chicago"
+        )
+        assert "Times are Chicago time" not in html, (
+            "sprint page must not name a zone the package does not carry"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_sprint_page_timezone_line_present_without_clock_times():
+    """AC3: the timezone line is present even when no decisions or
+    send-backs are recorded (no clock times on the page)."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 0,
+                "points_delivered": 0,
+                "first_attempt_numerator": 0,
+                "first_attempt_denominator": 0,
+                "escalation_count": 0,
+                "cycle_time_minutes": None,
+            }
+        },
+    )
+    pkg_dir = PACKAGE_DIR / tag
+    data = json.loads((pkg_dir / "delivery-history.json").read_text())
+    data["timezone"] = "America/Chicago"
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(data))
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        assert "Times are Chicago time" in html, (
+            "timezone line must be present even when no clock times are shown"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changelog_fragment_mentions_timezone():
+    """AC4: the changelog fragment tells the reader that the sprint page now
+    states which timezone its times are in."""
+    fragment = REPO_ROOT / "changes" / "324.added.md"
+    assert fragment.is_file(), "changelog fragment changes/324.added.md not found"
+    text = fragment.read_text().lower()
+    assert "timezone" in text, (
+        "changelog fragment should mention the timezone"
+    )
+    assert "sprint" in text, (
+        "changelog fragment should mention the sprint page"
+    )
+
+
+def _orientation_full_text(html: str) -> str:
+    """Extract all text from the orientation section, tags stripped."""
+    section = _orientation_section(html)
+    return re.sub(r"<[^>]+>", "", section)
+
+
+def test_all_measure_terms_explained_in_orientation_block():
+    """AC1: every term a visitor meets in a measure label, 'What changed' line
+    label or section heading is either absent from those positions or its
+    meaning is stated in the 'What this is' block."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(tag, ["Sprint 6"])
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        orientation_text = _orientation_full_text(html).lower()
+
+        # Fixed list of terms a visitor meets in labels and headings
+        terms = [
+            "sprint",
+            "story",
+            "point",
+            "delivered",
+            "first attempt",
+            "first-attempt",
+            "cycle time",
+            "lead time",
+            "release",
+            "failure",
+            "recovery",
+            "crew",
+            "dora",
+        ]
+
+        # Collect the text of all measure labels, changed-trend labels,
+        # section headings, and DORA meta labels from the page.
+        label_texts: list[str] = []
+
+        # Stat labels (.stat__label)
+        label_texts.extend(re.findall(
+            r'class="stat__label"[^>]*>([^<]+)<', html
+        ))
+
+        # 'What changed' line labels: text before the colon in .changed-trend-values
+        for m in re.finditer(
+            r'class="changed-trend-values"[^>]*>([^:]+):', html
+        ):
+            label_texts.append(m.group(1))
+
+        # Section headings (h2)
+        label_texts.extend(re.findall(r"<h2[^>]*>([^<]+)</h2>", html))
+
+        # DORA section: all .meta text within it (descriptions and labels)
+        dora_match = re.search(
+            r'<section[^>]*aria-labelledby="dora-h"[^>]*>(.*?)</section>',
+            html, re.DOTALL,
+        )
+        if dora_match:
+            dora_html = dora_match.group(1)
+            label_texts.extend(
+                re.findall(r'<div class="meta">(.*?)</div>', dora_html)
+            )
+
+        all_label_text = " ".join(label_texts).lower()
+
+        for term in terms:
+            if term in all_label_text:
+                # The label may use a hyphenated form (e.g. 'first-attempt')
+                # while the block uses the spaced form ('first attempt').
+                spaced = term.replace("-", " ")
+                assert term in orientation_text or spaced in orientation_text, (
+                    f"term {term!r} appears in a measure label or heading on "
+                    f"the sprint page but is not explained in the "
+                    f"'What this is' block"
+                )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)

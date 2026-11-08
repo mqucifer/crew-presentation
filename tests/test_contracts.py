@@ -74,35 +74,39 @@ def test_build_check_exits_zero():
     assert sprint_files, "no sprint-overview page in build output"
 
     # Section structure of the rendered page, which the pinned package decides:
-    # a 3.0.0 package carries no analysis, so the page renders the story list;
-    # a 2.x (or earlier) package carries analysis with delivered stories, so
-    # the page renders the attempt chart. test_browser holds the no-analysis
+    # a 3.0.0 package carries no analysis, so the page renders the sprint's
+    # stories story by story, grouped under their epics; a 2.x (or earlier)
+    # package carries analysis with delivered stories, so the page renders the
+    # attempt chart. test_browser holds the no-analysis
     # case (test_no_attempt_elements_when_no_analysis).
     index = _load_json(_package_dir() / "delivery-history.json")
     analysis_stories = index.get("analysis", {}).get("stories", [])
     has_delivered_story = any(story.get("delivered") for story in analysis_stories)
 
     page = sorted(sprint_files)[0].read_text()
-    assert "Stories delivered this sprint" in page, (
-        "sprint chart heading not found in sprint-overview page"
-    )
     if has_delivered_story:
         # AC2: the package carries delivered analysis, so the page shows the
         # attempt chart.
+        assert "Stories delivered this sprint" in page, (
+            "sprint chart heading not found in sprint-overview page"
+        )
         assert 'class="attempt-legend"' in page, "attempt legend section not found"
         assert 'class="attempt-row"' in page, "attempt rows not found"
         # attempt-block is always rendered alongside a modifier class, e.g.
         # class="attempt-block attempt-block--landed", so check the prefix.
         assert 'class="attempt-block' in page, "attempt blocks not found"
     else:
-        # AC1: the package carries no analysis, so the page shows the story
-        # list and no attempt elements.
-        assert 'class="story-list"' in page, "story list not found"
-        assert 'class="attempt-legend"' not in page, (
-            "attempt legend found without analysis"
+        # AC1: the package carries no analysis, so the page shows the sprint's
+        # stories grouped under their epics, with a legend and attempt blocks
+        # read from the sprint's events, but no attempt rows from the analysis
+        # path.
+        assert "What got done, story by story" in page, (
+            "story-by-story heading not found in sprint-overview page"
+        )
+        assert 'class="attempt-legend"' in page, (
+            "attempt legend not found without analysis"
         )
         assert 'class="attempt-row"' not in page, "attempt rows found without analysis"
-        assert 'class="attempt-block' not in page, "attempt blocks found without analysis"
 
     # CSS: striped-blocked gradient present, no placeholder marker
     css = (build_dir / "css" / "site.css").read_text()
@@ -499,7 +503,8 @@ def test_build_succeeds_on_well_formed_major_3_package():
 
 def test_sprint_page_shows_story_list_without_analysis():
     """AC1: with no analysis in the package, the first sprint page shows the
-    story list and no attempt-chart elements (the case a 3.0.0 pin takes)."""
+    sprint's stories story by story, grouped under their epics, and no
+    attempt-chart elements (the case a 3.0.0 pin takes)."""
     tag = "delivery-history-TEST-3-NOANALYSIS"
     pkg_dir = PACKAGE_DIR / tag
     pkg_dir.mkdir(parents=True, exist_ok=True)
@@ -619,13 +624,27 @@ def test_sprint_page_shows_story_list_without_analysis():
         )
         build_dir = REPO_ROOT / "build"
         page = (build_dir / "sprint-1.html").read_text()
-        assert 'class="story-list"' in page, "story list not found without analysis"
-        assert 'class="attempt-legend"' not in page, (
-            "attempt legend found without analysis"
+        # The story-by-story heading, not the attempt chart's heading.
+        assert "What got done, story by story" in page, (
+            "story-by-story heading not found without analysis"
+        )
+        assert "Stories delivered this sprint" not in page, (
+            "attempt-chart heading found without analysis"
+        )
+        # The sprint's story appears as a row under its epic group. Its parent is
+        # null, so it sits under the 'not part of an epic' group.
+        assert 'class="story-row"' in page, "story row not found without analysis"
+        assert "not part of an epic" in page, (
+            "'not part of an epic' group not found for a parentless story"
+        )
+        # The roster names the story delivered, so the group carries a done count.
+        assert "1 of 1 stories done" in page, "done count not found"
+        assert 'class="attempt-legend"' in page, (
+            "attempt legend not found without analysis"
         )
         assert 'class="attempt-row"' not in page, "attempt rows found without analysis"
         assert 'class="attempt-block' not in page, (
-            "attempt blocks found without analysis"
+            "attempt blocks found without events"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original_tag)
@@ -1298,6 +1317,39 @@ def test_left_open_docs_mention_the_new_card():
     assert fragment.is_file(), "changelog fragment changes/323.added.md not found"
     text = fragment.read_text()
     assert "open" in text.lower(), "changelog fragment should mention the left-open card"
+
+
+def test_readme_sprint_overview_mentions_stories_under_epics():
+    """AC9: README's 'What the site shows' section and the changelog fragment say
+    the sprint page lists the sprint's stories story by story, grouped under
+    their epics, each epic's heading showing how many of its stories are done,
+    and each story carrying its status, a line of what happened to it and its
+    time."""
+    readme = (REPO_ROOT / "README.md").read_text()
+    what_shows = readme[readme.index("## What the site shows"):]
+    assert "story by story" in what_shows, (
+        "README's 'What the site shows' section should say stories story by story"
+    )
+    assert "grouped under their" in what_shows and "epic" in what_shows, (
+        "README should say the stories are grouped under their epics"
+    )
+    assert "done count" in what_shows, (
+        "README should say each epic's heading shows how many of its stories are done"
+    )
+    assert "what happened to it and its time" in what_shows, (
+        "README should say each story carries what happened to it and its time"
+    )
+    # Changelog fragment exists and says the same of the delivered change.
+    fragment = REPO_ROOT / "changes" / "353.added.md"
+    assert fragment.is_file(), "changelog fragment changes/353.added.md not found"
+    text = fragment.read_text().lower()
+    assert "sprint's stories under their epics" in text, (
+        "changelog fragment should say the sprint page lists the stories under their epics"
+    )
+    assert "done count" in text, (
+        "changelog fragment should mention each epic's done count"
+    )
+    assert "status" in text, "changelog fragment should mention each epic's status"
 
 
 def test_placeholder_checks_contain_marker():

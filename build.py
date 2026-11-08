@@ -133,6 +133,7 @@ def _render_pages(pkg: Path) -> dict:
     analysis_stories = index.get("analysis", {}).get("stories", [])
     analysis_sprints = index.get("analysis", {}).get("sprints", [])
     analysis_by_sprint: dict[str, dict] = {a["sprint"]: a for a in analysis_sprints}
+    timezone_label = _timezone_label(index["timezone"]) if index.get("timezone") else None
 
     cards_by_key: dict[tuple, dict] = {}
     for card in cards:
@@ -162,6 +163,7 @@ def _render_pages(pkg: Path) -> dict:
         numerator = metrics.get("first_attempt_numerator") or 0
 
         stories = []
+        epic_groups = []
         has_analysis = bool(analysis_stories)
         if has_analysis:
             for story in analysis_stories:
@@ -200,7 +202,10 @@ def _render_pages(pkg: Path) -> dict:
                     }
                 )
         else:
-            stories = _stories_from_roster(metrics, cards)
+            sprint_events = _load_sprint_events(pkg, sprint["name"], index)
+            epic_groups = _epic_groups(
+                cards, sprint["name"], metrics.get("roster"), sprint_events
+            )
 
         analysis_changed = analysis_by_sprint.get(sprint["name"], {}).get(
             "changed", []
@@ -261,6 +266,7 @@ def _render_pages(pkg: Path) -> dict:
             "cycle_time": _format_minutes(metrics.get("cycle_time_minutes")),
             "sprint_slug": slug,
             "stories": stories,
+            "epic_groups": epic_groups,
             "has_analysis": has_analysis,
             "changed": changed,
             "decided": decided,
@@ -269,7 +275,10 @@ def _render_pages(pkg: Path) -> dict:
             "left_open_rows": left_open_rows,
             "roster_released_epics": released_epics,
             "roster_achieved_goals": achieved_goals,
+            "model_time_split": _build_model_time_split(metrics),
+            "idle_time": _build_idle_time(metrics),
             "current_view": "sprint",
+            "timezone_label": timezone_label,
         }
         pages[slug] = sprint_template.render(**context)
         default_sprint_slug = slug
@@ -398,49 +407,334 @@ def _slug(name: str) -> str:
     return name.lower().replace(" ", "-") + ".html"
 
 
-def _stories_from_roster(metrics: dict, cards: list[dict]) -> list[dict]:
-    """Build the delivered-story list from the sprint-metrics' roster.
+def _timezone_label(tz: str) -> str:
+    """A human-readable zone name from an IANA timezone identifier.
 
-    Used when the package carries no analysis: the list comes from
-    sprint_metrics.answers.<sprint>.roster.completed_stories, which
-    sprint-metrics computed. Each entry is a 'repo#number' reference;
-    the title is looked up from the card if one matches, otherwise the
-    row shows the reference without a title.
+    'America/Chicago' becomes 'Chicago'; 'UTC' stays 'UTC'.
     """
-    roster = metrics.get("roster")
-    if not isinstance(roster, dict):
-        return []
-    completed = roster.get("completed_stories")
-    if not isinstance(completed, (list, tuple)) or not completed:
-        return []
+    if "/" in tz:
+        return tz.rsplit("/", 1)[-1]
+    return tz
+
+
+def _status_tone(status) -> str:
+    """A board status's badge tone, in the design system's own words.
+
+    The board's columns map onto the design system's badge tones: Done is
+    done, the working columns are active, the blocked columns are blocked,
+    and everything that is waiting on someone is waiting. An empty status
+    reads as waiting.
+    """
+    if not status:
+        return "waiting"
+    s = str(status).strip()
+    if s == "Done":
+        return "done"
+    if s in ("In Progress", "Reviewing", "QAing", "Merging", "Sprint Backlog"):
+        return "active"
+    if s in ("Blocked", "Refused"):
+        return "blocked"
+    return "waiting"
+
+
+def _status_label(card: dict) -> str:
+    """The badge's label: the board's own words, with a superseded story
+    reading 'Closed, not planned' regardless of its Done status."""
+    if card.get("closed_as") == "not_planned":
+        return "Closed, not planned"
+    return card.get("status") or ""
+
+
+def _story_attempt_blocks(
+    events: list[dict] | None, repo, number
+) -> tuple[list[str], list[int], bool]:
+    """The story's attempt blocks, read from the sprint's events.
+
+    Returns (blocks, crew_fix_numbers, escalated) where blocks is a list of
+    block-type strings in the order the events record them:
+    'missed' for each attempt that did not land, 'blocked' for each time the
+    story was blocked, 'crew-fix' for each merged fix to the crew the story
+    references, and 'landed' for the attempt that landed.
+    """
+    if not events or repo is None or number is None:
+        return [], [], False
+
+    blocks: list[str] = []
+    crew_fix_numbers: list[int] = []
+    escalated = False
+    seen_sent_back_rounds: set = set()
+
+    for event in events:
+        kind = event.get("kind")
+
+        if kind == "attempt":
+            card = event.get("card")
+            if card and card.get("repo") == repo and card.get("number") == number:
+                blocks.append("missed")
+
+        elif kind == "card_moved":
+            card = event.get("card")
+            if (
+                card
+                and card.get("repo") == repo
+                and card.get("number") == number
+                and event.get("to_column") == "Blocked"
+            ):
+                blocks.append("blocked")
+
+        elif kind == "sent_back":
+            card = event.get("card")
+            if card and card.get("repo") == repo and card.get("number") == number:
+                round_val = event.get("round")
+                if round_val not in seen_sent_back_rounds:
+                    seen_sent_back_rounds.add(round_val)
+                    blocks.append("missed")
+
+        elif kind == "escalated":
+            card = event.get("card")
+            if card and card.get("repo") == repo and card.get("number") == number:
+                escalated = True
+
+        elif kind == "pull_merged":
+            crews_own = event.get("crews_own", False)
+            about = event.get("about") or []
+            closes = event.get("closes") or []
+            in_about = any(
+                ref.get("repo") == repo and ref.get("number") == number
+                for ref in about
+            )
+            in_closes = any(
+                ref.get("repo") == repo and ref.get("number") == number
+                for ref in closes
+            )
+            if crews_own and in_about:
+                blocks.append("crew-fix")
+                crew_fix_numbers.append(event.get("number", 0))
+            elif not crews_own and in_closes:
+                blocks.append("landed")
+
+    return blocks, crew_fix_numbers, escalated
+
+
+def _story_happened_line(
+    blocks: list[str],
+    card: dict,
+    delivered: bool,
+    crew_fix_numbers: list[int],
+    escalated: bool,
+) -> str:
+    """One plain-words line saying what happened to the story."""
+    if card.get("closed_as") == "not_planned":
+        return "Superseded (closed as not planned) and never built."
+
+    missed_count = blocks.count("missed")
+    blocked_count = blocks.count("blocked")
+    landed = "landed" in blocks
+
+    def _plural(n: int, singular: str, plural: str | None = None) -> str:
+        if n == 1:
+            return "once" if singular == "time" else singular
+        if n == 2:
+            return "twice" if singular == "time" else (plural or f"{singular}s")
+        return f"{n} {singular}s" if not plural else f"{n} {plural}"
+
+    if delivered:
+        if missed_count == 0 and not blocked_count and not crew_fix_numbers:
+            return "Landed first try."
+        parts: list[str] = []
+        if missed_count:
+            if missed_count == 1:
+                parts.append("missed once")
+            elif missed_count == 2:
+                parts.append("missed twice")
+            else:
+                parts.append(f"missed {missed_count} times")
+        if blocked_count:
+            if blocked_count == 1:
+                parts.append("was blocked once")
+            elif blocked_count == 2:
+                parts.append("was blocked twice")
+            else:
+                parts.append(f"was blocked {blocked_count} times")
+        if crew_fix_numbers:
+            names = " and ".join(f"crew#{n}" for n in crew_fix_numbers)
+            parts.append(f"{names} merged")
+        if escalated:
+            line = (", ".join(parts) + ", then landed after it was escalated.")
+        else:
+            line = (", ".join(parts) + ", then landed.") if parts else "Landed."
+        return line[0].upper() + line[1:]
+
+    # Not delivered
+    status = card.get("status") or ""
+    if status == "Blocked":
+        parts = []
+        if missed_count == 1:
+            parts.append("missed once")
+        elif missed_count == 2:
+            parts.append("missed twice")
+        elif missed_count > 2:
+            parts.append(f"missed {missed_count} times")
+        if blocked_count == 1:
+            parts.append("was blocked once first")
+        elif blocked_count == 2:
+            parts.append("was blocked twice first")
+        elif blocked_count > 2:
+            parts.append(f"was blocked {blocked_count} times first")
+        if parts:
+            return "Blocked now, " + " and ".join(parts) + "."
+        return "Blocked now."
+    if missed_count == 1:
+        return "Not delivered yet, missed once so far."
+    elif missed_count == 2:
+        return "Not delivered yet, missed twice so far."
+    elif missed_count > 2:
+        return f"Not delivered yet, missed {missed_count} times so far."
+    return "Not delivered yet."
+
+
+def _epic_groups(
+    cards: list[dict], sprint_name: str, roster, events: list[dict] | None = None
+) -> list[dict]:
+    """Group the sprint's cards under their epics.
+
+    Every card whose sprint is this sprint's name becomes a row, whatever its
+    status, type or closed state. The rows are grouped under their epic's
+    heading, where the epic is the card's parent (by the card's parent number
+    and its own repo). A story with no epic parent, or whose parent card is
+    not an Epic, is grouped under a 'not part of an epic' heading and is never
+    dropped.
+
+    roster is the sprint answer's roster (a dict, or None when the answer
+    carries no roster). roster.completed_stories marks which of the rows are
+    delivered; it never decides which rows appear. A roster entry that names
+    no card in the sprint adds no row and is counted nowhere.
+    """
     cards_by_key: dict[tuple, dict] = {}
     for card in cards:
         key = (card.get("number"), card.get("repo"))
         cards_by_key[key] = card
-    stories = []
-    for ref in completed:
-        if not isinstance(ref, str) or "#" not in ref:
-            continue
-        repo, _, number_str = ref.partition("#")
-        try:
-            number = int(number_str)
-        except ValueError:
-            number = 0
-        card = cards_by_key.get((number, repo))
-        title = card.get("title", "") if card else ""
-        stories.append(
-            {
-                "number": number,
-                "repo": repo,
-                "title": title,
-                "blocks": [],
-                "crew_fixes": [],
-                "delivered": True,
-                "pattern": "",
-                "status": "merged",
-            }
-        )
-    return stories
+
+    # The rows the roster names delivered: a set of (number, repo).
+    has_roster = isinstance(roster, dict) and isinstance(
+        roster.get("completed_stories"), (list, tuple)
+    )
+    delivered: set[tuple] = set()
+    if has_roster:
+        for ref in roster.get("completed_stories") or []:
+            if not isinstance(ref, str) or "#" not in ref:
+                continue
+            repo, _, number_str = ref.partition("#")
+            try:
+                number = int(number_str)
+            except ValueError:
+                continue
+            delivered.add((number, repo))
+
+    # The sprint's cards, in package order.
+    sprint_cards = [c for c in cards if c.get("sprint") == sprint_name]
+
+    # Group each sprint card under its epic (or the no-epic group).
+    groups: dict[tuple, list[dict]] = {}
+    for card in sprint_cards:
+        repo = card.get("repo")
+        parent = card.get("parent")
+        epic_card = cards_by_key.get((parent, repo)) if parent is not None else None
+        if epic_card is not None and epic_card.get("type") == "Epic":
+            key: tuple = ("epic", parent, repo)
+        else:
+            key = ("no-epic", None, None)
+        groups.setdefault(key, []).append(card)
+
+    # Order the groups: epics by their card's position in the package, then the
+    # no-epic group last.
+    epic_index: dict[tuple, int] = {}
+    for i, card in enumerate(cards):
+        if card.get("type") == "Epic":
+            epic_index[(card.get("number"), card.get("repo"))] = i
+
+    def order(key):
+        if key[0] == "epic":
+            return (
+                0,
+                epic_index.get((key[1], key[2]), 10**9),
+                key[2] or "",
+                key[1] or 0,
+            )
+        return (1, 0, "", 0)
+
+    result: list[dict] = []
+    for key in sorted(groups, key=order):
+        rows: list[dict] = []
+        done_count = 0
+        for card in groups[key]:
+            is_delivered = (card.get("number"), card.get("repo")) in delivered
+            if is_delivered:
+                done_count += 1
+            blocks, crew_fix_numbers, escalated = _story_attempt_blocks(
+                events, card.get("repo"), card.get("number")
+            )
+            status_label = _status_label(card)
+            rows.append(
+                {
+                    "repo": card.get("repo") or "",
+                    "number": card.get("number"),
+                    "title": card.get("title") or "",
+                    "status": status_label,
+                    "status_tone": _status_tone(status_label),
+                    "delivered": is_delivered,
+                    "blocks": blocks,
+                    "happened_line": _story_happened_line(
+                        blocks,
+                        card,
+                        is_delivered,
+                        crew_fix_numbers,
+                        escalated,
+                    ),
+                }
+            )
+        group: dict = {
+            "rows": rows,
+            "done_count": done_count,
+            "total_count": len(rows),
+            "has_roster": has_roster,
+            "is_epic": False,
+            "epic_repo": None,
+            "epic_number": None,
+            "epic_title": None,
+            "epic_status": None,
+            "epic_status_tone": None,
+            "has_goal": False,
+            "goal_repo": None,
+            "goal_number": None,
+            "goal_title": None,
+        }
+        if key[0] == "epic":
+            _, parent, repo = key
+            epic_card = cards_by_key.get((parent, repo), {})
+            goal_parent = epic_card.get("parent")
+            goal_card = (
+                cards_by_key.get((goal_parent, repo))
+                if goal_parent is not None
+                else None
+            )
+            has_goal = goal_card is not None and goal_card.get("type") == "Goal"
+            group.update(
+                {
+                    "is_epic": True,
+                    "epic_repo": repo,
+                    "epic_number": parent,
+                    "epic_title": epic_card.get("title") or "",
+                    "epic_status": epic_card.get("status") or "",
+                    "epic_status_tone": _status_tone(epic_card.get("status")),
+                    "has_goal": has_goal,
+                    "goal_repo": goal_card.get("repo") if has_goal else None,
+                    "goal_number": goal_card.get("number") if has_goal else None,
+                    "goal_title": goal_card.get("title") if has_goal else None,
+                }
+            )
+        result.append(group)
+    return result
 
 
 def _normalize_failure_causes(raw) -> list[dict]:
@@ -622,6 +916,67 @@ def _format_metrics_value(measure: str, value) -> str:
     if isinstance(value, float) and value == int(value):
         return str(int(value))
     return str(value)
+
+
+def _build_model_time_split(metrics: dict):
+    """Read the sprint-metrics' model_time_split null-tolerantly.
+
+    Returns None when the field is absent or null (the pinned 3.0.0 package
+    carries it as null for every sprint). Otherwise returns a dict with
+    planning_minutes, building_minutes and the two segment widths as
+    percentages of the bar.
+    """
+    split = metrics.get("model_time_split")
+    if not isinstance(split, dict):
+        return None
+    planning = split.get("refinement")
+    building = split.get("delivery")
+    if planning is None or building is None:
+        return None
+    total = planning + building
+    if total == 0:
+        return {
+            "planning_minutes": planning,
+            "building_minutes": building,
+            "planning_percent": 0,
+            "building_percent": 100,
+        }
+    return {
+        "planning_minutes": planning,
+        "building_minutes": building,
+        "planning_percent": int(round(planning / total * 100)),
+        "building_percent": int(round(building / total * 100)),
+    }
+
+
+def _build_idle_time(metrics: dict):
+    """Read the sprint-metrics' idle figure null-tolerantly.
+
+    Returns None when the field is absent or null, or when idle_minutes is
+    null (the pinned 3.0.0 package carries it as null for every sprint).
+    Otherwise returns a dict with idle_minutes, sprint_total_minutes and the
+    idle share of the sprint's total time as a percentage.
+    """
+    idle = metrics.get("idle")
+    if not isinstance(idle, dict):
+        return None
+    idle_minutes = idle.get("idle_minutes")
+    if idle_minutes is None:
+        return None
+    sprint_total = idle.get("sprint_duration_minutes")
+    if sprint_total is None:
+        return None
+    if sprint_total == 0:
+        return {
+            "idle_minutes": idle_minutes,
+            "sprint_total_minutes": sprint_total,
+            "idle_percent": 0,
+        }
+    return {
+        "idle_minutes": idle_minutes,
+        "sprint_total_minutes": sprint_total,
+        "idle_percent": int(round(idle_minutes / sprint_total * 100)),
+    }
 
 
 def _changed_label(measure: str) -> str:

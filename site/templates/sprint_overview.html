@@ -79,11 +79,11 @@
 <div class="sprint-grid">
   <section class="card sprint-chart" aria-labelledby="split-h">
     <div class="card__head">
-      <h2 id="split-h">Stories delivered this sprint</h2>
+      <h2 id="split-h">{% if has_analysis %}Stories delivered this sprint{% else %}What got done, story by story{% endif %}</h2>
     </div>
     <div class="card__body">
-      {% if stories %}
       {% if has_analysis %}
+      {% if stories %}
       <div class="attempt-legend">
         <span><i class="swatch swatch--landed"></i> attempt that landed</span>
         <span><i class="swatch swatch--refused"></i> refused, repaired</span>
@@ -114,16 +114,45 @@
         {% endfor %}
       </div>
       {% else %}
-      <ul class="story-list">
-        {% for story in stories %}
-        <li class="story-row">
-          <a href="stories/{{ story.repo | replace('/', '-') }}-{{ story.number }}.html">{{ story.repo }}<span class="num meta">#{{ story.number }}</span> {{ story.title }}</a>
-        </li>
-        {% endfor %}
-      </ul>
+      <p>No stories were delivered this sprint</p>
       {% endif %}
       {% else %}
-      <p>No stories were delivered this sprint</p>
+      {% if epic_groups %}
+      <div class="attempt-legend">
+        <span><i class="swatch swatch--landed"></i> attempt that landed</span>
+        <span><i class="swatch swatch--missed"></i> missed, tried again</span>
+        <span><i class="swatch swatch--blocked"></i> blocked</span>
+        <span><i class="swatch swatch--crew-fix"></i> a fix to the crew merged</span>
+      </div>
+      <div class="epic-groups">
+        {% for group in epic_groups %}
+        <div class="epic-group">
+          <div class="epic-group__head">
+            {% if group.is_epic %}
+            <h3 class="epic-group__title">{{ group.epic_title }}</h3>
+            <span class="meta num">epic #{{ group.epic_number }} · {% if group.has_goal %}Goal {{ group.goal_repo }}#{{ group.goal_number }} {{ group.goal_title }}{% else %}not part of a Goal{% endif %}{% if group.has_roster %} · {{ group.done_count }} of {{ group.total_count }} stories done{% endif %}</span>
+            {% if group.epic_status %}<span class="badge" data-tone="{{ group.epic_status_tone }}">{{ group.epic_status }}</span>{% endif %}
+            {% else %}
+            <h3 class="epic-group__title">not part of an epic</h3>
+            {% if group.has_roster %}<span class="meta num">{{ group.done_count }} of {{ group.total_count }} stories done</span>{% endif %}
+            {% endif %}
+          </div>
+          <div class="epic-group__rows">
+            {% for row in group.rows %}
+            <div class="story-row" {% if row.delivered %}data-delivered="true"{% endif %}>
+              <a class="story-row__title" href="stories/{{ row.repo | replace('/', '-') }}-{{ row.number }}.html">{{ row.repo }}<span class="num meta">#{{ row.number }}</span> {{ row.title }}</a>
+              {% if row.status %}<span class="badge" data-tone="{{ row.status_tone }}">{{ row.status }}</span>{% endif %}
+              {% if row.blocks %}<div class="blocks">{% for block in row.blocks %}<span class="attempt-block attempt-block--{{ block | replace('_', '-') }}"></span>{% endfor %}</div>{% endif %}
+              <span class="story-row__happened">{{ row.happened_line }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p>No stories in this sprint</p>
+      {% endif %}
       {% endif %}
     </div>
   </section>
@@ -211,7 +240,7 @@
     <h2 id="dora-h">How releases went</h2>
     <span class="meta">DORA's four measures</span>
   </div>
-  {% if metrics.dora %}
+  {% if metrics.dora and (metrics.dora.release_frequency is not none or metrics.dora.lead_time_days is not none or metrics.dora.change_failure_count is not none or metrics.dora.mean_time_to_recovery_minutes is not none) %}
   <div class="card__body dora-grid">
     <div class="dora-metric">
       <div class="meta">Releases this sprint</div>
@@ -239,5 +268,46 @@
     <p>no release data for this sprint</p>
   </div>
   {% endif %}
+</section>
+{% if timezone_label %}
+<div class="meta">Times are {{ timezone_label }} time</div>
+{% endif %}
+<section class="card" aria-labelledby="time-went-h">
+  <div class="card__head">
+    <h2 id="time-went-h">Where the time went</h2>
+  </div>
+  <div class="card__body">
+    {% if model_time_split %}
+    <div class="model-time-split">
+      <div class="model-time-split__label">Model time: planning against building</div>
+      <div class="model-time-split__bar">
+        <div class="model-time-split__planning" style="width:{{ model_time_split.planning_percent }}%"></div>
+        <div class="model-time-split__building" style="width:{{ model_time_split.building_percent }}%"></div>
+      </div>
+      <div class="model-time-split__values">
+        <span>Planning: <span class="num">{{ model_time_split.planning_minutes }}</span> min</span>
+        <span>Building: <span class="num">{{ model_time_split.building_minutes }}</span> min</span>
+      </div>
+    </div>
+    {% else %}
+    <p>No model time recorded for this sprint</p>
+    {% endif %}
+    {% if idle_time %}
+    <div class="idle-time">
+      <div class="idle-time__label">Time with no session running</div>
+      <div class="idle-time__bar">
+        <div class="idle-time__fill" style="width:{{ idle_time.idle_percent }}%"></div>
+      </div>
+      <div class="idle-time__values">
+        <span class="num">{{ idle_time.idle_minutes }}</span> min of the sprint's <span class="num">{{ idle_time.sprint_total_minutes }}</span> min
+      </div>
+    </div>
+    {% else %}
+    <div class="idle-time">
+      <div class="idle-time__label">Time with no session running</div>
+      <p class="meta">No value yet</p>
+    </div>
+    {% endif %}
+  </div>
 </section>
 {% endblock %}
