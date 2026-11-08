@@ -472,17 +472,6 @@ def _story_attempt_blocks(
             if card and card.get("repo") == repo and card.get("number") == number:
                 blocks.append("missed")
 
-        elif kind == "sent_back":
-            card = event.get("card")
-            if card and card.get("repo") == repo and card.get("number") == number:
-                round_val = event.get("round")
-                if round_val is None:
-                    blocks.append("missed")
-                else:
-                    if round_val not in seen_sent_back_rounds:
-                        seen_sent_back_rounds.add(round_val)
-                        blocks.append("missed")
-
         elif kind == "card_moved":
             card = event.get("card")
             if (
@@ -492,6 +481,14 @@ def _story_attempt_blocks(
                 and event.get("to_column") == "Blocked"
             ):
                 blocks.append("blocked")
+
+        elif kind == "sent_back":
+            card = event.get("card")
+            if card and card.get("repo") == repo and card.get("number") == number:
+                round_val = event.get("round")
+                if round_val not in seen_sent_back_rounds:
+                    seen_sent_back_rounds.add(round_val)
+                    blocks.append("missed")
 
         elif kind == "escalated":
             card = event.get("card")
@@ -534,45 +531,65 @@ def _story_happened_line(
     blocked_count = blocks.count("blocked")
     landed = "landed" in blocks
 
+    def _plural(n: int, singular: str, plural: str | None = None) -> str:
+        if n == 1:
+            return "once" if singular == "time" else singular
+        if n == 2:
+            return "twice" if singular == "time" else (plural or f"{singular}s")
+        return f"{n} {singular}s" if not plural else f"{n} {plural}"
+
     if delivered:
         if missed_count == 0 and not blocked_count and not crew_fix_numbers:
             return "Landed first try."
         parts: list[str] = []
         if missed_count:
-            parts.append(
-                f"Missed {missed_count} time{'s' if missed_count != 1 else ''}"
-            )
+            if missed_count == 1:
+                parts.append("missed once")
+            elif missed_count == 2:
+                parts.append("missed twice")
+            else:
+                parts.append(f"missed {missed_count} times")
         if blocked_count:
-            parts.append(
-                f"was blocked{f' {blocked_count} times' if blocked_count > 1 else ''}"
-            )
+            if blocked_count == 1:
+                parts.append("was blocked once")
+            elif blocked_count == 2:
+                parts.append("was blocked twice")
+            else:
+                parts.append(f"was blocked {blocked_count} times")
         if crew_fix_numbers:
             names = " and ".join(f"crew#{n}" for n in crew_fix_numbers)
             parts.append(f"{names} merged")
         if escalated:
-            return (", ".join(parts) + ", then landed after it was escalated.")
-        return (", ".join(parts) + ", then landed.") if parts else "Landed."
+            line = (", ".join(parts) + ", then landed after it was escalated.")
+        else:
+            line = (", ".join(parts) + ", then landed.") if parts else "Landed."
+        return line[0].upper() + line[1:]
 
     # Not delivered
     status = card.get("status") or ""
     if status == "Blocked":
         parts = []
-        if missed_count:
-            parts.append(
-                f"missed {missed_count} time{'s' if missed_count != 1 else ''}"
-            )
-        if blocked_count:
-            parts.append(
-                f"was blocked {blocked_count} time{'s' if blocked_count != 1 else ''} first"
-            )
+        if missed_count == 1:
+            parts.append("missed once")
+        elif missed_count == 2:
+            parts.append("missed twice")
+        elif missed_count > 2:
+            parts.append(f"missed {missed_count} times")
+        if blocked_count == 1:
+            parts.append("was blocked once first")
+        elif blocked_count == 2:
+            parts.append("was blocked twice first")
+        elif blocked_count > 2:
+            parts.append(f"was blocked {blocked_count} times first")
         if parts:
             return "Blocked now, " + " and ".join(parts) + "."
         return "Blocked now."
-    if missed_count:
-        return (
-            f"Not delivered yet, missed {missed_count} time"
-            f"{'s' if missed_count != 1 else ''} so far."
-        )
+    if missed_count == 1:
+        return "Not delivered yet, missed once so far."
+    elif missed_count == 2:
+        return "Not delivered yet, missed twice so far."
+    elif missed_count > 2:
+        return f"Not delivered yet, missed {missed_count} times so far."
     return "Not delivered yet."
 
 

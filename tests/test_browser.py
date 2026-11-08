@@ -10208,6 +10208,413 @@ def test_announced_3_0_0_mock_shows_story_rows():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def _build_3_0_0_mock_sprint_6(roster_completed=None):
+    """Build the 3.0.0 mock fixture's sprint-6 page with a given roster.
+
+    Returns (html, pkg_dir) where pkg_dir is the package directory (for cleanup).
+    """
+    base_dir = REPO_ROOT / "tests" / "fixtures" / "delivery-history-3.0.0"
+    mock_dir = base_dir / "mock"
+    tag = "delivery-history-3000-TEST"
+    pkg_dir = PACKAGE_DIR / tag
+    shutil.copytree(mock_dir, pkg_dir)
+    for schema_file in ("schema.json", "manifest.schema.json", "events.schema.json"):
+        shutil.copy2(base_dir / schema_file, pkg_dir / schema_file)
+    if roster_completed is not None:
+        dh_path = pkg_dir / "delivery-history.json"
+        dh = json.loads(dh_path.read_text())
+        answers = dh["sprint_metrics"]["answers"]
+        answers["Sprint 6"]["roster"] = {
+            "completed_stories": roster_completed,
+            "released_epics": None,
+            "achieved_goals": None,
+        }
+        answers["Sprint 5"]["roster"] = {
+            "completed_stories": [],
+            "released_epics": None,
+            "achieved_goals": None,
+        }
+        dh_path.write_text(json.dumps(dh))
+    return tag, pkg_dir
+
+
+def test_story_rows_show_attempt_blocks_from_events():
+    """AC1: each row shows the story's attempt blocks, read from the sprint's
+    events, in the order the events record them."""
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6(
+        roster_completed=[
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ]
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        # Extract each story row's blocks by finding the row for each card number.
+        def row_blocks(card_number):
+            # Find the start of this card's row in the HTML
+            marker = f'sprint-metrics<span class="num meta">#{card_number}</span>'
+            row_start = html.find(marker)
+            assert row_start != -1, f"row for card #{card_number} not found"
+            # Find the end of this row (next story-row or end of section)
+            next_row = html.find('class="story-row"', row_start + len(marker))
+            if next_row == -1:
+                next_row = len(html)
+            row_html = html[row_start:next_row]
+            blocks_match = re.search(
+                r'<div class="blocks">(.*?)</div>', row_html, re.DOTALL
+            )
+            if not blocks_match:
+                return []
+            return re.findall(r'attempt-block--(\S+)"', blocks_match.group(1))
+
+        # AC1: story 127 shows three missed, one blocked, two crew-fix, one landed
+        blocks_127 = row_blocks(127)
+        assert blocks_127 == [
+            "missed",
+            "missed",
+            "missed",
+            "blocked",
+            "crew-fix",
+            "crew-fix",
+            "landed",
+        ], f"story 127 blocks: {blocks_127}"
+
+        # AC1: story 126 shows one missed and one landed
+        blocks_126 = row_blocks(126)
+        assert blocks_126 == ["missed", "landed"], f"story 126 blocks: {blocks_126}"
+
+        # AC1: story 125 and 128 each show one landed
+        blocks_125 = row_blocks(125)
+        assert blocks_125 == ["landed"], f"story 125 blocks: {blocks_125}"
+        blocks_128 = row_blocks(128)
+        assert blocks_128 == ["landed"], f"story 128 blocks: {blocks_128}"
+
+        # AC1: story 131 shows one missed and one blocked
+        blocks_131 = row_blocks(131)
+        assert blocks_131 == ["missed", "blocked"], f"story 131 blocks: {blocks_131}"
+
+        # AC1: story 132 and 136 each show one missed and no landed
+        blocks_132 = row_blocks(132)
+        assert blocks_132 == ["missed"], f"story 132 blocks: {blocks_132}"
+        blocks_136 = row_blocks(136)
+        assert blocks_136 == ["missed"], f"story 136 blocks: {blocks_136}"
+
+        # AC1: the legend's four items
+        legend_match = re.search(
+            r'<div class="attempt-legend">(.*?)</div>', html, re.DOTALL
+        )
+        assert legend_match, "attempt-legend div not found"
+        legend_html = legend_match.group(1)
+        for label in (
+            "attempt that landed",
+            "missed, tried again",
+            "blocked",
+            "a fix to the crew merged",
+        ):
+            assert label in legend_html, f"legend item {label!r} not found"
+        swatch_count = legend_html.count('class="swatch')
+        assert swatch_count == 4, f"expected 4 legend swatches, got {swatch_count}"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_story_rows_show_status_badges():
+    """AC2: each row's status badge uses the board's own words with a tone;
+    a story closed as not planned reads 'Closed, not planned'."""
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6(
+        roster_completed=[
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ]
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        def row_badge(card_number):
+            pattern = (
+                rf'sprint-metrics<span class="num meta">#{card_number}</span>'
+                r'.*?class="badge" data-tone="(\w+)">([^<]+)<'
+            )
+            match = re.search(pattern, html, re.DOTALL)
+            assert match, f"badge for card #{card_number} not found"
+            return match.group(2), match.group(1)
+
+        # AC2: Done stories
+        for num in (125, 126, 127, 128, 133):
+            label, tone = row_badge(num)
+            assert label == "Done", f"story {num} badge label: {label!r}"
+            assert tone == "done", f"story {num} badge tone: {tone!r}"
+
+        # AC2: In Progress
+        label, tone = row_badge(129)
+        assert label == "In Progress", f"story 129 badge label: {label!r}"
+        assert tone == "active", f"story 129 badge tone: {tone!r}"
+
+        # AC2: Ready
+        label, tone = row_badge(132)
+        assert label == "Ready", f"story 132 badge label: {label!r}"
+
+        # AC2: Reviewing
+        label, tone = row_badge(136)
+        assert label == "Reviewing", f"story 136 badge label: {label!r}"
+        assert tone == "active", f"story 136 badge tone: {tone!r}"
+
+        # AC2: Blocked
+        label, tone = row_badge(131)
+        assert label == "Blocked", f"story 131 badge label: {label!r}"
+        assert tone == "blocked", f"story 131 badge tone: {tone!r}"
+
+        # AC2: Closed, not planned (status Done, closed_as not_planned)
+        label, tone = row_badge(130)
+        assert label == "Closed, not planned", f"story 130 badge label: {label!r}"
+
+        # AC2: every badge carries both its word and its tone (data-tone attr)
+        badges = re.findall(r'class="badge" data-tone="[^"]+">[^<]+<', html)
+        assert len(badges) > 0, "no badges found"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_story_rows_show_happened_line():
+    """AC3: each row carries one plain-words line saying what happened;
+    machine codes are banned."""
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6(
+        roster_completed=[
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ]
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        def row_happened(card_number):
+            pattern = (
+                rf'sprint-metrics<span class="num meta">#{card_number}</span>'
+                r'.*?class="story-row__happened">([^<]+)<'
+            )
+            match = re.search(pattern, html, re.DOTALL)
+            assert match, f"happened line for card #{card_number} not found"
+            return match.group(1)
+
+        # AC3: story 133's line
+        line_133 = row_happened(133)
+        assert line_133 == "Missed twice, then landed after it was escalated.", (
+            f"story 133 line: {line_133!r}"
+        )
+
+        # AC3: story 125's line
+        line_125 = row_happened(125)
+        assert line_125 == "Landed first try.", f"story 125 line: {line_125!r}"
+
+        # AC3: story 127's line names the two merged crew fixes
+        line_127 = row_happened(127)
+        assert "crew#208 and crew#209" in line_127, (
+            f"story 127 line should name crew fixes: {line_127!r}"
+        )
+
+        # AC3: no machine codes in any badge, line or block label
+        for code in ("pull_merged", "work_started", "model_call"):
+            assert code not in html, (
+                f"machine code {code!r} appears in the section"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_not_delivered_vs_never_built_read_distinctly():
+    """AC4: 'not delivered' and 'never built' read distinctly."""
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6(
+        roster_completed=[
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ]
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        def row_happened(card_number):
+            pattern = (
+                rf'sprint-metrics<span class="num meta">#{card_number}</span>'
+                r'.*?class="story-row__happened">([^<]+)<'
+            )
+            match = re.search(pattern, html, re.DOTALL)
+            assert match, f"happened line for card #{card_number} not found"
+            return match.group(1)
+
+        # AC4: story 129 says not delivered yet
+        line_129 = row_happened(129)
+        assert "not delivered yet" in line_129.lower(), (
+            f"story 129 line should say not delivered: {line_129!r}"
+        )
+
+        # AC4: story 132 and 136 say not delivered yet and missed once so far
+        line_132 = row_happened(132)
+        assert "not delivered yet" in line_132.lower(), (
+            f"story 132 line: {line_132!r}"
+        )
+        assert "missed once" in line_132, f"story 132 line: {line_132!r}"
+
+        line_136 = row_happened(136)
+        assert "not delivered yet" in line_136.lower(), (
+            f"story 136 line: {line_136!r}"
+        )
+        assert "missed once" in line_136, f"story 136 line: {line_136!r}"
+
+        # AC4: story 131 says blocked now and missed once and was blocked once first
+        line_131 = row_happened(131)
+        assert "blocked now" in line_131.lower(), f"story 131 line: {line_131!r}"
+        assert "missed once" in line_131, f"story 131 line: {line_131!r}"
+        assert "was blocked once" in line_131, f"story 131 line: {line_131!r}"
+
+        # AC4: story 130's badge reads 'Closed, not planned' and its line says
+        # superseded and never built
+        line_130 = row_happened(130)
+        assert "superseded" in line_130.lower(), f"story 130 line: {line_130!r}"
+        assert "never built" in line_130, f"story 130 line: {line_130!r}"
+        badge_130 = re.search(
+            r'sprint-metrics<span class="num meta">#130</span>'
+            r'.*?class="badge" data-tone="[^"]+">([^<]+)<',
+            html,
+            re.DOTALL,
+        )
+        assert badge_130, "story 130 badge not found"
+        assert badge_130.group(1) == "Closed, not planned", (
+            f"story 130 badge: {badge_130.group(1)!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_story_with_no_events_gets_row_and_line():
+    """AC5: a story with no events in the sprint still gets a row and a line;
+    it says not delivered yet, shows no attempt blocks, and no machine wording."""
+    tag = "delivery-history-NOEVENTS"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-11-06"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    index = {
+        "package": "delivery-history",
+        "schema_version": "3.0.0",
+        "date": "2026-11-06",
+        "timezone": "America/Chicago",
+        "crew_repository": "crew",
+        "repositories": ["crew-presentation"],
+        "sprints": [
+            {"name": "Sprint 1", "start": "2026-11-06", "end": "2026-11-06"}
+        ],
+        "cards": [
+            {
+                "repo": "crew-presentation",
+                "number": 1,
+                "type": "Story",
+                "title": "Story without activity",
+                "url": "https://github.com/mqucifer/crew-presentation/issues/1",
+                "parent": None,
+                "points": 1,
+                "sprint": "Sprint 1",
+                "status": "In Progress",
+                "status_set": None,
+                "created": "2026-11-06T09:00:00Z",
+                "closed": None,
+                "technical": False,
+                "closed_as": None,
+                "superseded_because": None,
+            }
+        ],
+        "periods": [],
+        "sprint_metrics": {
+            "release": "3.0.0",
+            "answers": {
+                "Sprint 1": {
+                    "cycle_time_days": 0,
+                    "lead_time_days": 0,
+                    "throughput": 0,
+                    "wip_violations": 0,
+                    "blocked_aging_days": 0,
+                    "escalation_rate_percent": 0,
+                    "points_delivered": 0,
+                    "first_attempt_numerator": 0,
+                    "first_attempt_denominator": 0,
+                    "escalation_count": 0,
+                    "superseded_count": 0,
+                    "superseded_points": 0,
+                    "first_attempt_rate_percent": 0,
+                    "failure_breakdown": [],
+                    "top_failure_causes": {},
+                    "superseded_breakdown": None,
+                    "flags": None,
+                    "prior": None,
+                    "delta": None,
+                    "cycle_time_minutes": 0,
+                    "lead_time_minutes": 0,
+                    "roster": {"completed_stories": []},
+                }
+            },
+        },
+    }
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        page = (BUILD_DIR / "sprint-1.html").read_text()
+        # The row exists
+        assert 'class="story-row"' in page, "story row not found"
+        assert "#1" in page, "card #1 not found"
+        # No attempt blocks
+        assert "attempt-block" not in page, "attempt blocks found for no-event story"
+        # The line says not delivered yet
+        assert "not delivered yet" in page.lower(), (
+            "happened line should say not delivered yet"
+        )
+        # No machine wording
+        for code in ("no events", "pull_merged", "work_started"):
+            assert code not in page, f"machine wording {code!r} found"
+        # The badge is not empty
+        assert 'class="badge"' in page, "badge not found"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
 def test_epic_heading_shows_goal_parent_done_count_and_status():
     """AC3: an epic heading names the epic's number and title, its Goal parent
     (by number and title) when the epic has one, 'x of y stories done', and the
