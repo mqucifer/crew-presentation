@@ -920,21 +920,28 @@ def _first_try_stat(numerator, denominator) -> str:
 
 
 def _format_minutes(total_minutes) -> str:
-    """A metric's minutes as hours and minutes: '1 hr 29 min', '1 hr', '0 min'.
+    """A metric's minutes in the canonical vocabulary: '10 h 55 min', '1 d 1 h'.
 
-    Zero units are omitted and days are never shown (R2), so a sprint that
-    ran for a few hundred minutes reads in the reader's terms, not as
-    '0 days'. A missing value (JSON null) renders '—', the same mark
+    Below a day: hours and minutes, zero units dropped.
+    At a day and up: days and hours, minutes dropped, zero units dropped.
+    A missing value (JSON null) renders '—', the same mark
     _stat_value uses for other missing stats.
     """
     if total_minutes is None:
         return "—"
-    hours, minutes = divmod(int(total_minutes), 60)
+    total_minutes = int(total_minutes)
+    if total_minutes < 60:
+        return f"{total_minutes} min"
+    if total_minutes < 1440:
+        hours, minutes = divmod(total_minutes, 60)
+        if minutes == 0:
+            return f"{hours} h"
+        return f"{hours} h {minutes} min"
+    days, remainder = divmod(total_minutes, 1440)
+    hours = remainder // 60
     if hours == 0:
-        return f"{minutes} min"
-    if minutes == 0:
-        return f"{hours} hr"
-    return f"{hours} hr {minutes} min"
+        return f"{days} d"
+    return f"{days} d {hours} h"
 
 
 def _format_changed_value(measure: str, value) -> str:
@@ -963,20 +970,15 @@ def _format_changed_value(measure: str, value) -> str:
 def _format_metrics_value(measure: str, value) -> str:
     """Format a value for the metrics-derived 'What changed' fallback.
 
-    Time measures always show both hours and minutes (e.g. '0 hr 26 min');
-    first_attempt_rate_percent is shown with a '%' unit;
-    other measures are shown as their raw number.
+    Uses the same canonical vocabulary as the rest of the page:
+    time measures via _format_minutes, rates with '%', others as raw numbers.
     """
     if value is None:
-        return ""
+        return "—"
     if measure in ("cycle_time_minutes", "lead_time_minutes"):
-        total_minutes = round(value)
-        hours, minutes = divmod(total_minutes, 60)
-        return f"{hours} hr {minutes} min"
+        return _format_minutes(round(value))
     if measure in ("cycle_time_days", "lead_time_days"):
-        total_minutes = round(value * 24 * 60)
-        hours, minutes = divmod(total_minutes, 60)
-        return f"{hours} hr {minutes} min"
+        return _format_minutes(round(value * 24 * 60))
     if measure == "first_attempt_rate_percent":
         if isinstance(value, float) and value == int(value):
             return f"{int(value)}%"
