@@ -12408,20 +12408,6 @@ def test_sprint_page_timezone_line_present_without_clock_times():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
-def test_changelog_fragment_mentions_timezone():
-    """AC4: the changelog fragment tells the reader that the sprint page now
-    states which timezone its times are in."""
-    fragment = REPO_ROOT / "changes" / "324.added.md"
-    assert fragment.is_file(), "changelog fragment changes/324.added.md not found"
-    text = fragment.read_text().lower()
-    assert "timezone" in text, (
-        "changelog fragment should mention the timezone"
-    )
-    assert "sprint" in text, (
-        "changelog fragment should mention the sprint page"
-    )
-
-
 def _orientation_full_text(html: str) -> str:
     """Extract all text from the orientation section, tags stripped."""
     section = _orientation_section(html)

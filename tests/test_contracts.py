@@ -1409,7 +1409,7 @@ def test_left_open_pinned_package_builds():
 
 
 def test_left_open_docs_mention_the_new_card():
-    """AC6: README's 'What the site shows' section and the changelog fragment tell the reader what the sprint page now shows."""
+    """AC6: README's 'What the site shows' section tells the reader what the sprint page now shows."""
     readme = (REPO_ROOT / "README.md").read_text()
     # README's 'What the site shows' section mentions the left-open card
     what_shows = readme[readme.index("## What the site shows"):]
@@ -1422,15 +1422,10 @@ def test_left_open_docs_mention_the_new_card():
     assert "refused" in what_shows, (
         "README should mention the three states: waiting, blocked or refused"
     )
-    # Changelog fragment exists and names the feature
-    fragment = REPO_ROOT / "changes" / "323.added.md"
-    assert fragment.is_file(), "changelog fragment changes/323.added.md not found"
-    text = fragment.read_text()
-    assert "open" in text.lower(), "changelog fragment should mention the left-open card"
 
 
 def test_readme_sprint_overview_mentions_stories_under_epics():
-    """AC9: README's 'What the site shows' section and the changelog fragment say
+    """AC9: README's 'What the site shows' section says
     the sprint page lists the sprint's stories story by story, grouped under
     their epics, each epic's heading showing how many of its stories are done,
     and each story carrying its status, a line of what happened to it and its
@@ -1449,17 +1444,6 @@ def test_readme_sprint_overview_mentions_stories_under_epics():
     assert "what happened to it and its time" in what_shows, (
         "README should say each story carries what happened to it and its time"
     )
-    # Changelog fragment exists and says the same of the delivered change.
-    fragment = REPO_ROOT / "changes" / "353.added.md"
-    assert fragment.is_file(), "changelog fragment changes/353.added.md not found"
-    text = fragment.read_text().lower()
-    assert "sprint's stories under their epics" in text, (
-        "changelog fragment should say the sprint page lists the stories under their epics"
-    )
-    assert "done count" in text, (
-        "changelog fragment should mention each epic's done count"
-    )
-    assert "status" in text, "changelog fragment should mention each epic's status"
 
 
 def test_placeholder_checks_contain_marker():
