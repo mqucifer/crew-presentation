@@ -100,6 +100,10 @@
   flex-shrink: 0;
 }
 
+.attempt-block--missed {
+  background: var(--stage-1);
+}
+
 .attempt-block--refused {
   background: var(--stage-1);
 }
@@ -146,6 +150,10 @@
 
 .swatch--landed {
   background: var(--tone-done-text);
+}
+
+.swatch--missed {
+  background: var(--stage-1);
 }
 
 .swatch--refused {
@@ -260,6 +268,18 @@
 .story-row__title {
   min-width: 0;
   overflow-wrap: break-word;
+}
+
+.story-row .blocks {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.story-row__happened {
+  font-size: 13px;
+  color: var(--color-text-dim);
+  flex-basis: 100%;
 }
 
 /* Failure-causes bar chart */

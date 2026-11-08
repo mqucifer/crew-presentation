@@ -10014,8 +10014,9 @@ def test_roster_entry_without_matching_card_shows_reference():
 
 
 def test_no_attempt_elements_when_no_analysis():
-    """AC2: when the package has no analysis, the page has no .attempt-block,
-    .attempt-status, or .attempt-legend element."""
+    """AC2: when the package has no analysis, the page has no .attempt-block or
+    .attempt-status element, but it does carry the attempt-legend and each row
+    carries a status badge."""
     tag = "delivery-history-TEST"
     cards = [
         {
@@ -10034,9 +10035,10 @@ def test_no_attempt_elements_when_no_analysis():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        assert "attempt-block" not in html, "attempt-block element found without analysis"
+        assert "attempt-block" not in html, "attempt-block element found without events"
         assert "attempt-status" not in html, "attempt-status element found without analysis"
-        assert "attempt-legend" not in html, "attempt-legend element found without analysis"
+        assert "attempt-legend" in html, "attempt-legend not found without analysis"
+        assert 'class="badge"' in html, "status badge not found on story row"
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)

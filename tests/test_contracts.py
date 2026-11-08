@@ -638,12 +638,12 @@ def test_sprint_page_shows_story_list_without_analysis():
         )
         # The roster names the story delivered, so the group carries a done count.
         assert "1 of 1 stories done" in page, "done count not found"
-        assert 'class="attempt-legend"' not in page, (
-            "attempt legend found without analysis"
+        assert 'class="attempt-legend"' in page, (
+            "attempt legend not found without analysis"
         )
         assert 'class="attempt-row"' not in page, "attempt rows found without analysis"
         assert 'class="attempt-block' not in page, (
-            "attempt blocks found without analysis"
+            "attempt blocks found without events"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original_tag)
