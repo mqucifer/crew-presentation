@@ -12489,3 +12489,265 @@ def test_all_measure_terms_explained_in_orientation_block():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _build_3_0_0_mock_sprint_6_with_times(
+    roster_completed=None,
+    working_time_stories=None,
+    session_stories=None,
+    session_epics=None,
+):
+    """Build the 3.0.0 mock fixture's sprint-6 page with patched time fields.
+
+    Uses the pinned package's schema (4.x) which allows working_time.stories,
+    session_stories and session_epics in the answer, so the time cells can be
+    populated. The mock data itself is the 3.0.0 fixture's.
+    """
+    base_dir = REPO_ROOT / "tests" / "fixtures" / "delivery-history-3.0.0"
+    mock_dir = base_dir / "mock"
+    pinned_dir = PACKAGE_DIR / DELIVERY_HISTORY_TAG.read_text().strip()
+    tag = "delivery-history-3000-TEST"
+    pkg_dir = PACKAGE_DIR / tag
+    shutil.copytree(mock_dir, pkg_dir)
+    shutil.copy2(pinned_dir / "schema.json", pkg_dir / "schema.json")
+    for schema_file in ("manifest.schema.json", "events.schema.json"):
+        shutil.copy2(base_dir / schema_file, pkg_dir / schema_file)
+    dh_path = pkg_dir / "delivery-history.json"
+    dh = json.loads(dh_path.read_text())
+    answers = dh["sprint_metrics"]["answers"]
+    if roster_completed is not None:
+        answers["Sprint 6"]["roster"] = {
+            "completed_stories": roster_completed,
+            "released_epics": None,
+            "achieved_goals": None,
+        }
+    if working_time_stories is not None:
+        answers["Sprint 6"]["working_time"] = {
+            "stories": working_time_stories,
+            "planning": 0,
+            "cardless": 0,
+            "total": sum(working_time_stories.values()) if working_time_stories else 0,
+        }
+    if session_stories is not None:
+        answers["Sprint 6"]["session_stories"] = {
+            k: {
+                "session_minutes": 0,
+                "minutes_by_role": {},
+                "model_minutes": v,
+                "input_tokens": 0,
+                "output_tokens": 0,
+            }
+            for k, v in session_stories.items()
+        }
+    if session_epics is not None:
+        answers["Sprint 6"]["session_epics"] = {
+            k: {
+                "session_minutes": v.get("session_minutes", 0),
+                "minutes_by_role": {},
+                "model_minutes": v.get("model_minutes", 0),
+                "input_tokens": 0,
+                "output_tokens": 0,
+            }
+            for k, v in session_epics.items()
+        }
+    dh_path.write_text(json.dumps(dh))
+    return tag, pkg_dir
+
+
+def _row_time_cell(html, card_number):
+    """Extract the time cell text from a story row by card number."""
+    pattern = (
+        rf'sprint-metrics<span class="num meta">#{card_number}</span>'
+        r'.*?class="story-row__time num">([^<]+)<'
+    )
+    match = re.search(pattern, html, re.DOTALL)
+    assert match, f"time cell for card #{card_number} not found"
+    return match.group(1)
+
+
+def test_story_time_cell_shows_working_and_model_time():
+    """AC1: a delivered story's row shows '<working> · <model> min model'."""
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6_with_times(
+        roster_completed=[
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ],
+        working_time_stories={"sprint-metrics#127": 51},
+        session_stories={"sprint-metrics#127": {"model_minutes": 20}},
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        cell = _row_time_cell(html, 127)
+        assert cell == "51 min · 20 min model", (
+            f"story 127 time cell: {cell!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_epic_heading_shows_worked_and_model_time():
+    """AC2: an epic's heading shows '<worked> worked, <model> model' beside
+    the done count."""
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6_with_times(
+        roster_completed=[
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ],
+        session_epics={
+            "sprint-metrics#123": {"session_minutes": 128, "model_minutes": 40}
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The epic heading for #123 should contain the time display
+        pattern = (
+            r'epic-group__head[^>]*>\s*'
+            r'<h3[^>]*>Split crew_performance\.py into seven modules</h3>\s*'
+            r'<span class="meta num">(.*?)</span>'
+        )
+        match = re.search(pattern, html, re.DOTALL)
+        assert match, "epic #123 heading not found"
+        heading = match.group(1)
+        assert "2 h 8 min worked, 40 min model" in heading, (
+            f"epic #123 heading: {heading!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_delivered_stories_no_time_data_read_no_time_recorded():
+    """AC3: when the answer carries no working_time, session_stories or
+    session_epics, each delivered row reads 'no time recorded' and the epic
+    headings show no worked or model time."""
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6_with_times(
+        roster_completed=[
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Each delivered row reads 'no time recorded'
+        for num in (125, 126, 127, 128, 133):
+            cell = _row_time_cell(html, num)
+            assert cell == "no time recorded", (
+                f"story {num} time cell: {cell!r}"
+            )
+        # The epic headings show no worked or model time
+        pattern = (
+            r'epic-group__head[^>]*>\s*'
+            r'<h3[^>]*>Split crew_performance\.py into seven modules</h3>\s*'
+            r'<span class="meta num">(.*?)</span>'
+        )
+        match = re.search(pattern, html, re.DOTALL)
+        assert match, "epic #123 heading not found"
+        heading = match.group(1)
+        assert "worked" not in heading, (
+            f"epic #123 heading should not show worked time: {heading!r}"
+        )
+        assert "model" not in heading, (
+            f"epic #123 heading should not show model time: {heading!r}"
+        )
+        # Neither a dash nor a 0 appears anywhere in the section as a time
+        for num in (125, 126, 127, 128, 133):
+            cell = _row_time_cell(html, num)
+            assert "–" not in cell, f"story {num} time cell has a dash: {cell!r}"
+            assert not cell.startswith("0"), (
+                f"story {num} time cell starts with 0: {cell!r}"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_undelivered_stories_time_cell_shows_state():
+    """AC4: an undelivered story's time cell says 'not delivered' while open,
+    'never built' when closed as not planned."""
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6_with_times(
+        roster_completed=[
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # Stories 129, 131, 132, 136 are in the sprint and open (not delivered)
+        for num in (129, 131, 132, 136):
+            cell = _row_time_cell(html, num)
+            assert cell == "not delivered", (
+                f"story {num} time cell: {cell!r}"
+            )
+        # Story 130 was closed as not planned
+        cell_130 = _row_time_cell(html, 130)
+        assert cell_130 == "never built", (
+            f"story 130 time cell: {cell_130!r}"
+        )
+        # The five delivered rows never read either phrase
+        for num in (125, 126, 127, 128, 133):
+            cell = _row_time_cell(html, num)
+            assert "not delivered" not in cell, (
+                f"delivered story {num} should not read 'not delivered': {cell!r}"
+            )
+            assert "never built" not in cell, (
+                f"delivered story {num} should not read 'never built': {cell!r}"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_section_card_head_carries_subtitle():
+    """AC5: the section's card head shows the title and the subtitle."""
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6_with_times(
+        roster_completed=[
+            "sprint-metrics#125",
+            "sprint-metrics#126",
+            "sprint-metrics#127",
+            "sprint-metrics#128",
+            "sprint-metrics#133",
+        ],
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The card head should show both the title and the subtitle
+        pattern = (
+            r'<div class="card__head">\s*'
+            r'<h2 id="split-h">What got done, story by story</h2>\s*'
+            r'<span class="meta">by epic · time worked and model time per story</span>\s*'
+            r'</div>'
+        )
+        assert re.search(pattern, html, re.DOTALL), (
+            "card head does not show the title and subtitle"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
