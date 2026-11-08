@@ -271,6 +271,7 @@ def _render_pages(pkg: Path) -> dict:
             "roster_released_epics": released_epics,
             "roster_achieved_goals": achieved_goals,
             "model_time_split": _build_model_time_split(metrics),
+            "idle_time": _build_idle_time(metrics),
             "current_view": "sprint",
             "timezone_label": timezone_label,
         }
@@ -663,6 +664,36 @@ def _build_model_time_split(metrics: dict):
         "building_minutes": building,
         "planning_percent": int(round(planning / total * 100)),
         "building_percent": int(round(building / total * 100)),
+    }
+
+
+def _build_idle_time(metrics: dict):
+    """Read the sprint-metrics' idle figure null-tolerantly.
+
+    Returns None when the field is absent or null, or when idle_minutes is
+    null (the pinned 3.0.0 package carries it as null for every sprint).
+    Otherwise returns a dict with idle_minutes, sprint_total_minutes and the
+    idle share of the sprint's total time as a percentage.
+    """
+    idle = metrics.get("idle")
+    if not isinstance(idle, dict):
+        return None
+    idle_minutes = idle.get("idle_minutes")
+    if idle_minutes is None:
+        return None
+    sprint_total = idle.get("sprint_duration_minutes")
+    if sprint_total is None:
+        return None
+    if sprint_total == 0:
+        return {
+            "idle_minutes": idle_minutes,
+            "sprint_total_minutes": sprint_total,
+            "idle_percent": 0,
+        }
+    return {
+        "idle_minutes": idle_minutes,
+        "sprint_total_minutes": sprint_total,
+        "idle_percent": int(round(idle_minutes / sprint_total * 100)),
     }
 
 
