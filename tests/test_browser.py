@@ -12489,3 +12489,148 @@ def test_all_measure_terms_explained_in_orientation_block():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_timeline_step_started_ended_names_step():
+    """AC1: step_started and step_ended events name the step, not bare 'Step started'/'Step ended'."""
+    tag = "delivery-history-TEST"
+    pkg_dir = _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 300, "repo": "crew-presentation"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+                "text": "A story with step events.",
+            }
+        ],
+        cards=[
+            {
+                "number": 300,
+                "repo": "crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "Step events story",
+            }
+        ],
+    )
+    events = [
+        {
+            "kind": "step_started",
+            "at": "2026-10-01T10:00:00+00:00",
+            "card": {"number": 300, "repo": "crew-presentation"},
+            "role": "QA Engineer",
+            "step": "qa",
+        },
+        {
+            "kind": "step_ended",
+            "at": "2026-10-01T10:30:00+00:00",
+            "card": {"number": 300, "repo": "crew-presentation"},
+            "role": "QA Engineer",
+            "step": "qa",
+        },
+    ]
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(exist_ok=True)
+    (events_dir / "2026-10-01.json").write_text(json.dumps({"events": events}))
+    index = json.loads((pkg_dir / "delivery-history.json").read_text())
+    index["periods"] = [
+        {
+            "sprint": "Sprint 6",
+            "start": "2026-10-01",
+            "end": "2026-10-01",
+            "file": "events/2026-10-01.json",
+            "events": 2,
+        }
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "crew-presentation-300.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        timeline_texts = re.findall(
+            r'<span class="timeline__text">(.*?)</span>', html, re.DOTALL
+        )
+        for text in timeline_texts:
+            assert text.strip() != "Step started", (
+                f"bare 'Step started' found in timeline: {text!r}"
+            )
+            assert text.strip() != "Step ended", (
+                f"bare 'Step ended' found in timeline: {text!r}"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_journey_timeline_step_started_ended_unknown_step():
+    """AC2: a step not in STEP_DISPLAY still never shows bare 'Step started'/'Step ended'."""
+    tag = "delivery-history-TEST"
+    pkg_dir = _make_package_with_stories(
+        tag,
+        stories=[
+            {
+                "card": {"number": 301, "repo": "crew-presentation"},
+                "blocks": ["landed"],
+                "crew_fixes": [],
+                "delivered": True,
+                "text": "A story with an unknown step.",
+            }
+        ],
+        cards=[
+            {
+                "number": 301,
+                "repo": "crew-presentation",
+                "sprint": "Sprint 6",
+                "title": "Unknown step story",
+            }
+        ],
+    )
+    events = [
+        {
+            "kind": "step_started",
+            "at": "2026-10-01T10:00:00+00:00",
+            "card": {"number": 301, "repo": "crew-presentation"},
+            "role": "QA Engineer",
+            "step": "brand_new_step",
+        },
+    ]
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(exist_ok=True)
+    (events_dir / "2026-10-01.json").write_text(json.dumps({"events": events}))
+    index = json.loads((pkg_dir / "delivery-history.json").read_text())
+    index["periods"] = [
+        {
+            "sprint": "Sprint 6",
+            "start": "2026-10-01",
+            "end": "2026-10-01",
+            "file": "events/2026-10-01.json",
+            "events": 1,
+        }
+    ]
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        journey_file = BUILD_DIR / "stories" / "crew-presentation-301.html"
+        assert journey_file.is_file(), f"journey page not found at {journey_file}"
+        html = journey_file.read_text()
+        timeline_texts = re.findall(
+            r'<span class="timeline__text">(.*?)</span>', html, re.DOTALL
+        )
+        for text in timeline_texts:
+            assert text.strip() != "Step started", (
+                f"bare 'Step started' found in timeline: {text!r}"
+            )
+            assert text.strip() != "Step ended", (
+                f"bare 'Step ended' found in timeline: {text!r}"
+            )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
