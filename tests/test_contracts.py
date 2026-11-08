@@ -97,15 +97,16 @@ def test_build_check_exits_zero():
         assert 'class="attempt-block' in page, "attempt blocks not found"
     else:
         # AC1: the package carries no analysis, so the page shows the sprint's
-        # stories grouped under their epics, and no attempt elements.
+        # stories grouped under their epics, with a legend and attempt blocks
+        # read from the sprint's events, but no attempt rows from the analysis
+        # path.
         assert "What got done, story by story" in page, (
             "story-by-story heading not found in sprint-overview page"
         )
-        assert 'class="attempt-legend"' not in page, (
-            "attempt legend found without analysis"
+        assert 'class="attempt-legend"' in page, (
+            "attempt legend not found without analysis"
         )
         assert 'class="attempt-row"' not in page, "attempt rows found without analysis"
-        assert 'class="attempt-block' not in page, "attempt blocks found without analysis"
 
     # CSS: striped-blocked gradient present, no placeholder marker
     css = (build_dir / "css" / "site.css").read_text()
