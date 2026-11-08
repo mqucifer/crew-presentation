@@ -327,13 +327,30 @@ def _render_pages(pkg: Path) -> dict:
             "metrics": metrics,
             "stats": {
                 "throughput": _stat_value(metrics.get("throughput")),
+                "points_sub": _points_sub(
+                    metrics.get("points_delivered")
+                ),
                 "first_try": _first_try_stat(
                     metrics.get("first_attempt_numerator"),
                     metrics.get("first_attempt_denominator"),
                 ),
-                "points_delivered": _stat_value(metrics.get("points_delivered")),
+                "first_try_rate": _rate_percent(
+                    metrics.get("first_attempt_rate_percent")
+                ),
+                "cycle_time": _format_minutes(
+                    metrics.get("cycle_time_minutes")
+                ),
+                "lead_time": _format_minutes(
+                    metrics.get("lead_time_minutes")
+                ),
+                "days_blocked": _stat_value(
+                    metrics.get("blocked_aging_days")
+                ),
+                "superseded_sub": _superseded_sub(
+                    metrics.get("superseded_count"),
+                    metrics.get("superseded_points"),
+                ),
             },
-            "cycle_time": _format_minutes(metrics.get("cycle_time_minutes")),
             "sprint_slug": slug,
             "stories": stories,
             "epic_groups": epic_groups,
@@ -917,6 +934,37 @@ def _first_try_stat(numerator, denominator) -> str:
     if numerator is None or denominator is None:
         return "—"
     return f"{numerator} of {denominator}"
+
+
+def _points_sub(points) -> str:
+    """The sub-line beneath 'Stories delivered': '18 points' or the missing mark."""
+    if points is None:
+        return "—"
+    return f"{points} points"
+
+
+def _rate_percent(rate) -> str:
+    """The first-try rate as a percent string: '50%' or the missing mark."""
+    if rate is None:
+        return "—"
+    if isinstance(rate, float) and rate == int(rate):
+        return f"{int(rate)}%"
+    return f"{rate}%"
+
+
+def _superseded_sub(count, points) -> str:
+    """The sub-line beneath 'Days blocked': superseded story count and points.
+
+    Singular/plural handling: '1 story superseded, 3 points' vs
+    '2 stories superseded, 5 points'. A null count or points renders the
+    missing mark, never a zero.
+    """
+    if count is None or points is None:
+        return "—"
+    if count == 0:
+        return "No stories superseded recorded"
+    noun = "story" if count == 1 else "stories"
+    return f"{count} {noun} superseded, {points} points"
 
 
 def _format_minutes(total_minutes) -> str:

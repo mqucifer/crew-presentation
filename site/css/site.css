@@ -28,10 +28,16 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Stats row: four equal columns on desktop so all four totals sit in one row.
+/* Stats row: five equal columns on desktop so all five totals sit in one row.
    The phone media query below overrides this to two columns. */
 .stats {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
+}
+
+/* Sub-line beneath a stat value: the unit word or the points count. */
+.stat__sub {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
 }
 
 /* Roster: what got done across card kinds */

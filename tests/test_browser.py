@@ -609,7 +609,7 @@ def test_view_nav_aria_current():
 
 
 def test_cycle_time_is_fourth_stat():
-    """AC7: '1 h 42 min' is the third stat, label 'cycle time', after throughput/first-attempt."""
+    """AC1: '1 h 42 min' is the third stat, label 'Start to delivered', after throughput/first-attempt."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -638,13 +638,13 @@ def test_cycle_time_is_fourth_stat():
         labels = re.findall(
             r'<span class="stat__label">(.*?)</span>', stats, re.DOTALL
         )
-        # The third stat (index 2) should be cycle time
+        # The third stat (index 2) should be cycle time (Start to delivered)
         assert len(values) >= 3, f"expected at least 3 stats, got {len(values)}"
         assert values[2].strip() == "1 h 42 min", (
             f"3rd stat value is {values[2]!r}, expected '1 h 42 min'"
         )
-        assert labels[2].strip() == "cycle time", (
-            f"3rd stat label is {labels[2].strip()!r}, expected 'cycle time'"
+        assert labels[2].strip() == "Start to delivered", (
+            f"3rd stat label is {labels[2].strip()!r}, expected 'Start to delivered'"
         )
         # Verify the two stats before it
         assert "22" in values[0], f"1st stat is {values[0]!r}, expected throughput"
@@ -2250,7 +2250,7 @@ def test_stat_values_match_package_data():
                 () => {
                     const labels = document.querySelectorAll('.stat__label');
                     for (const label of labels) {
-                        if (label.textContent.trim() === 'stories delivered') {
+                        if (label.textContent.trim() === 'Stories delivered') {
                             const stat = label.closest('.stat');
                             return stat.querySelector('.stat__value').textContent.trim();
                         }
@@ -2263,12 +2263,12 @@ def test_stat_values_match_package_data():
                 f"expected {answers['throughput']!r} from package"
             )
 
-            # Exact text for first-attempt pass
+            # Exact text for landed first try
             first_attempt_text = page.evaluate("""
                 () => {
                     const labels = document.querySelectorAll('.stat__label');
                     for (const label of labels) {
-                        if (label.textContent.trim() === 'first-attempt pass') {
+                        if (label.textContent.trim() === 'Landed first try') {
                             const stat = label.closest('.stat');
                             return stat.querySelector('.stat__value').textContent.trim();
                         }
@@ -2281,7 +2281,7 @@ def test_stat_values_match_package_data():
                 f"{answers['first_attempt_denominator']}"
             )
             assert first_attempt_text == expected_fa, (
-                f"first-attempt pass shows {first_attempt_text!r}, expected {expected_fa!r}"
+                f"landed first try shows {first_attempt_text!r}, expected {expected_fa!r}"
             )
 
             # Design-system CSS was served from local file: the sandbox has no
@@ -3159,10 +3159,10 @@ def test_cycle_time_stat_formats_hours_and_minutes():
             for block in re.findall(
                 r'<div class="stat">(.*?)</div>', stats, re.DOTALL
             ):
-                if '<span class="stat__label">cycle time</span>' in block:
+                if '<span class="stat__label">Start to delivered</span>' in block:
                     cycle_stat = block
                     break
-            assert cycle_stat is not None, "no stat labelled 'cycle time' found"
+            assert cycle_stat is not None, "no stat labelled 'Start to delivered' found"
             m = re.search(
                 r'<span class="stat__value([^"]*)">(.*?)</span>',
                 cycle_stat,
@@ -5857,7 +5857,7 @@ def _read_cycle_time(html: str) -> tuple[str | None, str | None]:
     stat_text = None
     stats = _stats_section(html)
     for block in re.findall(r'<div class="stat">(.*?)</div>', stats, re.DOTALL):
-        if '<span class="stat__label">cycle time</span>' in block:
+        if '<span class="stat__label">Start to delivered</span>' in block:
             m = re.search(
                 r'<span class="stat__value[^"]*">(.*?)</span>', block, re.DOTALL
             )
@@ -6407,7 +6407,7 @@ def test_non_first_try_count_mismatch_names_both_values():
                 () => {
                     const labels = document.querySelectorAll('.stat__label');
                     for (const label of labels) {
-                        if (label.textContent.trim() === 'first-attempt pass') {
+                        if (label.textContent.trim() === 'Landed first try') {
                             const stat = label.closest('.stat');
                             return stat.querySelector('.stat__value').textContent.trim();
                         }
@@ -6490,7 +6490,7 @@ def test_non_first_try_count_all_first_try():
                 () => {
                     const labels = document.querySelectorAll('.stat__label');
                     for (const label of labels) {
-                        if (label.textContent.trim() === 'first-attempt pass') {
+                        if (label.textContent.trim() === 'Landed first try') {
                             const stat = label.closest('.stat');
                             return stat.querySelector('.stat__value').textContent.trim();
                         }
@@ -6851,8 +6851,8 @@ def test_stat_values_not_horizontally_clipped_at_phone_width():
 
 
 def test_stats_single_row_at_desktop_width():
-    """AC3: at a 1440px viewport all four .stat elements share the same top offset,
-    i.e. they sit in a single row, unchanged from the desktop layout."""
+    """AC3: at a 1440px viewport all five .stat elements share the same top offset,
+    i.e. they sit in a single row."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -6888,7 +6888,7 @@ def test_stats_single_row_at_desktop_width():
                 ).map((el) => el.getBoundingClientRect().top)
                 """
             )
-            assert len(tops) == 4, f"expected 4 .stat elements, got {len(tops)}"
+            assert len(tops) == 5, f"expected 5 .stat elements, got {len(tops)}"
             assert len(set(tops)) == 1, (
                 f"at 1440px the .stat top offsets differ {tops}; the stats are "
                 f"not in a single row"
@@ -6900,7 +6900,7 @@ def test_stats_single_row_at_desktop_width():
 
 
 def test_stat_values_and_order_at_phone_width():
-    """AC4: at a 375px viewport the four .stat__value elements keep their document
+    """AC4: at a 375px viewport the five .stat__value elements keep their document
     order and show the same values as at 1440px for the same package data. The
     reflow changes the layout, not the values or their order.
 
@@ -6918,6 +6918,10 @@ def test_stat_values_and_order_at_phone_width():
             "first_attempt_denominator": 22,
             "escalation_count": 1,
             "cycle_time_minutes": 720,
+            "lead_time_minutes": 1500,
+            "blocked_aging_days": 1,
+            "superseded_count": 1,
+            "superseded_points": 3,
         }
     }
     _make_fake_package(tag, ["Sprint 6"], metrics=metrics)
@@ -6947,17 +6951,16 @@ def test_stat_values_and_order_at_phone_width():
 
         phone = read_values({"width": 375, "height": 812})
         desktop = read_values({"width": 1440, "height": 900})
-        assert len(phone) == 4, f"expected 4 .stat__value at 375px, got {phone}"
-        assert len(desktop) == 4, f"expected 4 .stat__value at 1440px, got {desktop}"
+        assert len(phone) == 5, f"expected 5 .stat__value at 375px, got {phone}"
+        assert len(desktop) == 5, f"expected 5 .stat__value at 1440px, got {desktop}"
         assert phone == desktop, (
-            f"the four stat values differ between 375px {phone} and 1440px "
+            f"the five stat values differ between 375px {phone} and 1440px "
             f"{desktop}; reflow must not change the values or their order"
         )
-        # The two fixed endpoints (first and last) pin the order and the
-        # throughput/points values the criterion names.
+        # The two fixed endpoints (first and last) pin the order.
         assert phone[0] == "22", f"first stat value is {phone[0]!r}, expected '22'"
-        assert phone[3] == "63", (
-            f"last stat value is {phone[3]!r}, expected '63'"
+        assert phone[4] == "1", (
+            f"last stat value is {phone[4]!r}, expected '1'"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -7007,7 +7010,7 @@ def test_stat_values_at_least_text_xl_at_phone_width():
                 )
                 """
             )
-            assert len(sizes) == 4, f"expected 4 .stat__value, got {len(sizes)}"
+            assert len(sizes) == 5, f"expected 5 .stat__value, got {len(sizes)}"
             under = [
                 (s, i)
                 for i, s in enumerate(sizes)
@@ -7024,8 +7027,8 @@ def test_stat_values_at_least_text_xl_at_phone_width():
 
 
 def test_first_stat_label_visible_under_value_at_phone_width():
-    """AC6: at a 375px viewport the .stat__label following the .stat__value whose
-    text is '22' reads exactly 'stories delivered' and is not horizontally clipped
+    """AC6: at a 375px viewport the .stat__label preceding the .stat__value whose
+    text is '22' reads exactly 'Stories delivered' and is not horizontally clipped
     (scrollWidth == clientWidth)."""
     tag = "delivery-history-TEST"
     _make_fake_package(
@@ -7064,9 +7067,9 @@ def test_first_stat_label_visible_under_value_at_phone_width():
                         if (value.textContent.trim() !== '22') {
                             continue;
                         }
-                        const label = value.nextElementSibling;
+                        const label = value.previousElementSibling;
                         if (!label || !label.classList.contains('stat__label')) {
-                            return { error: 'no .stat__label follows the 22 value' };
+                            return { error: 'no .stat__label precedes the 22 value' };
                         }
                         return {
                             text: label.textContent.trim(),
@@ -7078,12 +7081,12 @@ def test_first_stat_label_visible_under_value_at_phone_width():
                 """
             )
             assert "error" not in result, f"AC6 lookup failed: {result}"
-            assert result["text"] == "stories delivered", (
-                f"the label under the '22' value is {result['text']!r}, expected "
-                f"'stories delivered'"
+            assert result["text"] == "Stories delivered", (
+                f"the label above the '22' value is {result['text']!r}, expected "
+                f"'Stories delivered'"
             )
             assert result["clipped"] is False, (
-                f"the 'stories delivered' label is horizontally clipped at 375px "
+                f"the 'Stories delivered' label is horizontally clipped at 375px "
                 f"(scrollWidth > clientWidth)"
             )
             browser.close()
@@ -7093,9 +7096,8 @@ def test_first_stat_label_visible_under_value_at_phone_width():
 
 
 def test_stats_single_row_height_at_desktop_width():
-    """AC7: at a 1440px viewport all four .stat elements share the same top offset
-    and the .stats element's height equals a single .stat's height — a single row,
-    unchanged from the desktop layout."""
+    """AC7: at a 1440px viewport all five .stat elements share the same top offset
+    and the .stats element's height equals a single .stat's height — a single row."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -7131,7 +7133,7 @@ def test_stats_single_row_height_at_desktop_width():
                 ).map((el) => el.getBoundingClientRect().top)
                 """
             )
-            assert len(tops) == 4, f"expected 4 .stat elements, got {len(tops)}"
+            assert len(tops) == 5, f"expected 5 .stat elements, got {len(tops)}"
             assert len(set(tops)) == 1, (
                 f"at 1440px the .stat top offsets differ {tops}; not a single row"
             )
@@ -8979,23 +8981,23 @@ def test_zero_sprint_metrics_render_zero_and_fraction():
         _build()
         html = (BUILD_DIR / "sprint-33.html").read_text()
         stats = _stats_section(html)
-        # '0' immediately before 'stories delivered'
+        # '0' immediately after 'Stories delivered'
         throughput_match = re.search(
-            r'<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>\s*<span class="stat__label">stories delivered</span>',
+            r'<span class="stat__label">Stories delivered</span>\s*<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>',
             stats,
             re.DOTALL,
         )
-        assert throughput_match, "no 'stories delivered' stat found"
+        assert throughput_match, "no 'Stories delivered' stat found"
         assert throughput_match.group(1) == "0", (
             f"throughput stat is {throughput_match.group(1)!r}, expected '0'"
         )
-        # '0 of 4' immediately before 'first-attempt pass'
+        # '0 of 4' immediately after 'Landed first try'
         first_try_match = re.search(
-            r'<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>\s*<span class="stat__label">first-attempt pass</span>',
+            r'<span class="stat__label">Landed first try</span>\s*<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>',
             stats,
             re.DOTALL,
         )
-        assert first_try_match, "no 'first-attempt pass' stat found"
+        assert first_try_match, "no 'Landed first try' stat found"
         assert first_try_match.group(1) == "0 of 4", (
             f"first-try stat is {first_try_match.group(1)!r}, expected '0 of 4'"
         )
@@ -9174,6 +9176,11 @@ def test_null_metrics_cycle_time_renders_em_dash_like_other_stats():
                 "escalation_count": None,
                 "points_delivered": None,
                 "cycle_time_minutes": None,
+                "lead_time_minutes": None,
+                "blocked_aging_days": None,
+                "superseded_count": None,
+                "superseded_points": None,
+                "first_attempt_rate_percent": None,
             }
         },
     )
@@ -9186,8 +9193,8 @@ def test_null_metrics_cycle_time_renders_em_dash_like_other_stats():
         values = re.findall(
             r'<span class="stat__value[^"]*">(.*?)</span>', stats, re.DOTALL
         )
-        assert len(values) == 4, (
-            f"expected 4 stat values, got {len(values)}: {values}"
+        assert len(values) == 5, (
+            f"expected 5 stat values, got {len(values)}: {values}"
         )
         for i, value in enumerate(values, 1):
             assert value.strip() == "\u2014", (
@@ -9200,8 +9207,8 @@ def test_null_metrics_cycle_time_renders_em_dash_like_other_stats():
 
 def test_stats_grid_four_equal_columns_at_1280px():
     """AC1: at a 1280px viewport the .stats element's computed
-    grid-template-columns resolves to four equal fractional tracks (not five),
-    and the fourth .stat element's right edge coincides with the .stats
+    grid-template-columns resolves to five equal fractional tracks,
+    and the fifth .stat element's right edge coincides with the .stats
     element's right content edge, leaving no empty grid track to its right."""
     tag = "delivery-history-TEST"
     _make_fake_package(
@@ -9232,31 +9239,31 @@ def test_stats_grid_four_equal_columns_at_1280px():
             page.goto(f"file://{page_path}")
             page.wait_for_selector(".stats")
 
-            # The computed grid-template-columns must be four equal 1fr tracks.
+            # The computed grid-template-columns must be five equal 1fr tracks.
             grid_cols = page.evaluate(
                 "getComputedStyle(document.querySelector('.stats')).gridTemplateColumns"
             )
-            # Browsers report repeat(4, 1fr) as four space-separated lengths.
+            # Browsers report repeat(5, 1fr) as five space-separated lengths.
             tracks = grid_cols.split(" ")
-            assert len(tracks) == 4, (
+            assert len(tracks) == 5, (
                 f"at 1280px .stats grid-template-columns has {len(tracks)} tracks "
-                f"({grid_cols!r}); expected 4"
+                f"({grid_cols!r}); expected 5"
             )
             # All tracks must be equal (the same length).
             assert len(set(tracks)) == 1, (
                 f"at 1280px .stats tracks are not equal: {tracks}"
             )
 
-            # The fourth .stat's right edge must coincide with .stats' right
-            # content edge — no empty fifth track to the right.
-            fourth_right = page.evaluate(
-                "document.querySelectorAll('.stat')[3].getBoundingClientRect().right"
+            # The fifth .stat's right edge must coincide with .stats' right
+            # content edge — no empty track to the right.
+            fifth_right = page.evaluate(
+                "document.querySelectorAll('.stat')[4].getBoundingClientRect().right"
             )
             stats_right = page.evaluate(
                 "document.querySelector('.stats').getBoundingClientRect().right"
             )
-            assert abs(fourth_right - stats_right) < 1, (
-                f"at 1280px the fourth .stat right edge {fourth_right} does not "
+            assert abs(fifth_right - stats_right) < 1, (
+                f"at 1280px the fifth .stat right edge {fifth_right} does not "
                 f"coincide with the .stats right edge {stats_right}; an empty "
                 f"grid track remains to the right"
             )
@@ -9268,9 +9275,8 @@ def test_stats_grid_four_equal_columns_at_1280px():
 
 def test_stats_grid_two_columns_at_767px():
     """AC2: at a 767px viewport the .stats element's computed
-    grid-template-columns is repeat(2, minmax(0, 1fr)) and all four .stat
-    elements are visible in two rows of two, unchanged from current phone
-    behaviour."""
+    grid-template-columns is repeat(2, minmax(0, 1fr)) and all five .stat
+    elements are visible in two columns, wrapped to three rows."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -9313,7 +9319,7 @@ def test_stats_grid_two_columns_at_767px():
                 f"at 767px .stats tracks are not equal: {tracks}"
             )
 
-            # All four .stat elements must be visible in two rows of two.
+            # All five .stat elements must be visible.
             stats = page.evaluate(
                 """
                 () => Array.from(document.querySelectorAll('.stat')).map(
@@ -9324,14 +9330,15 @@ def test_stats_grid_two_columns_at_767px():
                 )
                 """
             )
-            assert len(stats) == 4, (
-                f"expected 4 .stat elements, got {len(stats)}"
+            assert len(stats) == 5, (
+                f"expected 5 .stat elements, got {len(stats)}"
             )
             for i, s in enumerate(stats):
                 assert s["visible"], (
                     f".stat {i + 1} is not visible at 767px"
                 )
-            # Two rows: the first two share a top, the last two share another.
+            # Three rows: the first two share a top, the next two share another,
+            # and the fifth is in its own row.
             assert stats[0]["top"] == stats[1]["top"], (
                 f"at 767px stats 0 and 1 do not share a row: "
                 f"{stats[0]['top']} vs {stats[1]['top']}"
@@ -9341,8 +9348,8 @@ def test_stats_grid_two_columns_at_767px():
                 f"{stats[2]['top']} vs {stats[3]['top']}"
             )
             assert stats[0]["top"] != stats[2]["top"], (
-                f"at 767px all four .stat elements share the same row; "
-                f"expected two rows"
+                f"at 767px stats 0 and 2 share the same row; "
+                f"expected different rows"
             )
             browser.close()
     finally:
@@ -10187,7 +10194,7 @@ def test_announced_3_0_0_mock_shows_story_rows():
         # AC5: the answer's throughput (5) and the section's done counts disagree;
         # both are shown as-is. The stat row still reads the answer's throughput.
         assert ">5</span>" in html, "stat row should read the answer's throughput of 5"
-        assert "stories delivered" in html, "stat label 'stories delivered' not found"
+        assert "Stories delivered" in html, "stat label 'Stories delivered' not found"
         assert "4 of 7 stories done" in html, "epic 123 done count not found"
         assert "1 of 3 stories done" in html, "epic 124 done count not found"
         # AC4: both epics have no Goal parent, so each reads 'not part of a Goal'.
