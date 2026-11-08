@@ -84,6 +84,76 @@ def _check_schema_version(manifest: dict) -> None:
         sys.exit(1)
 
 
+def _validate_events_file(data, events_schema, file_label: str) -> None:
+    """Validate an events file, using the schema's discriminator to pick the right oneOf branch.
+
+    Without this, every event is checked against every oneOf branch (18× per
+    event on the pinned package), which is the dominant cost of validation.
+    """
+    items_schema = events_schema.get("properties", {}).get("events", {}).get("items", {})
+    discriminator = items_schema.get("discriminator")
+
+    if not discriminator:
+        # No discriminator: fall back to full oneOf validation.
+        _validate_against_schema(data, events_schema, file_label)
+        return
+
+    kind_property = discriminator.get("propertyName", "kind")
+    kind_to_ref = discriminator.get("mapping", {})
+
+    # Build a structural schema: same top-level constraints, but events.items
+    # is permissive so the oneOf is not evaluated here.
+    # Carry over array-level keywords (minItems, uniqueItems, etc.) from the
+    # original events property so they are not silently dropped.
+    orig_events = events_schema.get("properties", {}).get("events", {})
+    structural_schema = {
+        **events_schema,
+        "properties": {
+            **events_schema.get("properties", {}),
+            "events": {**orig_events, "items": {"type": "object"}, "title": "Events"},
+        },
+    }
+
+    errors: list[tuple[list, str]] = []
+
+    # Pass 1: top-level structure (required fields, types, events is a list of objects).
+    structural_validator = jsonschema.Draft202012Validator(structural_schema)
+    for err in structural_validator.iter_errors(data):
+        errors.append((list(err.path), err.message))
+
+    # Pass 2: each event against its specific oneOf branch, chosen by kind.
+    events = data.get("events")
+    if isinstance(events, list):
+        branch_validators = {}
+        for kind, ref in kind_to_ref.items():
+            branch_schema = {
+                "$defs": events_schema.get("$defs", {}),
+                "$ref": ref,
+            }
+            branch_validators[kind] = jsonschema.Draft202012Validator(branch_schema)
+
+        for i, event in enumerate(events):
+            if not isinstance(event, dict):
+                continue  # already caught by structural validation
+            kind = event.get(kind_property)
+            if kind not in branch_validators:
+                errors.append((["events", i, kind_property], f"unrecognized kind {kind!r}"))
+                continue
+            for err in branch_validators[kind].iter_errors(event):
+                errors.append((["events", i] + list(err.path), err.message))
+
+    if errors:
+        errors.sort(key=lambda e: e[0])
+        messages = "; ".join(
+            f"{'.'.join(map(str, path)) or '<root>'}: {msg}" for path, msg in errors[:5]
+        )
+        print(
+            f"ERROR: {file_label} does not conform to its schema: {messages}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def _validate_package(pkg: Path) -> None:
     """Validate every data file in the package against the schema it carries."""
     manifest = _load_json(pkg / "manifest.json")
@@ -102,7 +172,7 @@ def _validate_package(pkg: Path) -> None:
     if events_dir.is_dir():
         for events_file in sorted(events_dir.glob("*.json")):
             data = _load_json(events_file)
-            _validate_against_schema(data, events_schema, f"events/{events_file.name}")
+            _validate_events_file(data, events_schema, f"events/{events_file.name}")
 
 
 def _render_pages(pkg: Path) -> dict:
@@ -850,21 +920,28 @@ def _first_try_stat(numerator, denominator) -> str:
 
 
 def _format_minutes(total_minutes) -> str:
-    """A metric's minutes as hours and minutes: '1 hr 29 min', '1 hr', '0 min'.
+    """A metric's minutes in the canonical vocabulary: '10 h 55 min', '1 d 1 h'.
 
-    Zero units are omitted and days are never shown (R2), so a sprint that
-    ran for a few hundred minutes reads in the reader's terms, not as
-    '0 days'. A missing value (JSON null) renders '—', the same mark
+    Below a day: hours and minutes, zero units dropped.
+    At a day and up: days and hours, minutes dropped, zero units dropped.
+    A missing value (JSON null) renders '—', the same mark
     _stat_value uses for other missing stats.
     """
     if total_minutes is None:
         return "—"
-    hours, minutes = divmod(int(total_minutes), 60)
+    total_minutes = int(total_minutes)
+    if total_minutes < 60:
+        return f"{total_minutes} min"
+    if total_minutes < 1440:
+        hours, minutes = divmod(total_minutes, 60)
+        if minutes == 0:
+            return f"{hours} h"
+        return f"{hours} h {minutes} min"
+    days, remainder = divmod(total_minutes, 1440)
+    hours = remainder // 60
     if hours == 0:
-        return f"{minutes} min"
-    if minutes == 0:
-        return f"{hours} hr"
-    return f"{hours} hr {minutes} min"
+        return f"{days} d"
+    return f"{days} d {hours} h"
 
 
 def _format_changed_value(measure: str, value) -> str:
@@ -893,20 +970,15 @@ def _format_changed_value(measure: str, value) -> str:
 def _format_metrics_value(measure: str, value) -> str:
     """Format a value for the metrics-derived 'What changed' fallback.
 
-    Time measures always show both hours and minutes (e.g. '0 hr 26 min');
-    first_attempt_rate_percent is shown with a '%' unit;
-    other measures are shown as their raw number.
+    Uses the same canonical vocabulary as the rest of the page:
+    time measures via _format_minutes, rates with '%', others as raw numbers.
     """
     if value is None:
-        return ""
+        return "—"
     if measure in ("cycle_time_minutes", "lead_time_minutes"):
-        total_minutes = round(value)
-        hours, minutes = divmod(total_minutes, 60)
-        return f"{hours} hr {minutes} min"
+        return _format_minutes(round(value))
     if measure in ("cycle_time_days", "lead_time_days"):
-        total_minutes = round(value * 24 * 60)
-        hours, minutes = divmod(total_minutes, 60)
-        return f"{hours} hr {minutes} min"
+        return _format_minutes(round(value * 24 * 60))
     if measure == "first_attempt_rate_percent":
         if isinstance(value, float) and value == int(value):
             return f"{int(value)}%"
