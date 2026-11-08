@@ -70,3 +70,14 @@ def test_entries_left_under_unreleased_from_before_the_fragments_break_no_rule()
         START, f"{START}\n\n## [Unreleased]\n\n### Fixed\n\n- An old-way fix\n", 1
     )
     assert changelog_problems(text, []) == []
+
+
+def test_fragment_298_names_attempts_status_and_happened():
+    """AC7: the fragment says a story row shows its attempt blocks, its status in
+    the board's own words with a tone, and a plain-words line of what happened."""
+    fragment = CHANGES / "298.added.md"
+    assert fragment.exists(), "changes/298.added.md not found"
+    text = fragment.read_text().lower()
+    assert "attempt" in text, "fragment does not mention attempt blocks"
+    assert "status" in text, "fragment does not mention status"
+    assert "plain-words" in text, "fragment does not mention plain-words line"
