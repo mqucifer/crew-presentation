@@ -11,9 +11,7 @@ builds its section here from them (towncrier, Keep a Changelog). Entries still u
 ### Added
 
 - The sprint page now lists every send-back of the sprint — which step sent it back, which step it went back to, why, and when — with the sprint's total count in the card head. (mqucifer/crew-presentation#297)
-- Each story on the sprint page now shows its attempt blocks (landed, missed,
-  blocked, crew fix merged) against the legend, its status in the board's own
-  words with a tone, and a plain-words line of what happened to it. (mqucifer/crew-presentation#298)
+- Each story on the sprint page now shows its attempt blocks (landed, missed, blocked, crew fix merged) against the legend, its status in the board's own words with a tone, and a plain-words line of what happened to it. (mqucifer/crew-presentation#298)
 - The sprint page now shows what was still open at the sprint's end: every story not done, with its state (waiting, blocked or refused) and how long it has been in that state. (mqucifer/crew-presentation#323)
 - The sprint page now states which timezone its times are in, from the package's own timezone field. (mqucifer/crew-presentation#324)
 - Every page now opens with a "What this is" explanation of what the crew is and what each page shows, before any measure. (mqucifer/crew-presentation#329)
