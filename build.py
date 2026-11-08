@@ -163,6 +163,7 @@ def _render_pages(pkg: Path) -> dict:
         numerator = metrics.get("first_attempt_numerator") or 0
 
         stories = []
+        epic_groups = []
         has_analysis = bool(analysis_stories)
         if has_analysis:
             for story in analysis_stories:
@@ -201,7 +202,7 @@ def _render_pages(pkg: Path) -> dict:
                     }
                 )
         else:
-            stories = _stories_from_roster(metrics, cards)
+            epic_groups = _epic_groups(cards, sprint["name"], metrics.get("roster"))
 
         analysis_changed = analysis_by_sprint.get(sprint["name"], {}).get(
             "changed", []
@@ -262,6 +263,7 @@ def _render_pages(pkg: Path) -> dict:
             "cycle_time": _format_minutes(metrics.get("cycle_time_minutes")),
             "sprint_slug": slug,
             "stories": stories,
+            "epic_groups": epic_groups,
             "has_analysis": has_analysis,
             "changed": changed,
             "decided": decided,
@@ -271,6 +273,7 @@ def _render_pages(pkg: Path) -> dict:
             "roster_released_epics": released_epics,
             "roster_achieved_goals": achieved_goals,
             "model_time_split": _build_model_time_split(metrics),
+            "idle_time": _build_idle_time(metrics),
             "current_view": "sprint",
             "timezone_label": timezone_label,
         }
@@ -411,49 +414,154 @@ def _timezone_label(tz: str) -> str:
     return tz
 
 
-def _stories_from_roster(metrics: dict, cards: list[dict]) -> list[dict]:
-    """Build the delivered-story list from the sprint-metrics' roster.
+def _status_tone(status) -> str:
+    """A board status's badge tone, in the design system's own words.
 
-    Used when the package carries no analysis: the list comes from
-    sprint_metrics.answers.<sprint>.roster.completed_stories, which
-    sprint-metrics computed. Each entry is a 'repo#number' reference;
-    the title is looked up from the card if one matches, otherwise the
-    row shows the reference without a title.
+    The board's columns map onto the design system's badge tones: Done is
+    done, the working columns are active, the blocked columns are blocked,
+    and everything that is waiting on someone is waiting. An empty status
+    reads as waiting.
     """
-    roster = metrics.get("roster")
-    if not isinstance(roster, dict):
-        return []
-    completed = roster.get("completed_stories")
-    if not isinstance(completed, (list, tuple)) or not completed:
-        return []
+    if not status:
+        return "waiting"
+    s = str(status).strip()
+    if s == "Done":
+        return "done"
+    if s in ("In Progress", "Reviewing", "QAing", "Merging", "Sprint Backlog"):
+        return "active"
+    if s in ("Blocked", "Refused"):
+        return "blocked"
+    return "waiting"
+
+
+def _epic_groups(cards: list[dict], sprint_name: str, roster) -> list[dict]:
+    """Group the sprint's cards under their epics.
+
+    Every card whose sprint is this sprint's name becomes a row, whatever its
+    status, type or closed state. The rows are grouped under their epic's
+    heading, where the epic is the card's parent (by the card's parent number
+    and its own repo). A story with no epic parent, or whose parent card is
+    not an Epic, is grouped under a 'not part of an epic' heading and is never
+    dropped.
+
+    roster is the sprint answer's roster (a dict, or None when the answer
+    carries no roster). roster.completed_stories marks which of the rows are
+    delivered; it never decides which rows appear. A roster entry that names
+    no card in the sprint adds no row and is counted nowhere.
+    """
     cards_by_key: dict[tuple, dict] = {}
     for card in cards:
         key = (card.get("number"), card.get("repo"))
         cards_by_key[key] = card
-    stories = []
-    for ref in completed:
-        if not isinstance(ref, str) or "#" not in ref:
-            continue
-        repo, _, number_str = ref.partition("#")
-        try:
-            number = int(number_str)
-        except ValueError:
-            number = 0
-        card = cards_by_key.get((number, repo))
-        title = card.get("title", "") if card else ""
-        stories.append(
-            {
-                "number": number,
-                "repo": repo,
-                "title": title,
-                "blocks": [],
-                "crew_fixes": [],
-                "delivered": True,
-                "pattern": "",
-                "status": "merged",
-            }
-        )
-    return stories
+
+    # The rows the roster names delivered: a set of (number, repo).
+    has_roster = isinstance(roster, dict) and isinstance(
+        roster.get("completed_stories"), (list, tuple)
+    )
+    delivered: set[tuple] = set()
+    if has_roster:
+        for ref in roster.get("completed_stories") or []:
+            if not isinstance(ref, str) or "#" not in ref:
+                continue
+            repo, _, number_str = ref.partition("#")
+            try:
+                number = int(number_str)
+            except ValueError:
+                continue
+            delivered.add((number, repo))
+
+    # The sprint's cards, in package order.
+    sprint_cards = [c for c in cards if c.get("sprint") == sprint_name]
+
+    # Group each sprint card under its epic (or the no-epic group).
+    groups: dict[tuple, list[dict]] = {}
+    for card in sprint_cards:
+        repo = card.get("repo")
+        parent = card.get("parent")
+        epic_card = cards_by_key.get((parent, repo)) if parent is not None else None
+        if epic_card is not None and epic_card.get("type") == "Epic":
+            key: tuple = ("epic", parent, repo)
+        else:
+            key = ("no-epic", None, None)
+        groups.setdefault(key, []).append(card)
+
+    # Order the groups: epics by their card's position in the package, then the
+    # no-epic group last.
+    epic_index: dict[tuple, int] = {}
+    for i, card in enumerate(cards):
+        if card.get("type") == "Epic":
+            epic_index[(card.get("number"), card.get("repo"))] = i
+
+    def order(key):
+        if key[0] == "epic":
+            return (
+                0,
+                epic_index.get((key[1], key[2]), 10**9),
+                key[2] or "",
+                key[1] or 0,
+            )
+        return (1, 0, "", 0)
+
+    result: list[dict] = []
+    for key in sorted(groups, key=order):
+        rows: list[dict] = []
+        done_count = 0
+        for card in groups[key]:
+            is_delivered = (card.get("number"), card.get("repo")) in delivered
+            if is_delivered:
+                done_count += 1
+            rows.append(
+                {
+                    "repo": card.get("repo") or "",
+                    "number": card.get("number"),
+                    "title": card.get("title") or "",
+                    "status": card.get("status") or "",
+                    "status_tone": _status_tone(card.get("status")),
+                    "delivered": is_delivered,
+                }
+            )
+        group: dict = {
+            "rows": rows,
+            "done_count": done_count,
+            "total_count": len(rows),
+            "has_roster": has_roster,
+            "is_epic": False,
+            "epic_repo": None,
+            "epic_number": None,
+            "epic_title": None,
+            "epic_status": None,
+            "epic_status_tone": None,
+            "has_goal": False,
+            "goal_repo": None,
+            "goal_number": None,
+            "goal_title": None,
+        }
+        if key[0] == "epic":
+            _, parent, repo = key
+            epic_card = cards_by_key.get((parent, repo), {})
+            goal_parent = epic_card.get("parent")
+            goal_card = (
+                cards_by_key.get((goal_parent, repo))
+                if goal_parent is not None
+                else None
+            )
+            has_goal = goal_card is not None and goal_card.get("type") == "Goal"
+            group.update(
+                {
+                    "is_epic": True,
+                    "epic_repo": repo,
+                    "epic_number": parent,
+                    "epic_title": epic_card.get("title") or "",
+                    "epic_status": epic_card.get("status") or "",
+                    "epic_status_tone": _status_tone(epic_card.get("status")),
+                    "has_goal": has_goal,
+                    "goal_repo": goal_card.get("repo") if has_goal else None,
+                    "goal_number": goal_card.get("number") if has_goal else None,
+                    "goal_title": goal_card.get("title") if has_goal else None,
+                }
+            )
+        result.append(group)
+    return result
 
 
 def _normalize_failure_causes(raw) -> list[dict]:
@@ -663,6 +771,36 @@ def _build_model_time_split(metrics: dict):
         "building_minutes": building,
         "planning_percent": int(round(planning / total * 100)),
         "building_percent": int(round(building / total * 100)),
+    }
+
+
+def _build_idle_time(metrics: dict):
+    """Read the sprint-metrics' idle figure null-tolerantly.
+
+    Returns None when the field is absent or null, or when idle_minutes is
+    null (the pinned 3.0.0 package carries it as null for every sprint).
+    Otherwise returns a dict with idle_minutes, sprint_total_minutes and the
+    idle share of the sprint's total time as a percentage.
+    """
+    idle = metrics.get("idle")
+    if not isinstance(idle, dict):
+        return None
+    idle_minutes = idle.get("idle_minutes")
+    if idle_minutes is None:
+        return None
+    sprint_total = idle.get("sprint_duration_minutes")
+    if sprint_total is None:
+        return None
+    if sprint_total == 0:
+        return {
+            "idle_minutes": idle_minutes,
+            "sprint_total_minutes": sprint_total,
+            "idle_percent": 0,
+        }
+    return {
+        "idle_minutes": idle_minutes,
+        "sprint_total_minutes": sprint_total,
+        "idle_percent": int(round(idle_minutes / sprint_total * 100)),
     }
 
 
