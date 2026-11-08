@@ -9346,7 +9346,8 @@ def test_stats_grid_two_columns_at_767px():
 
 
 def test_attempt_section_empty_renders_no_stories():
-    """AC1: when a sprint delivered zero stories, the attempt section says so in plain language."""
+    """AC1: when the sprint has no stories (no analysis, no cards in the
+    sprint), the story-by-story section says so in plain language."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -9367,13 +9368,16 @@ def test_attempt_section_empty_renders_no_stories():
     try:
         _build()
         html = (BUILD_DIR / "sprint-6.html").read_text()
-        # The section contains the exact empty-state message
-        assert "No stories were delivered this sprint" in html, (
-            "'No stories were delivered this sprint' not found in attempt section"
+        # The section carries the story-by-story heading and its empty state.
+        assert "What got done, story by story" in html, (
+            "story-by-story heading not found"
         )
-        # No attempt-row elements
-        assert 'class="attempt-row"' not in html, (
-            "attempt-row elements found for empty stories"
+        assert "No stories in this sprint" in html, (
+            "'No stories in this sprint' not found in story-by-story section"
+        )
+        # No story rows
+        assert 'class="story-row"' not in html, (
+            "story-row elements found for an empty sprint"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
