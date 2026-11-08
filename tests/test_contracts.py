@@ -10,6 +10,7 @@ import jsonschema
 import re
 import subprocess
 import sys
+import time
 import urllib.error
 from pathlib import Path
 
@@ -51,12 +52,18 @@ def test_design_system_stylesheet_exists():
 
 def test_build_check_exits_zero():
     """AC: build.py validates the package, renders the sprint overview, and writes the site to build/."""
+    start = time.monotonic()
     result = subprocess.run(
         [sys.executable, "build.py"],
         capture_output=True,
         text=True,
         cwd=REPO_ROOT,
         check=False,
+    )
+    elapsed = time.monotonic() - start
+    assert elapsed < 20, (
+        f"build.py took {elapsed:.1f}s (limit 20s); "
+        "events-file validation must not check every event against every oneOf branch"
     )
     assert result.returncode == 0, f"build.py failed:\n{result.stdout}\n{result.stderr}"
     build_dir = REPO_ROOT / "build"
