@@ -808,7 +808,7 @@ def _epic_groups(
 
 
 def _normalize_failure_causes(raw) -> list[dict]:
-    """Normalize sprint-metrics' top_failure_causes into [{'reason', 'count', 'recorded'}].
+    """Normalize sprint-metrics' top_failure_causes into [{'reason', 'count'}].
 
     The site's contract is a list of {reason, count} objects, but the answer
     shape has drifted across releases: 2.0.0 carries a list of {class, role,
@@ -816,18 +816,17 @@ def _normalize_failure_causes(raw) -> list[dict]:
     shapes carry a list of [reason, count] pairs, a list of {reason, count}
     objects, or a bare list of reasons. Each carries the same information.
 
-    A 2.0.0 entry's class is a recorded cause and is shown as-is, so it is
-    flagged recorded=True and its reason is the class value; every other shape
-    (a 1.x map key, a reason/cause field, or a bare code) is looked up in
-    CAUSE_LABELS by the caller and flagged recorded=False. Anything we cannot
-    read yields a 0 count instead of a crash — the site shows what its package
-    says, it does not compute the metric itself.
+    A 2.0.0 entry's class value is treated the same as any other cause code:
+    it is looked up in CAUSE_LABELS by the caller, falling through to
+    'Cause not recorded' when the code is not one the site knows. Anything we
+    cannot read yields a 0 count instead of a crash — the site shows what its
+    package says, it does not compute the metric itself.
     """
     if not raw:
         return []
     if isinstance(raw, dict):
         return [
-            {"reason": str(reason), "count": _as_count(count), "recorded": False}
+            {"reason": str(reason), "count": _as_count(count)}
             for reason, count in raw.items()
         ]
     if not isinstance(raw, (list, tuple)):
@@ -837,22 +836,18 @@ def _normalize_failure_causes(raw) -> list[dict]:
         if isinstance(item, dict):
             class_code = item.get("class")
             if class_code is not None:
-                # 2.0.0: {class, role, count} — the class is the recorded cause
+                # 2.0.0: {class, role, count} — the class is the cause code
                 reason = str(class_code)
                 count = item.get("count", 0)
-                recorded = bool(reason)
             else:
                 reason = item.get("reason", item.get("cause", ""))
                 count = item.get("count", 0)
-                recorded = False
         elif isinstance(item, (list, tuple)) and len(item) >= 2:
             reason, count = item[0], item[1]
-            recorded = False
         else:
             reason, count = item, 0
-            recorded = False
         causes.append(
-            {"reason": str(reason), "count": _as_count(count), "recorded": recorded}
+            {"reason": str(reason), "count": _as_count(count)}
         )
     return causes
 
@@ -873,23 +868,19 @@ def _as_count(value) -> int:
 def _build_failure_causes(metrics: dict) -> list[dict]:
     """Sprint-metrics' top_failure_causes as ready-to-render bar-chart rows.
 
-    Each row carries the reason (a 2.0.0 class shown as-is, or a 1.x reason
-    code mapped to a display string via CAUSE_LABELS), its count, the bar's
-    width as a percentage of the largest count, and whether the reason is the
-    unrecorded placeholder. Widths are computed here (display sizing, not a
-    metric) so the template only prints values and the build never divides by
-    zero.
+    Each row carries the reason code mapped to a display string via CAUSE_LABELS
+    (falling through to 'Cause not recorded' when the code is not one the site
+    knows), its count, the bar's width as a percentage of the largest count, and
+    whether the reason is the unrecorded placeholder. Widths are computed here
+    (display sizing, not a metric) so the template only prints values and the
+    build never divides by zero.
     """
     causes = _normalize_failure_causes(metrics.get("top_failure_causes"))
     max_count = max((c["count"] for c in causes), default=0)
     rows = []
     for c in causes:
-        if c["recorded"]:
-            reason = c["reason"]
-            unrecorded = False
-        else:
-            reason = CAUSE_LABELS.get(c["reason"], "Cause not recorded")
-            unrecorded = c["reason"] not in CAUSE_LABELS or c["reason"] == "unrecorded"
+        reason = CAUSE_LABELS.get(c["reason"], "Cause not recorded")
+        unrecorded = c["reason"] not in CAUSE_LABELS or c["reason"] == "unrecorded"
         rows.append(
             {
                 "reason": reason,

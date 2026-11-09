@@ -1532,8 +1532,8 @@ def test_failure_causes_empty_renders_no_failures():
 
 
 def test_failure_causes_2_0_list_shape_renders_class_rows():
-    """AC1: 2.0.0 {class, role, count} entries render one row each, the class as the
-    label, each count preserved, and no row is the 'Cause not recorded' placeholder."""
+    """AC1: 2.0.0 {class, role, count} entries whose class is not in CAUSE_LABELS
+    render 'Cause not recorded' as the label; no raw uppercase class code appears."""
     tag = "delivery-history-TEST"
     causes = [
         {"class": "VERIFY", "role": "Developer", "count": 7},
@@ -1566,16 +1566,16 @@ def test_failure_causes_2_0_list_shape_renders_class_rows():
         # one row per entry
         rows = section.count('class="cause-row"')
         assert rows == 2, f"expected 2 cause rows, got {rows}"
-        # the class is shown as the label, not the placeholder
-        assert ">VERIFY</span>" in section, "2.0.0 class 'VERIFY' not shown as a label"
-        assert ">EDIT</span>" in section, "2.0.0 class 'EDIT' not shown as a label"
+        # unknown class codes render as 'Cause not recorded', not the raw code
+        assert ">VERIFY</span>" not in section, "raw class 'VERIFY' must not appear as a label"
+        assert ">EDIT</span>" not in section, "raw class 'EDIT' must not appear as a label"
+        # both rows show 'Cause not recorded'
+        assert section.count(">Cause not recorded</span>") == 2, (
+            "each unknown class code should render as 'Cause not recorded'"
+        )
         # each row's count equals the entry's count
         assert ">7</span>" in section, "VERIFY count 7 not shown"
         assert ">1</span>" in section, "EDIT count 1 not shown"
-        # a class-carrying entry is not the 'Cause not recorded' placeholder
-        assert "Cause not recorded" not in section, (
-            "a class-carrying entry must not render as 'Cause not recorded'"
-        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
@@ -7710,9 +7710,9 @@ def test_changed_trend_no_field_name_pattern_in_values():
 
 
 def test_cause_label_test_assertion_failed():
-    """AC1: code 'test_assertion_failed' renders as exactly 'A test's assertion failed' in the label span."""
+    """AC2: 1.x map shape with key 'test_assertion_failed' renders as exactly 'A test's assertion failed'."""
     tag = "delivery-history-TEST"
-    causes = [{"reason": "test_assertion_failed", "count": 10}]
+    causes = {"test_assertion_failed": 3}
     _make_fake_package(
         tag,
         ["Sprint 6"],
@@ -7869,9 +7869,9 @@ def test_cause_labels_no_raw_code_pattern():
 
 
 def test_cause_label_review_renders_as_cause_not_recorded():
-    """AC1: code 'REVIEW' (not in CAUSE_LABELS) renders as 'Cause not recorded', not 'REVIEW'."""
+    """AC1: 2.0.0+ entry {"class": "REVIEW", ...} renders as 'Cause not recorded', not 'REVIEW'."""
     tag = "delivery-history-TEST"
-    causes = [{"reason": "REVIEW", "count": 1}]
+    causes = [{"class": "REVIEW", "role": "Developer", "count": 1}]
     _make_fake_package(
         tag,
         ["Sprint 6"],
@@ -7886,6 +7886,7 @@ def test_cause_label_review_renders_as_cause_not_recorded():
                 "top_failure_causes": causes,
             }
         },
+        schema_version="2.0.0",
     )
     original = DELIVERY_HISTORY_TAG.read_text()
     DELIVERY_HISTORY_TAG.write_text(tag + "\n")
