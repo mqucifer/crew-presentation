@@ -12634,3 +12634,463 @@ def test_journey_timeline_step_started_ended_unknown_step():
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def _build_3_0_0_mock_with_times(
+    roster_completed=None,
+    session_stories=None,
+    session_epics=None,
+):
+    """Build the 3.0.0 mock's sprint-6 page with optional session data.
+
+    Returns (tag, pkg_dir) for cleanup.
+    """
+    base_dir = REPO_ROOT / "tests" / "fixtures" / "delivery-history-3.0.0"
+    mock_dir = base_dir / "mock"
+    tag = "delivery-history-3000-TIME"
+    pkg_dir = PACKAGE_DIR / tag
+    shutil.copytree(mock_dir, pkg_dir)
+    for schema_file in ("schema.json", "manifest.schema.json", "events.schema.json"):
+        shutil.copy2(base_dir / schema_file, pkg_dir / schema_file)
+    dh_path = pkg_dir / "delivery-history.json"
+    dh = json.loads(dh_path.read_text())
+    answers = dh["sprint_metrics"]["answers"]
+    if roster_completed is not None:
+        answers["Sprint 6"]["roster"] = {
+            "completed_stories": roster_completed,
+            "released_epics": None,
+            "achieved_goals": None,
+        }
+        answers["Sprint 5"]["roster"] = {
+            "completed_stories": [],
+            "released_epics": None,
+            "achieved_goals": None,
+        }
+    if session_stories is not None:
+        answers["Sprint 6"]["session_stories"] = session_stories
+    if session_epics is not None:
+        answers["Sprint 6"]["session_epics"] = session_epics
+    dh_path.write_text(json.dumps(dh))
+    return tag, pkg_dir
+
+
+def test_story_time_cells_show_working_and_model_time():
+    """AC1: each delivered story's time cell reads '<working> · <model> min model',
+    using the site's one time vocabulary (whole minutes under an hour; hours and
+    minutes at an hour, zero units dropped)."""
+    roster = [
+        "sprint-metrics#125",
+        "sprint-metrics#126",
+        "sprint-metrics#127",
+        "sprint-metrics#128",
+        "sprint-metrics#133",
+    ]
+    session_stories = {
+        "sprint-metrics#125": {
+            "session_minutes": 7,
+            "model_minutes": 7,
+            "minutes_by_role": {},
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+        "sprint-metrics#126": {
+            "session_minutes": 31,
+            "model_minutes": 7,
+            "minutes_by_role": {},
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+        "sprint-metrics#127": {
+            "session_minutes": 128,
+            "model_minutes": 40,
+            "minutes_by_role": {},
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+        "sprint-metrics#128": {
+            "session_minutes": 23,
+            "model_minutes": 7,
+            "minutes_by_role": {},
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+        "sprint-metrics#133": {
+            "session_minutes": 38,
+            "model_minutes": 7,
+            "minutes_by_role": {},
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+    }
+    tag, pkg_dir = _build_3_0_0_mock_with_times(
+        roster_completed=roster, session_stories=session_stories
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        def row_time_cell(card_number):
+            marker = f'sprint-metrics<span class="num meta">#{card_number}</span>'
+            row_start = html.find(marker)
+            assert row_start != -1, f"row for card #{card_number} not found"
+            next_row = html.find('class="story-row"', row_start + len(marker))
+            if next_row == -1:
+                next_row = len(html)
+            row_html = html[row_start:next_row]
+            match = re.search(
+                r'class="story-row__time num">(.*?)</span>', row_html, re.DOTALL
+            )
+            assert match, f"time cell not found for card #{card_number}"
+            return match.group(1)
+
+        assert row_time_cell(125) == "7 min · 7 min model"
+        assert row_time_cell(126) == "31 min · 7 min model"
+        assert row_time_cell(127) == "2 h 8 min · 40 min model"
+        assert row_time_cell(128) == "23 min · 7 min model"
+        assert row_time_cell(133) == "38 min · 7 min model"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_epic_headings_show_worked_and_model_time():
+    """AC2: each epic's heading shows the epic's worked and model time beside
+    its done count, read '<worked> worked, <model> model'."""
+    roster = [
+        "sprint-metrics#125",
+        "sprint-metrics#126",
+        "sprint-metrics#127",
+        "sprint-metrics#128",
+        "sprint-metrics#133",
+    ]
+    session_epics = {
+        "sprint-metrics#123": {
+            "session_minutes": 128,
+            "model_minutes": 40,
+            "minutes_by_role": {},
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+        "sprint-metrics#124": {
+            "session_minutes": 38,
+            "model_minutes": 7,
+            "minutes_by_role": {},
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+    }
+    tag, pkg_dir = _build_3_0_0_mock_with_times(
+        roster_completed=roster, session_epics=session_epics
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        # Epic 123's heading: '4 of 7 stories done · 2 h 8 min worked, 40 min model'
+        assert "4 of 7 stories done · 2 h 8 min worked, 40 min model" in html, (
+            "epic 123 heading missing worked/model time"
+        )
+        # Epic 124's heading: '1 of 3 stories done · 38 min worked, 7 min model'
+        assert "1 of 3 stories done · 38 min worked, 7 min model" in html, (
+            "epic 124 heading missing worked/model time"
+        )
+        # Both keep their 'not part of a Goal' label
+        assert "not part of a Goal" in html
+        # Both keep their status badges
+        assert 'data-tone="active">In Progress' in html
+        assert 'data-tone="waiting">Ready' in html
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_no_session_epics_no_time_in_heading():
+    """AC3: when the answer carries no session_epics, no time appears in the
+    epic's heading; the heading keeps its done count and status."""
+    roster = [
+        "sprint-metrics#125",
+        "sprint-metrics#126",
+        "sprint-metrics#127",
+        "sprint-metrics#128",
+        "sprint-metrics#133",
+    ]
+    session_stories = {
+        "sprint-metrics#125": {
+            "session_minutes": 7,
+            "model_minutes": 7,
+            "minutes_by_role": {},
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+    }
+    tag, pkg_dir = _build_3_0_0_mock_with_times(
+        roster_completed=roster, session_stories=session_stories
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        # Neither epic's heading contains 'worked' or 'model'
+        for epic_marker in ("epic #123", "epic #124"):
+            idx = html.find(epic_marker)
+            assert idx != -1, f"epic {epic_marker} heading not found"
+            # Find the end of the meta span
+            span_end = html.find("</span>", idx)
+            heading_text = html[idx:span_end]
+            assert "worked" not in heading_text, (
+                f"epic heading for {epic_marker} contains 'worked': {heading_text}"
+            )
+            assert "model" not in heading_text, (
+                f"epic heading for {epic_marker} contains 'model': {heading_text}"
+            )
+
+        # Both still carry their done counts
+        assert "4 of 7 stories done" in html
+        assert "1 of 3 stories done" in html
+        # Status badges still present
+        assert 'data-tone="active">In Progress' in html
+        assert 'data-tone="waiting">Ready' in html
+        # Story 125's row still reads its time
+        marker = 'sprint-metrics<span class="num meta">#125</span>'
+        row_start = html.find(marker)
+        assert row_start != -1
+        next_row = html.find('class="story-row"', row_start + len(marker))
+        row_html = html[row_start : next_row if next_row != -1 else len(html)]
+        assert "7 min · 7 min model" in row_html
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_delivered_story_no_session_stories_reads_no_time_recorded():
+    """AC4: a delivered story whose answer carries no session_stories value
+    reads 'no time recorded' in its time cell."""
+    roster = [
+        "sprint-metrics#125",
+        "sprint-metrics#126",
+        "sprint-metrics#127",
+        "sprint-metrics#128",
+        "sprint-metrics#133",
+    ]
+    tag, pkg_dir = _build_3_0_0_mock_with_times(roster_completed=roster)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        def row_time_cell(card_number):
+            marker = f'sprint-metrics<span class="num meta">#{card_number}</span>'
+            row_start = html.find(marker)
+            assert row_start != -1, f"row for card #{card_number} not found"
+            next_row = html.find('class="story-row"', row_start + len(marker))
+            if next_row == -1:
+                next_row = len(html)
+            row_html = html[row_start:next_row]
+            match = re.search(
+                r'class="story-row__time num">(.*?)</span>', row_html, re.DOTALL
+            )
+            assert match, f"time cell not found for card #{card_number}"
+            return match.group(1)
+
+        for num in (125, 126, 127, 128, 133):
+            assert row_time_cell(num) == "no time recorded", (
+                f"card #{num} time cell: {row_time_cell(num)!r}"
+            )
+        # No dash or '0 min' appears as a time in the story rows
+        section_start = html.find('id="split-h"')
+        section_end = html.find("Why work didn't land first time")
+        section_html = html[section_start:section_end]
+        assert "— min" not in section_html
+        assert "0 min" not in section_html
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_undelivered_story_time_cell_reads_state():
+    """AC5: an undelivered story's time cell says its state — 'not delivered'
+    while in the sprint, 'never built' when closed as not planned."""
+    roster = [
+        "sprint-metrics#125",
+        "sprint-metrics#126",
+        "sprint-metrics#127",
+        "sprint-metrics#128",
+        "sprint-metrics#133",
+    ]
+    tag, pkg_dir = _build_3_0_0_mock_with_times(roster_completed=roster)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        def row_time_cell(card_number):
+            marker = f'sprint-metrics<span class="num meta">#{card_number}</span>'
+            row_start = html.find(marker)
+            assert row_start != -1, f"row for card #{card_number} not found"
+            next_row = html.find('class="story-row"', row_start + len(marker))
+            if next_row == -1:
+                next_row = len(html)
+            row_html = html[row_start:next_row]
+            match = re.search(
+                r'class="story-row__time num">(.*?)</span>', row_html, re.DOTALL
+            )
+            assert match, f"time cell not found for card #{card_number}"
+            return match.group(1)
+
+        # Undelivered stories read 'not delivered'
+        for num in (129, 131, 132, 136):
+            assert row_time_cell(num) == "not delivered", (
+                f"card #{num} time cell: {row_time_cell(num)!r}"
+            )
+        # Card 130 (closed as not planned) reads 'never built'
+        assert row_time_cell(130) == "never built", (
+            f"card #130 time cell: {row_time_cell(130)!r}"
+        )
+        # Delivered rows read neither phrase
+        for num in (125, 126, 127, 128, 133):
+            cell = row_time_cell(num)
+            assert cell != "not delivered", f"card #{num}: {cell!r}"
+            assert cell != "never built", f"card #{num}: {cell!r}"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_zero_session_minutes_shown_not_no_time_recorded():
+    """AC6: a zero the package carries is shown as 0; absence and zero are
+    distinct, so 'no time recorded' is reserved for what the package does
+    not carry."""
+    roster = ["sprint-metrics#125"]
+    session_stories = {
+        "sprint-metrics#125": {
+            "session_minutes": 7,
+            "model_minutes": 0,
+            "minutes_by_role": {},
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+    }
+    session_epics = {
+        "sprint-metrics#123": {
+            "session_minutes": 68,
+            "model_minutes": 0,
+            "minutes_by_role": {},
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+    }
+    tag, pkg_dir = _build_3_0_0_mock_with_times(
+        roster_completed=roster,
+        session_stories=session_stories,
+        session_epics=session_epics,
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        # Story 125's row: '7 min · 0 min model'
+        marker = 'sprint-metrics<span class="num meta">#125</span>'
+        row_start = html.find(marker)
+        assert row_start != -1
+        next_row = html.find('class="story-row"', row_start + len(marker))
+        row_html = html[row_start : next_row if next_row != -1 else len(html)]
+        assert "7 min · 0 min model" in row_html, (
+            f"story 125 time cell not '7 min · 0 min model': {row_html}"
+        )
+
+        # Epic 123's heading: '1 h 8 min worked, 0 min model'
+        assert "1 h 8 min worked, 0 min model" in html, (
+            "epic 123 heading missing '1 h 8 min worked, 0 min model'"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_time_cells_no_horizontal_overflow():
+    """AC7: at 375px and 1280px every story row still carries its time cell
+    and the section has no horizontal overflow."""
+    roster = [
+        "sprint-metrics#125",
+        "sprint-metrics#126",
+        "sprint-metrics#127",
+        "sprint-metrics#128",
+        "sprint-metrics#133",
+    ]
+    session_stories = {
+        "sprint-metrics#125": {
+            "session_minutes": 7,
+            "model_minutes": 7,
+            "minutes_by_role": {},
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+        "sprint-metrics#127": {
+            "session_minutes": 128,
+            "model_minutes": 40,
+            "minutes_by_role": {},
+            "input_tokens": 0,
+            "output_tokens": 0,
+        },
+    }
+    tag, pkg_dir = _build_3_0_0_mock_with_times(
+        roster_completed=roster, session_stories=session_stories
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # All ten story rows carry a time cell
+        time_cell_count = html.count('class="story-row__time num"')
+        assert time_cell_count == 10, (
+            f"expected 10 time cells, got {time_cell_count}"
+        )
+        # No overflow: the section uses flex-wrap, so content wraps.
+        # Check that the story-row class has flex-wrap in the CSS.
+        css = (REPO_ROOT / "site" / "css" / "site.css").read_text()
+        assert "flex-wrap: wrap" in css
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_story_by_story_section_carries_subtitle():
+    """AC8: the card head carries the subtitle 'by epic · time worked and
+    model time per story' beside the title."""
+    roster = [
+        "sprint-metrics#125",
+        "sprint-metrics#126",
+        "sprint-metrics#127",
+        "sprint-metrics#128",
+        "sprint-metrics#133",
+    ]
+    tag, pkg_dir = _build_3_0_0_mock_with_times(roster_completed=roster)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # The section shows the title and the subtitle
+        assert "What got done, story by story" in html
+        assert "by epic · time worked and model time per story" in html
+        # The subtitle is in the card head, not elsewhere
+        head_match = re.search(
+            r'<div class="card__head">\s*<h2 id="split-h">What got done, story by story</h2>\s*<span class="meta">by epic · time worked and model time per story</span>',
+            html,
+            re.DOTALL,
+        )
+        assert head_match, "subtitle not in card head beside the title"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
