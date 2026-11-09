@@ -274,7 +274,12 @@ def _render_pages(pkg: Path) -> dict:
         else:
             sprint_events = _load_sprint_events(pkg, sprint["name"], index)
             epic_groups = _epic_groups(
-                cards, sprint["name"], metrics.get("roster"), sprint_events
+                cards,
+                sprint["name"],
+                metrics.get("roster"),
+                sprint_events,
+                metrics.get("session_stories"),
+                metrics.get("session_epics"),
             )
 
         analysis_changed = analysis_by_sprint.get(sprint["name"], {}).get(
@@ -663,8 +668,62 @@ def _story_happened_line(
     return "Not delivered yet."
 
 
+def _story_time_cell(
+    card: dict, is_delivered: bool, session_stories: dict | None
+) -> str:
+    """The time cell text for a story row.
+
+    A delivered story with a session_stories entry whose session_minutes is
+    not null reads '<working> · <model> model'; a delivered story with no
+    entry (or a null session_minutes) reads 'no time recorded'; a story
+    closed as not planned reads 'never built'; any other undelivered story
+    reads 'not delivered'.
+    """
+    if not is_delivered:
+        if card.get("closed_as") == "not_planned":
+            return "never built"
+        return "not delivered"
+    # Delivered: look up the session_stories entry.
+    if not session_stories:
+        return "no time recorded"
+    card_key = f"{card.get('repo')}#{card.get('number')}"
+    entry = session_stories.get(card_key)
+    if not isinstance(entry, dict):
+        return "no time recorded"
+    session_minutes = entry.get("session_minutes")
+    if session_minutes is None:
+        return "no time recorded"
+    model_minutes = entry.get("model_minutes")
+    return f"{_format_minutes(session_minutes)} · {_format_minutes(model_minutes)} model"
+
+
+def _epic_time_label(epic_number, epic_repo, session_epics: dict | None) -> str:
+    """The epic's worked and model time for its heading, or '' when absent.
+
+    Reads the session_epics entry for the epic; a missing entry or a null
+    session_minutes yields no time text (the heading keeps its done count
+    and status without a time).
+    """
+    if not session_epics or epic_number is None or not epic_repo:
+        return ""
+    epic_key = f"{epic_repo}#{epic_number}"
+    entry = session_epics.get(epic_key)
+    if not isinstance(entry, dict):
+        return ""
+    session_minutes = entry.get("session_minutes")
+    if session_minutes is None:
+        return ""
+    model_minutes = entry.get("model_minutes")
+    return f" · {_format_minutes(session_minutes)} worked, {_format_minutes(model_minutes)} model"
+
+
 def _epic_groups(
-    cards: list[dict], sprint_name: str, roster, events: list[dict] | None = None
+    cards: list[dict],
+    sprint_name: str,
+    roster,
+    events: list[dict] | None = None,
+    session_stories: dict | None = None,
+    session_epics: dict | None = None,
 ) -> list[dict]:
     """Group the sprint's cards under their epics.
 
@@ -761,6 +820,9 @@ def _epic_groups(
                         crew_fix_numbers,
                         escalated,
                     ),
+                    "time_cell": _story_time_cell(
+                        card, is_delivered, session_stories
+                    ),
                 }
             )
         group: dict = {
@@ -778,6 +840,7 @@ def _epic_groups(
             "goal_repo": None,
             "goal_number": None,
             "goal_title": None,
+            "epic_time_label": "",
         }
         if key[0] == "epic":
             _, parent, repo = key
@@ -801,6 +864,9 @@ def _epic_groups(
                     "goal_repo": goal_card.get("repo") if has_goal else None,
                     "goal_number": goal_card.get("number") if has_goal else None,
                     "goal_title": goal_card.get("title") if has_goal else None,
+                    "epic_time_label": _epic_time_label(
+                        parent, repo, session_epics
+                    ),
                 }
             )
         result.append(group)
