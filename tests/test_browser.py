@@ -656,6 +656,208 @@ def test_cycle_time_is_fourth_stat():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_headline_totals_card_shows_five_stats_with_sub_lines():
+    """AC1: the totals card shows exactly five stats in order, each with its
+    value and sub-line: '18 points' beneath Stories delivered, '50%' beneath
+    Landed first try, 'Start to delivered' beneath cycle time, 'lead time'
+    beneath Filed to delivered, and '1 story superseded, 3 points' beneath
+    Days blocked. No separate 'points delivered' stat appears (AC2)."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 6,
+                "points_delivered": 18,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 4,
+                "escalation_count": 1,
+                "cycle_time_minutes": 655,
+                "lead_time_minutes": 1500,
+                "blocked_aging_days": 1,
+                "superseded_count": 1,
+                "superseded_points": 3,
+                "first_attempt_rate_percent": 50,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        stats = _stats_section(html)
+
+        # Exactly five stat values
+        values = re.findall(
+            r'<span class="stat__value[^"]*">(.*?)</span>', stats, re.DOTALL
+        )
+        assert len(values) == 5, f"expected 5 stats, got {len(values)}: {values}"
+        assert values[0].strip() == "6", f"1st value is {values[0]!r}, expected '6'"
+        assert values[1].strip() == "3 of 4", (
+            f"2nd value is {values[1]!r}, expected '3 of 4'"
+        )
+        assert values[2].strip() == "10 h 55 min", (
+            f"3rd value is {values[2]!r}, expected '10 h 55 min'"
+        )
+        assert values[3].strip() == "1 d 1 h", (
+            f"4th value is {values[3]!r}, expected '1 d 1 h'"
+        )
+        assert values[4].strip() == "1", f"5th value is {values[4]!r}, expected '1'"
+
+        # Labels in order
+        labels = re.findall(
+            r'<span class="stat__label">(.*?)</span>', stats, re.DOTALL
+        )
+        assert len(labels) == 5
+        assert labels[0].strip() == "stories delivered"
+        assert labels[1].strip() == "Landed first try"
+        assert labels[2].strip() == "cycle time"
+        assert labels[3].strip() == "Filed to delivered"
+        assert labels[4].strip() == "Days blocked"
+
+        # Sub-lines: the unit or detail beneath each stat
+        subs = re.findall(
+            r'<span class="stat__sub">(.*?)</span>', stats, re.DOTALL
+        )
+        assert len(subs) == 5, f"expected 5 sub-lines, got {len(subs)}: {subs}"
+        assert subs[0].strip() == "18 points", (
+            f"1st sub-line is {subs[0]!r}, expected '18 points'"
+        )
+        assert subs[1].strip() == "50%", (
+            f"2nd sub-line is {subs[1]!r}, expected '50%'"
+        )
+        assert subs[2].strip() == "Start to delivered", (
+            f"3rd sub-line is {subs[2]!r}, expected 'Start to delivered'"
+        )
+        assert subs[3].strip() == "lead time", (
+            f"4th sub-line is {subs[3]!r}, expected 'lead time'"
+        )
+        assert subs[4].strip() == "1 story superseded, 3 points", (
+            f"5th sub-line is {subs[4]!r}, expected '1 story superseded, 3 points'"
+        )
+
+        # AC2: no separate 'points delivered' stat exists
+        assert "points delivered" not in stats, (
+            "a separate 'points delivered' stat should not appear"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_days_blocked_null_superseded_shows_absent_wording():
+    """AC5: when blocked_aging_days is present but superseded_count and
+    superseded_points are null, Days blocked shows the day count and its
+    sub-line uses an absent-data mark, never '0 stories superseded, 0 points'."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 5,
+                "escalation_count": 1,
+                "cycle_time_minutes": 600,
+                "lead_time_minutes": 1440,
+                "blocked_aging_days": 1,
+                "superseded_count": None,
+                "superseded_points": None,
+                "first_attempt_rate_percent": 60,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        stats = _stats_section(html)
+
+        # Days blocked value is '1'
+        values = re.findall(
+            r'<span class="stat__value[^"]*">(.*?)</span>', stats, re.DOTALL
+        )
+        assert values[4].strip() == "1", (
+            f"Days blocked value is {values[4]!r}, expected '1'"
+        )
+
+        # Sub-line shows absent-data wording, never '0 stories superseded, 0 points'
+        subs = re.findall(
+            r'<span class="stat__sub">(.*?)</span>', stats, re.DOTALL
+        )
+        sub_text = subs[4].strip()
+        assert sub_text == "\u2014", (
+            f"Days blocked sub-line is {sub_text!r}, expected em dash '\u2014'"
+        )
+        assert "0 stories superseded" not in sub_text, (
+            f"sub-line shows '0 stories superseded': {sub_text!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_null_lead_time_and_rate_show_em_dash_sub_lines():
+    """AC4: when lead_time_minutes is null and first_attempt_rate_percent is null,
+    'Filed to delivered' shows the missing mark and the sub-line beneath
+    'Landed first try' shows the missing mark, while the first-try value
+    still renders from its numerator and denominator."""
+    tag = "delivery-history-TEST"
+    _make_fake_package(
+        tag,
+        ["Sprint 6"],
+        metrics={
+            "Sprint 6": {
+                "throughput": 6,
+                "points_delivered": 18,
+                "first_attempt_numerator": 3,
+                "first_attempt_denominator": 4,
+                "escalation_count": 1,
+                "cycle_time_minutes": 655,
+                "lead_time_minutes": None,
+                "blocked_aging_days": 1,
+                "superseded_count": 1,
+                "superseded_points": 3,
+                "first_attempt_rate_percent": None,
+            }
+        },
+    )
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        stats = _stats_section(html)
+
+        values = re.findall(
+            r'<span class="stat__value[^"]*">(.*?)</span>', stats, re.DOTALL
+        )
+        # Filed to delivered (4th) shows the missing mark
+        assert values[3].strip() == "\u2014", (
+            f"Filed to delivered value is {values[3]!r}, expected em dash"
+        )
+        # Landed first try (2nd) still shows its value from numerator/denominator
+        assert values[1].strip() == "3 of 4", (
+            f"Landed first try value is {values[1]!r}, expected '3 of 4'"
+        )
+
+        subs = re.findall(
+            r'<span class="stat__sub">(.*?)</span>', stats, re.DOTALL
+        )
+        # The rate sub-line beneath Landed first try shows the missing mark
+        assert subs[1].strip() == "\u2014", (
+            f"rate sub-line is {subs[1]!r}, expected em dash"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def _stats_section(html: str) -> str:
     """Extract the stats section's inner HTML from a page (by class)."""
     match = re.search(
