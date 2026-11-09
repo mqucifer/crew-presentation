@@ -33,8 +33,11 @@ what each page shows, before any measure. Each page's top navigation offers an
 'About the crew' item that takes you to that explanation, alongside the
 story-journey and replay views.
 
-- **Sprint overview** — one page per sprint: the sprint's figures (stories
-  delivered, first-attempt pass, cycle time, points delivered), what changed
+- **Sprint overview** — one page per sprint: the sprint's headline totals
+  (stories delivered with their points, the stories that landed first try
+  with the share in percent, the time from start to delivered, the time
+  from filed to delivered, and the days blocked with what was superseded —
+  every number with its unit), what changed
   between sprints, the sprint's stories story by story, grouped under their
   epics with each epic's done count, status and worked and model time, each
   story carrying its status, a line of what happened to it and its time
