@@ -1,6 +1,6 @@
 [project]
 name = "crew-presentation"
-version = "0.4.1"
+version = "0.5.0"
 description = "Show how the crew works as visuals anyone can read"
 requires-python = ">=3.12"
 dependencies = [
