@@ -282,6 +282,11 @@
   flex-basis: 100%;
 }
 
+.story-row__time {
+  font-size: 13px;
+  color: var(--color-text-dim);
+}
+
 /* Failure-causes bar chart */
 .sprint-side {
   grid-column: span 5;
