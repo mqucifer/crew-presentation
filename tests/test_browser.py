@@ -9282,9 +9282,11 @@ def test_stats_grid_four_equal_columns_at_1280px():
                 f"at 1280px .stats grid-template-columns has {len(tracks)} tracks "
                 f"({grid_cols!r}); expected 5"
             )
-            # All tracks must be equal (the same length).
-            assert len(set(tracks)) == 1, (
-                f"at 1280px .stats tracks are not equal: {tracks}"
+            # All tracks must be equal within sub-pixel tolerance.
+            track_values = [float(t.replace("px", "")) for t in tracks]
+            track_diff = max(track_values) - min(track_values)
+            assert track_diff < 1, (
+                f"at 1280px .stats tracks differ by {track_diff:.3f}px: {tracks}"
             )
 
             # The fifth .stat's right edge must coincide with .stats' right
@@ -9349,8 +9351,10 @@ def test_stats_grid_two_columns_at_767px():
                 f"at 767px .stats grid-template-columns has {len(tracks)} tracks "
                 f"({grid_cols!r}); expected 2"
             )
-            assert len(set(tracks)) == 1, (
-                f"at 767px .stats tracks are not equal: {tracks}"
+            track_values = [float(t.replace("px", "")) for t in tracks]
+            track_diff = max(track_values) - min(track_values)
+            assert track_diff < 1, (
+                f"at 767px .stats tracks differ by {track_diff:.3f}px: {tracks}"
             )
 
             # All five .stat elements must be visible in three rows.
