@@ -20,6 +20,12 @@
   color: var(--color-text-dim);
 }
 
+/* Stat labels: small dim text above each value. */
+.stat__label {
+  font-size: var(--text-sm);
+  color: var(--color-text-dim);
+}
+
 /* Stat values: Public Sans style C — large numbers, tightened, tabular. */
 .stat__value {
   font-family: var(--font-sans);

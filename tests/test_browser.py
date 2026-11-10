@@ -643,8 +643,8 @@ def test_cycle_time_is_fourth_stat():
         assert values[2].strip() == "1 h 42 min", (
             f"3rd stat value is {values[2]!r}, expected '1 h 42 min'"
         )
-        assert labels[2].strip() == "cycle time", (
-            f"3rd stat label is {labels[2].strip()!r}, expected 'cycle time'"
+        assert labels[2].strip() == "Start to delivered", (
+            f"3rd stat label is {labels[2].strip()!r}, expected 'Start to delivered'"
         )
         # Verify the two stats before it
         assert "22" in values[0], f"1st stat is {values[0]!r}, expected throughput"
@@ -711,9 +711,9 @@ def test_headline_totals_card_shows_five_stats_with_sub_lines():
             r'<span class="stat__label">(.*?)</span>', stats, re.DOTALL
         )
         assert len(labels) == 5
-        assert labels[0].strip() == "stories delivered"
+        assert labels[0].strip() == "Stories delivered"
         assert labels[1].strip() == "Landed first try"
-        assert labels[2].strip() == "cycle time"
+        assert labels[2].strip() == "Start to delivered"
         assert labels[3].strip() == "Filed to delivered"
         assert labels[4].strip() == "Days blocked"
 
@@ -728,8 +728,8 @@ def test_headline_totals_card_shows_five_stats_with_sub_lines():
         assert subs[1].strip() == "50%", (
             f"2nd sub-line is {subs[1]!r}, expected '50%'"
         )
-        assert subs[2].strip() == "Start to delivered", (
-            f"3rd sub-line is {subs[2]!r}, expected 'Start to delivered'"
+        assert subs[2].strip() == "cycle time", (
+            f"3rd sub-line is {subs[2]!r}, expected 'cycle time'"
         )
         assert subs[3].strip() == "lead time", (
             f"4th sub-line is {subs[3]!r}, expected 'lead time'"
@@ -2447,12 +2447,12 @@ def test_stat_values_match_package_data():
             page.goto(f"file://{page_path}")
             page.wait_for_selector(".stat__value")
 
-            # Exact text for stories delivered
+            # Exact text for Stories delivered
             throughput_text = page.evaluate("""
                 () => {
                     const labels = document.querySelectorAll('.stat__label');
                     for (const label of labels) {
-                        if (label.textContent.trim() === 'stories delivered') {
+                        if (label.textContent.trim() === 'Stories delivered') {
                             const stat = label.closest('.stat');
                             return stat.querySelector('.stat__value').textContent.trim();
                         }
@@ -3361,10 +3361,10 @@ def test_cycle_time_stat_formats_hours_and_minutes():
             for block in re.findall(
                 r'<div class="stat">(.*?)</div>', stats, re.DOTALL
             ):
-                if '<span class="stat__label">cycle time</span>' in block:
+                if '<span class="stat__label">Start to delivered</span>' in block:
                     cycle_stat = block
                     break
-            assert cycle_stat is not None, "no stat labelled 'cycle time' found"
+            assert cycle_stat is not None, "no stat labelled 'Start to delivered' found"
             m = re.search(
                 r'<span class="stat__value([^"]*)">(.*?)</span>',
                 cycle_stat,
@@ -6059,7 +6059,7 @@ def _read_cycle_time(html: str) -> tuple[str | None, str | None]:
     stat_text = None
     stats = _stats_section(html)
     for block in re.findall(r'<div class="stat">(.*?)</div>', stats, re.DOTALL):
-        if '<span class="stat__label">cycle time</span>' in block:
+        if '<span class="stat__label">Start to delivered</span>' in block:
             m = re.search(
                 r'<span class="stat__value[^"]*">(.*?)</span>', block, re.DOTALL
             )
@@ -7231,8 +7231,8 @@ def test_stat_values_at_least_text_xl_at_phone_width():
 
 
 def test_first_stat_label_visible_under_value_at_phone_width():
-    """AC6: at a 375px viewport the .stat__label following the .stat__value whose
-    text is '22' reads exactly 'stories delivered' and is not horizontally clipped
+    """AC6: at a 375px viewport the .stat__label preceding the .stat__value whose
+    text is '22' reads exactly 'Stories delivered' and is not horizontally clipped
     (scrollWidth == clientWidth)."""
     tag = "delivery-history-TEST"
     _make_fake_package(
@@ -7271,9 +7271,9 @@ def test_first_stat_label_visible_under_value_at_phone_width():
                         if (value.textContent.trim() !== '22') {
                             continue;
                         }
-                        const label = value.nextElementSibling;
+                        const label = value.previousElementSibling;
                         if (!label || !label.classList.contains('stat__label')) {
-                            return { error: 'no .stat__label follows the 22 value' };
+                            return { error: 'no .stat__label precedes the 22 value' };
                         }
                         return {
                             text: label.textContent.trim(),
@@ -7285,12 +7285,12 @@ def test_first_stat_label_visible_under_value_at_phone_width():
                 """
             )
             assert "error" not in result, f"AC6 lookup failed: {result}"
-            assert result["text"] == "stories delivered", (
-                f"the label under the '22' value is {result['text']!r}, expected "
-                f"'stories delivered'"
+            assert result["text"] == "Stories delivered", (
+                f"the label above the '22' value is {result['text']!r}, expected "
+                f"'Stories delivered'"
             )
             assert result["clipped"] is False, (
-                f"the 'stories delivered' label is horizontally clipped at 375px "
+                f"the 'Stories delivered' label is horizontally clipped at 375px "
                 f"(scrollWidth > clientWidth)"
             )
             browser.close()
@@ -9189,19 +9189,19 @@ def test_zero_sprint_metrics_render_zero_and_fraction():
         _build()
         html = (BUILD_DIR / "sprint-33.html").read_text()
         stats = _stats_section(html)
-        # '0' immediately before 'stories delivered'
+        # 'Stories delivered' label followed by value '0'
         throughput_match = re.search(
-            r'<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>\s*<span class="stat__label">stories delivered</span>',
+            r'<span class="stat__label">Stories delivered</span>\s*<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>',
             stats,
             re.DOTALL,
         )
-        assert throughput_match, "no 'stories delivered' stat found"
+        assert throughput_match, "no 'Stories delivered' stat found"
         assert throughput_match.group(1) == "0", (
             f"throughput stat is {throughput_match.group(1)!r}, expected '0'"
         )
-        # '0 of 4' immediately before 'Landed first try'
+        # 'Landed first try' label followed by value '0 of 4'
         first_try_match = re.search(
-            r'<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>\s*<span class="stat__label">Landed first try</span>',
+            r'<span class="stat__label">Landed first try</span>\s*<span class="stat__value[^"]*">\s*([^<]*?)\s*</span>',
             stats,
             re.DOTALL,
         )
@@ -9211,7 +9211,7 @@ def test_zero_sprint_metrics_render_zero_and_fraction():
         )
         # AC3: the Days blocked sub-line reads '2 stories superseded, 5 points' (plural)
         superseded_match = re.search(
-            r'<span class="stat__label">Days blocked</span>\s*<span class="stat__sub">(.*?)</span>',
+            r'<span class="stat__label">Days blocked</span>\s*<span class="stat__value[^"]*">[^<]*?</span>\s*<span class="stat__sub">(.*?)</span>',
             stats,
             re.DOTALL,
         )
