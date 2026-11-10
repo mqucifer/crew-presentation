@@ -6,6 +6,17 @@ builds its section here from them (towncrier, Keep a Changelog). Entries still u
 
 <!-- towncrier release notes start -->
 
+## [0.6.0] - 2026-11-10
+
+### Added
+
+- The sprint page's headline totals card now shows five stats with their units: stories delivered with their points, landed first try with the share in percent, start to delivered (cycle time), filed to delivered (lead time), and days blocked with what was superseded. (mqucifer/crew-presentation#341)
+
+### Fixed
+
+- The "What this is" block now explains epics, technical epics, superseded stories, WIP violations, and the step names used in "Sent back" sentences, so a public visitor meets every term on the sprint page in plain words. (mqucifer/crew-presentation#352)
+- Setup now retries a download that fails on a transient network error (a 5xx, a connection drop, or a stalled read) a bounded number of times before failing the run, so a blip on GitHub's or jsDelivr's side no longer reds the checks after a merge. (mqucifer/crew-presentation#386)
+
 ## [0.5.0] - 2026-11-08
 
 ### Added
