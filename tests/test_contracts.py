@@ -158,6 +158,184 @@ def test_setup_fails_on_missing_release(monkeypatch, tmp_path):
     assert not index, f"index file present after failed setup: {index}"
 
 
+def _make_package_tarball(tag: str) -> bytes:
+    """A minimal tar.gz with the expected layout: <tag>/delivery-history.json."""
+    import io
+    import tarfile as _tarfile
+
+    buf = io.BytesIO()
+    with _tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        data = json.dumps({}).encode()
+        info = _tarfile.TarInfo(name=f"{tag}/delivery-history.json")
+        info.size = len(data)
+        tar.addfile(info, io.BytesIO(data))
+    return buf.getvalue()
+
+
+class _FakeResponse:
+    """A context-manager response whose read() returns pre-captured bytes."""
+
+    def __init__(self, data: bytes):
+        self._data = data
+
+    def read(self):
+        return self._data
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+
+def test_download_retries_on_transient_failure(monkeypatch, tmp_path):
+    """AC1: a 504 on the first attempt, then success, lets setup complete as if nothing failed."""
+    tag = "delivery-history-TEST-RETRY"
+    tarball = _make_package_tarball(tag)
+    calls = []
+
+    def flaky(url, *args, **kwargs):
+        calls.append(url)
+        if len(calls) == 1:
+            raise urllib.error.HTTPError(url, 504, "Gateway Timeout", None, None)
+        return _FakeResponse(tarball)
+
+    monkeypatch.setattr(setup, "PACKAGE_DIR", tmp_path)
+    monkeypatch.setattr(setup.urllib.request, "urlopen", flaky)
+    monkeypatch.setattr(setup.time, "sleep", lambda x: None)
+
+    setup._download_delivery_history(tag)
+
+    assert len(calls) == 2, f"expected 2 attempts, got {len(calls)}"
+    index = tmp_path / tag / "delivery-history.json"
+    assert index.is_file(), f"index file not found: {index}"
+
+
+def test_download_retries_on_connection_error(monkeypatch, tmp_path):
+    """AC1: a connection error (not a 5xx) is also transient and retried."""
+    tag = "delivery-history-TEST-CONN"
+    tarball = _make_package_tarball(tag)
+    calls = []
+
+    def flaky(url, *args, **kwargs):
+        calls.append(url)
+        if len(calls) == 1:
+            raise urllib.error.URLError("Connection refused")
+        return _FakeResponse(tarball)
+
+    monkeypatch.setattr(setup, "PACKAGE_DIR", tmp_path)
+    monkeypatch.setattr(setup.urllib.request, "urlopen", flaky)
+    monkeypatch.setattr(setup.time, "sleep", lambda x: None)
+
+    setup._download_delivery_history(tag)
+
+    assert len(calls) == 2
+    index = tmp_path / tag / "delivery-history.json"
+    assert index.is_file()
+
+
+def test_download_stalled_read_is_retried(monkeypatch, tmp_path):
+    """AC5: a stalled read (timeout) is treated as a transient failure and retried."""
+    import socket
+
+    tag = "delivery-history-TEST-STALL"
+    tarball = _make_package_tarball(tag)
+    calls = []
+
+    def stall_then_succeed(url, *args, **kwargs):
+        calls.append(url)
+        if len(calls) == 1:
+            raise socket.timeout("timed out")
+        return _FakeResponse(tarball)
+
+    monkeypatch.setattr(setup, "PACKAGE_DIR", tmp_path)
+    monkeypatch.setattr(setup.urllib.request, "urlopen", stall_then_succeed)
+    monkeypatch.setattr(setup.time, "sleep", lambda x: None)
+
+    setup._download_delivery_history(tag)
+
+    assert len(calls) == 2
+    index = tmp_path / tag / "delivery-history.json"
+    assert index.is_file()
+
+
+def test_download_fails_on_persistent_transient(monkeypatch, tmp_path, capsys):
+    """AC3: when a server keeps failing, setup gives up after a finite number of attempts
+    and the failure names the release it was fetching."""
+    tag = "delivery-history-2026-11-08"
+    calls = []
+
+    def always_504(url, *args, **kwargs):
+        calls.append(url)
+        raise urllib.error.HTTPError(url, 504, "Gateway Timeout", None, None)
+
+    monkeypatch.setattr(setup, "PACKAGE_DIR", tmp_path)
+    monkeypatch.setattr(setup.urllib.request, "urlopen", always_504)
+    monkeypatch.setattr(setup.time, "sleep", lambda x: None)
+
+    with pytest.raises(SystemExit) as exited:
+        setup._download_delivery_history(tag)
+
+    assert exited.value.code not in (0, None)
+    assert len(calls) == setup.MAX_ATTEMPTS, (
+        f"expected exactly {setup.MAX_ATTEMPTS} attempts, got {len(calls)}"
+    )
+    err = capsys.readouterr().err
+    assert tag in err, f"failure output should name the tag: {err!r}"
+    index = list(tmp_path.rglob("delivery-history.json"))
+    assert not index, f"index file present after failed setup: {index}"
+
+
+def test_design_system_css_retries_on_transient_failure(monkeypatch, tmp_path):
+    """AC4: the design-system CSS fetch gets the same retry: a 5xx on the first attempt
+    followed by a success lets setup complete with the CSS in place."""
+    version = "v0.1.0"
+    css_content = b"/* design system */\nbody { margin: 0; }\n"
+    calls = []
+
+    def flaky(url, *args, **kwargs):
+        calls.append(url)
+        if len(calls) == 1:
+            raise urllib.error.HTTPError(url, 503, "Service Unavailable", None, None)
+        return _FakeResponse(css_content)
+
+    monkeypatch.setattr(setup, "PACKAGE_DIR", tmp_path)
+    monkeypatch.setattr(setup.urllib.request, "urlopen", flaky)
+    monkeypatch.setattr(setup.time, "sleep", lambda x: None)
+
+    setup._download_design_system_css(version)
+
+    assert len(calls) == 2
+    css_path = setup.design_system_css(version)
+    assert css_path.is_file(), f"CSS not found: {css_path}"
+    assert css_path.read_bytes() == css_content
+
+
+def test_design_system_css_fails_on_persistent_transient(monkeypatch, tmp_path, capsys):
+    """AC3 (CSS): when the server keeps failing, the CSS download fails after bounded
+    attempts and names the version."""
+    version = "v0.1.0"
+    calls = []
+
+    def always_503(url, *args, **kwargs):
+        calls.append(url)
+        raise urllib.error.HTTPError(url, 503, "Service Unavailable", None, None)
+
+    monkeypatch.setattr(setup, "PACKAGE_DIR", tmp_path)
+    monkeypatch.setattr(setup.urllib.request, "urlopen", always_503)
+    monkeypatch.setattr(setup.time, "sleep", lambda x: None)
+
+    with pytest.raises(SystemExit) as exited:
+        setup._download_design_system_css(version)
+
+    assert exited.value.code not in (0, None)
+    assert len(calls) == setup.MAX_ATTEMPTS
+    err = capsys.readouterr().err
+    assert version in err, f"failure output should name the version: {err!r}"
+    css_path = setup.design_system_css(version)
+    assert not css_path.is_file(), f"CSS file left behind after failure: {css_path}"
+
+
 SUPPORTED_MAJOR_VERSIONS = (1, 2, 3, 4)
 
 

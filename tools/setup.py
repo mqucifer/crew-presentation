@@ -9,6 +9,8 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -20,6 +22,49 @@ DESIGN_SYSTEM_VERSION_FILE = REPO_ROOT / "site" / "css" / "design-system.version
 
 CREW_REPO = "mqucifer/crew"
 JSDELIVR_BASE = "https://cdn.jsdelivr.net/gh/mqucifer/design-system"
+
+MAX_ATTEMPTS = 3
+DOWNLOAD_TIMEOUT = 30  # seconds per attempt
+
+
+def _is_transient(exc: OSError) -> bool:
+    """True for a failure worth retrying: a 5xx, a connection error, or a stalled read."""
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code >= 500
+    return True
+
+
+def _fetch(url: str, dest: Path, label: str) -> None:
+    """Download url to dest, retrying transient failures up to MAX_ATTEMPTS times.
+
+    A 4xx response is not transient and fails immediately. After all attempts
+    are exhausted the run fails loudly, naming the label.
+    """
+    last_exc = None
+    attempts = 0
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        attempts = attempt
+        try:
+            with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT) as response:
+                dest.write_bytes(response.read())
+            return
+        except OSError as exc:
+            last_exc = exc
+            if not _is_transient(exc):
+                break
+            if attempt < MAX_ATTEMPTS:
+                wait = 2 ** (attempt - 1)
+                print(
+                    f"Attempt {attempt}/{MAX_ATTEMPTS} for {label} failed "
+                    f"({exc.__class__.__name__}: {exc}); retrying in {wait}s...",
+                    file=sys.stderr,
+                )
+                time.sleep(wait)
+    print(
+        f"Failed to download {label} after {attempts} attempt(s): {last_exc}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def _uv() -> str:
@@ -143,12 +188,7 @@ def _download_delivery_history(tag: str) -> None:
     archive_path = PACKAGE_DIR / f"{tag}.tar.gz"
 
     print(f"Downloading {url}")
-    try:
-        with urllib.request.urlopen(url) as response:
-            archive_path.write_bytes(response.read())
-    except OSError as exc:
-        print(f"Failed to download {tag}: {exc}", file=sys.stderr)
-        sys.exit(1)
+    _fetch(url, archive_path, tag)
 
     # Extract: the archive holds one top-level directory named for the tag.
     try:
@@ -179,12 +219,7 @@ def _download_design_system_css(version: str) -> None:
     PACKAGE_DIR.mkdir(parents=True, exist_ok=True)
     url = f"{JSDELIVR_BASE}@{version}/styles.css"
     print(f"Downloading {url}")
-    try:
-        with urllib.request.urlopen(url) as response:
-            design_system_css(version).write_bytes(response.read())
-    except OSError as exc:
-        print(f"Failed to download design-system CSS {version}: {exc}", file=sys.stderr)
-        sys.exit(1)
+    _fetch(url, design_system_css(version), version)
 
 
 def main() -> None:
