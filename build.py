@@ -336,9 +336,18 @@ def _render_pages(pkg: Path) -> dict:
                     metrics.get("first_attempt_numerator"),
                     metrics.get("first_attempt_denominator"),
                 ),
-                "points_delivered": _stat_value(metrics.get("points_delivered")),
+                "cycle_time": _format_minutes(metrics.get("cycle_time_minutes")),
+                "lead_time": _format_minutes(metrics.get("lead_time_minutes")),
+                "days_blocked": _stat_value(metrics.get("blocked_aging_days")),
             },
-            "cycle_time": _format_minutes(metrics.get("cycle_time_minutes")),
+            "stats_sub": {
+                "points": _points_sub(metrics.get("points_delivered")),
+                "rate": _rate_percent(metrics.get("first_attempt_rate_percent")),
+                "superseded": _superseded_sub(
+                    metrics.get("superseded_count"),
+                    metrics.get("superseded_points"),
+                ),
+            },
             "sprint_slug": slug,
             "stories": stories,
             "epic_groups": epic_groups,
@@ -983,6 +992,35 @@ def _first_try_stat(numerator, denominator) -> str:
     if numerator is None or denominator is None:
         return "—"
     return f"{numerator} of {denominator}"
+
+
+def _points_sub(value) -> str:
+    """The points sub-line beneath 'Stories delivered': 'N points' or the missing mark."""
+    if value is None:
+        return "—"
+    return f"{value} points"
+
+
+def _rate_percent(value) -> str:
+    """The rate sub-line beneath 'Landed first try': 'N%' or the missing mark."""
+    if value is None:
+        return "—"
+    return f"{value}%"
+
+
+def _superseded_sub(count, points) -> str:
+    """The superseded sub-line beneath 'Days blocked'.
+
+    'N story(ies) superseded, P points' when both are present and count is nonzero;
+    'No stories superseded recorded' when count is zero;
+    the missing mark when either is null.
+    """
+    if count is None or points is None:
+        return "—"
+    if count == 0:
+        return "No stories superseded recorded"
+    noun = "story" if count == 1 else "stories"
+    return f"{count} {noun} superseded, {points} points"
 
 
 def _format_minutes(total_minutes) -> str:
