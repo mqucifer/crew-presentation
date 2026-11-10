@@ -495,9 +495,21 @@ section ul li a {
 .timeline__text,
 .cause-row > span:first-child,
 .decided-list span:last-child,
-.changed-trend-text {
+.changed-trend-sentence {
   min-width: 0;
   overflow-wrap: break-word;
+}
+
+.changed-trend-sentence {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  margin: 0 0 4px;
+}
+
+.changed-trend-direction {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  margin-top: 2px;
 }
 
 /* Attempt-row link: journey-page navigation */
