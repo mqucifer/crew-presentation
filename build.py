@@ -1218,7 +1218,8 @@ def _changed_from_metrics(metrics: dict, prior: dict) -> list[dict]:
     """Build 'What changed' entries from sprint-metrics answers when analysis is absent.
 
     Compares each measure's current value to its prior value and returns
-    entries for measures that have a non-null value in both.
+    entries only for measures that moved: a measure equal to its prior or
+    null on either side gets no line.
     """
     MEASURES = [
         "throughput",
@@ -1234,6 +1235,8 @@ def _changed_from_metrics(metrics: dict, prior: dict) -> list[dict]:
         now_value = metrics.get(measure)
         prev_value = prior.get(measure)
         if now_value is None or prev_value is None:
+            continue
+        if now_value == prev_value:
             continue
         label = _changed_label(measure)
         previous = _format_metrics_value(measure, prev_value)
