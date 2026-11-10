@@ -1537,8 +1537,8 @@ def test_failure_causes_2_0_list_shape_renders_class_rows():
     'Cause not recorded' placeholder."""
     tag = "delivery-history-TEST"
     causes = [
-        {"class": "VERIFY", "role": "Developer", "count": 7},
-        {"class": "EDIT", "role": "Developer", "count": 1},
+        {"class": "REVIEW", "role": "Developer", "count": 1},
+        {"class": "VERIFY", "role": "Developer", "count": 13},
     ]
     _make_fake_package(
         tag,
@@ -1567,18 +1567,27 @@ def test_failure_causes_2_0_list_shape_renders_class_rows():
         # one row per entry
         rows = section.count('class="cause-row"')
         assert rows == 2, f"expected 2 cause rows, got {rows}"
-        # the class's plain sentence is shown as the label, not the raw code
-        assert ">Tests didn't pass</span>" in section, "2.0.0 class 'VERIFY' not shown as its plain sentence"
-        assert ">The edit didn't land</span>" in section, "2.0.0 class 'EDIT' not shown as its plain sentence"
+        # REVIEW reads as its fixed exact plain sentence
+        assert ">Failed at review</span>" in section, (
+            "2.0.0 class 'REVIEW' not shown as 'Failed at review'"
+        )
+        # VERIFY reads as its plain sentence, not the raw code
+        assert ">Tests didn't pass</span>" in section, (
+            "2.0.0 class 'VERIFY' not shown as its plain sentence"
+        )
         # the raw codes must not appear as labels
-        assert ">VERIFY</span>" not in section, "raw code 'VERIFY' must not appear as a label"
-        assert ">EDIT</span>" not in section, "raw code 'EDIT' must not appear as a label"
+        assert ">REVIEW</span>" not in section, (
+            "raw code 'REVIEW' must not appear as a label"
+        )
+        assert ">VERIFY</span>" not in section, (
+            "raw code 'VERIFY' must not appear as a label"
+        )
         # each row's count equals the entry's count
-        assert ">7</span>" in section, "VERIFY count 7 not shown"
-        assert ">1</span>" in section, "EDIT count 1 not shown"
-        # a class-carrying entry is not the 'Cause not recorded' placeholder
+        assert ">13</span>" in section, "VERIFY count 13 not shown"
+        assert ">1</span>" in section, "REVIEW count 1 not shown"
+        # no row is the 'Cause not recorded' placeholder
         assert "Cause not recorded" not in section, (
-            "a class-carrying entry must not render as 'Cause not recorded'"
+            "a known class must not render as 'Cause not recorded'"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
