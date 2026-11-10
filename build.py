@@ -33,6 +33,12 @@ TEMPLATE_MAP = {
     "story_journey.html": "story-journey.html",
 }
 
+_EXCLUDED_MEASURES = frozenset({
+    "escalation_count",
+    "wip_violations",
+    "crew_fixes_merged",
+})
+
 
 def _package_dir() -> Path:
     """Locate the package directory under ./.package/ named by delivery-history.tag."""
@@ -286,11 +292,6 @@ def _render_pages(pkg: Path) -> dict:
         analysis_changed = analysis_by_sprint.get(sprint["name"], {}).get(
             "changed", []
         )
-        _EXCLUDED_MEASURES = frozenset({
-            "escalation_count",
-            "wip_violations",
-            "crew_fixes_merged",
-        })
         if analysis_changed:
             changed = []
             for e in analysis_changed:

@@ -9969,6 +9969,193 @@ def test_changed_from_metrics_prior_null_no_section():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_changed_from_metrics_superseded_count_no_direction():
+    """AC3: superseded_count 1 vs 0 shows 'Stories superseded' with both numbers and no direction word."""
+    tag = "delivery-history-TEST"
+    metrics = {
+        "Sprint 6": {
+            "superseded_count": 1,
+            "throughput": 5,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "prior": {
+                "superseded_count": 0,
+                "throughput": 3,
+            },
+        }
+    }
+    _make_fake_package(tag, sprint_names=["Sprint 5", "Sprint 6"], metrics=metrics)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_match = re.search(
+            r'<section class="card changed-trend".*?</section>',
+            html,
+            re.DOTALL,
+        )
+        assert section_match, "changed-trend section not found"
+        section_html = section_match.group(0)
+        # AC3: label is 'Stories superseded'
+        assert "Stories superseded" in section_html, (
+            f"label 'Stories superseded' not found: {section_html!r}"
+        )
+        # AC3: both numbers are shown
+        assert 'class="num">0<' in section_html, (
+            f"previous value '0' not found: {section_html!r}"
+        )
+        assert 'class="num">1<' in section_html, (
+            f"now value '1' not found: {section_html!r}"
+        )
+        # AC3: sentence names the measure and both numbers
+        assert "Stories superseded went from 0 to 1" in section_html, (
+            f"sentence not found: {section_html!r}"
+        )
+        # AC3: no direction word for this entry
+        # Find the specific entry for Stories superseded and check it has no direction div
+        entry_match = re.search(
+            r'<div class="changed-trend-entry">\s*'
+            r'<div class="changed-trend-sentence">Stories superseded.*?</div>\s*'
+            r'<div class="changed-trend-values">Stories superseded:.*?</div>\s*'
+            r'(.*?)\s*</div>',
+            section_html,
+            re.DOTALL,
+        )
+        assert entry_match, (
+            f"Stories superseded entry not found: {section_html!r}"
+        )
+        entry_html = entry_match.group(0)
+        assert 'changed-trend-direction' not in entry_html, (
+            f"direction word found in Stories superseded entry: {entry_html!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_from_metrics_no_wip_violations_or_crew_fixes():
+    """AC4: wip_violations and crew_fixes_merged in metrics and prior do not appear in the card."""
+    tag = "delivery-history-TEST"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 5,
+            "points_delivered": 18,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "wip_violations": 2,
+            "crew_fixes_merged": 4,
+            "prior": {
+                "throughput": 3,
+                "points_delivered": 9,
+                "wip_violations": 1,
+                "crew_fixes_merged": 2,
+            },
+        }
+    }
+    _make_fake_package(tag, sprint_names=["Sprint 5", "Sprint 6"], metrics=metrics)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_match = re.search(
+            r'<section class="card changed-trend".*?</section>',
+            html,
+            re.DOTALL,
+        )
+        assert section_match, "changed-trend section not found"
+        section_html = section_match.group(0)
+        # AC4: no WIP violations line
+        assert "wip violations" not in section_html.lower(), (
+            f"'wip violations' line found in card: {section_html!r}"
+        )
+        assert "WIP" not in section_html, (
+            f"'WIP' found in card: {section_html!r}"
+        )
+        # AC4: no crew fixes line
+        assert "crew fixes" not in section_html.lower(), (
+            f"'crew fixes' line found in card: {section_html!r}"
+        )
+        assert "fixes to the crew" not in section_html.lower(), (
+            f"'fixes to the crew' found in card: {section_html!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_from_metrics_null_on_one_side_omits_line():
+    """AC6: when a measure is null on either side, that line is omitted — no blank or '—' shown."""
+    tag = "delivery-history-TEST"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 5,
+            "cycle_time_minutes": None,
+            "lead_time_minutes": None,
+            "blocked_aging_days": None,
+            "superseded_count": None,
+            "points_delivered": None,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "prior": {
+                "throughput": 3,
+                "cycle_time_minutes": 300,
+                "lead_time_minutes": 500,
+                "blocked_aging_days": 1,
+                "superseded_count": 2,
+                "points_delivered": 10,
+            },
+        }
+    }
+    _make_fake_package(tag, sprint_names=["Sprint 5", "Sprint 6"], metrics=metrics)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_match = re.search(
+            r'<section class="card changed-trend".*?</section>',
+            html,
+            re.DOTALL,
+        )
+        assert section_match, "changed-trend section not found"
+        section_html = section_match.group(0)
+        # AC6: the only line shown is throughput (the only measure non-null on both sides)
+        # No null measures should appear
+        assert "Start to delivered" not in section_html, (
+            f"'Start to delivered' (cycle_time_minutes null in now) should not appear: {section_html!r}"
+        )
+        assert "Filed to delivered" not in section_html, (
+            f"'Filed to delivered' (lead_time_minutes null in now) should not appear: {section_html!r}"
+        )
+        assert "Days blocked" not in section_html, (
+            f"'Days blocked' (blocked_aging_days null in now) should not appear: {section_html!r}"
+        )
+        assert "Stories superseded" not in section_html, (
+            f"'Stories superseded' (superseded_count null in now) should not appear: {section_html!r}"
+        )
+        assert "Points delivered" not in section_html, (
+            f"'Points delivered' (points_delivered null in now) should not appear: {section_html!r}"
+        )
+        # AC6: no blank or em-dash values
+        assert 'class="num">' not in section_html.replace(
+            'class="num">3<', ""
+        ).replace('class="num">5<', ""), (
+            f"unexpected num span (possible blank or em-dash): {section_html!r}"
+        )
+        assert "—" not in section_html, (
+            f"em-dash found in card: {section_html!r}"
+        )
+        # AC6: the throughput line is still shown
+        assert "Stories delivered" in section_html, (
+            f"'Stories delivered' (throughput non-null both sides) should appear: {section_html!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_changed_from_analysis_preserved():
     """AC5: analysis.sprints has a changed list with measure, previous, now.
 
