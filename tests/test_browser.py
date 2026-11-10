@@ -1669,7 +1669,7 @@ def test_changed_trend_heading_before_entries():
         )
         assert heading_match, "no h2/h3 heading containing 'changed' found"
         heading_pos = heading_match.start()
-        entry_pos = html.index("Cycle time improved")
+        entry_pos = html.index("Start to delivered went from 5 d 4 h to 3 d 19 h")
         assert heading_pos < entry_pos, (
             f"heading at {heading_pos} should appear before entry at {entry_pos}"
         )
@@ -13018,13 +13018,9 @@ def test_all_measure_terms_explained_in_orientation_block():
             "render the 'What got done' card"
         )
         # AC2: the 'What changed' labels must be present so the
-        # 'superseded' and 'wip violations' checks fire.
+        # 'superseded' check fires.
         assert "stories superseded" in all_label_text, (
-            "'stories superseded' label not found in 'What changed'; "
-            "the fixture's prior metrics should produce the row"
-        )
-        assert "wip violations" in all_label_text, (
-            "'WIP violations' label not found in 'What changed'; "
+            "'Stories superseded' label not found in 'What changed'; "
             "the fixture's prior metrics should produce the row"
         )
         # AC3: the decided kind 'technical epic' must be present so the

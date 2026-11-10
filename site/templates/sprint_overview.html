@@ -38,7 +38,7 @@
 {% if changed %}
 <section class="card changed-trend" aria-labelledby="changed-h">
   <div class="card__head">
-    <h2 id="changed-h">What changed since {{ prior_sprint_name }}</h2>
+    <h2 id="changed-h">{% if prior_sprint_name %}What changed since {{ prior_sprint_name }}{% else %}What changed{% endif %}</h2>
   </div>
   <div class="card__body">
     {% for entry in changed %}
