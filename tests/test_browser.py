@@ -12415,30 +12415,114 @@ def _orientation_full_text(html: str) -> str:
 
 
 def test_all_measure_terms_explained_in_orientation_block():
-    """AC1: every term a visitor meets in a measure label, 'What changed' line
-    label or section heading is either absent from those positions or its
-    meaning is stated in the 'What this is' block."""
+    """Every term a visitor meets in a measure label, 'What changed' line
+    label, roster label, decided kind, sent-back sentence or section heading
+    is either absent from those positions or its meaning is stated in the
+    'What this is' block."""
     tag = "delivery-history-TEST"
-    _make_fake_package(
-        tag,
-        ["Sprint 6"],
-        metrics={
-            "Sprint 6": {
-                "throughput": 5,
-                "points_delivered": 10,
-                "first_attempt_numerator": 3,
-                "first_attempt_denominator": 5,
-                "escalation_count": 0,
-                "cycle_time_days": 2.0,
-                "dora": {
-                    "release_frequency": 2,
-                    "lead_time_days": 3.5,
-                    "change_failure_count": 0,
-                    "change_failure_rate_percent": 0,
-                    "mean_time_to_recovery_minutes": None,
-                },
-            }
+    sprints = [{"name": "Sprint 6", "start": "2026-09-22", "end": "2026-09-29"}]
+    cards = [
+        {
+            "number": 348,
+            "repo": "mqucifer/crew-presentation",
+            "title": "Improve the build pipeline",
+            "type": "Epic",
+            "technical": True,
+            "created": "2026-09-25",
         },
+        {
+            "number": 340,
+            "repo": "mqucifer/crew-presentation",
+            "title": "Show sprint history",
+            "type": "Goal",
+            "created": "2026-09-20",
+        },
+    ]
+    metrics = {
+        "Sprint 6": {
+            "throughput": 5,
+            "points_delivered": 10,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "escalation_count": 0,
+            "cycle_time_days": 2.0,
+            "superseded_count": 1,
+            "wip_violations": 2,
+            "prior": {
+                "superseded_count": 2,
+                "wip_violations": 3,
+            },
+            "roster": {
+                "released_epics": ["mqucifer/crew-presentation#348"],
+                "achieved_goals": ["mqucifer/crew-presentation#340"],
+            },
+            "dora": {
+                "release_frequency": 2,
+                "lead_time_days": 3.5,
+                "change_failure_count": 0,
+                "change_failure_rate_percent": 0,
+                "mean_time_to_recovery_minutes": None,
+            },
+        }
+    }
+    events = [
+        {
+            "kind": "sent_back",
+            "at": "2026-09-25T10:00:00Z",
+            "card": {"number": 1, "repo": "mqucifer/crew-presentation"},
+            "sent_from": "criteria_check",
+            "sent_to": "split",
+            "rule": "gate.criteria_repair",
+        },
+        {
+            "kind": "sent_back",
+            "at": "2026-09-25T14:00:00Z",
+            "card": {"number": 2, "repo": "mqucifer/crew-presentation"},
+            "sent_from": "main",
+            "sent_to": "refinement",
+        },
+    ]
+
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0.0",
+                "package": "delivery-history",
+                "date": "2026-01-01",
+            }
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["sprints"],
+                "properties": {"sprints": {"type": "array"}},
+            }
+        )
+    )
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events").mkdir(exist_ok=True)
+    (pkg_dir / "events/sprint-sprint-6.json").write_text(
+        json.dumps({"events": events})
+    )
+    (pkg_dir / "delivery-history.json").write_text(
+        json.dumps(
+            {
+                "sprints": sprints,
+                "cards": cards,
+                "crew_repository": "mqucifer/crew",
+                "sprint_metrics": {"answers": metrics},
+                "periods": [
+                    {"sprint": "Sprint 6", "file": "events/sprint-sprint-6.json"}
+                ],
+            }
+        )
     )
     original = DELIVERY_HISTORY_TAG.read_text()
     DELIVERY_HISTORY_TAG.write_text(tag + "\n")
@@ -12448,7 +12532,8 @@ def test_all_measure_terms_explained_in_orientation_block():
 
         orientation_text = _orientation_full_text(html).lower()
 
-        # Fixed list of terms a visitor meets in labels and headings
+        # Fixed list of terms a visitor meets in labels, headings, roster
+        # labels, decided kinds, and sent-back sentences
         terms = [
             "sprint",
             "story",
@@ -12463,10 +12548,19 @@ def test_all_measure_terms_explained_in_orientation_block():
             "recovery",
             "crew",
             "dora",
+            "epic",
+            "superseded",
+            "wip violations",
+            "technical epic",
+            "criteria check",
+            "the split",
+            "main",
+            "refinement",
         ]
 
         # Collect the text of all measure labels, changed-trend labels,
-        # section headings, and DORA meta labels from the page.
+        # roster labels, decided kind labels, sent-back sentences, section
+        # headings, and DORA meta labels from the page.
         label_texts: list[str] = []
 
         # Stat labels (.stat__label)
@@ -12482,6 +12576,29 @@ def test_all_measure_terms_explained_in_orientation_block():
 
         # Section headings (h2)
         label_texts.extend(re.findall(r"<h2[^>]*>([^<]+)</h2>", html))
+
+        # Roster labels (.roster-label)
+        label_texts.extend(re.findall(
+            r'class="roster-label"[^>]*>([^<]+)<', html
+        ))
+
+        # Decided section: all text (tags stripped)
+        decided_match = re.search(
+            r'<section[^>]*aria-labelledby="decided-h"[^>]*>(.*?)</section>',
+            html, re.DOTALL,
+        )
+        if decided_match:
+            decided_text = re.sub(r"<[^>]+>", " ", decided_match.group(1))
+            label_texts.append(decided_text)
+
+        # Sent back section: all text (tags stripped)
+        sent_back_match = re.search(
+            r'<section[^>]*aria-labelledby="sent-back-h"[^>]*>(.*?)</section>',
+            html, re.DOTALL,
+        )
+        if sent_back_match:
+            sent_back_text = re.sub(r"<[^>]+>", " ", sent_back_match.group(1))
+            label_texts.append(sent_back_text)
 
         # DORA section: all .meta text within it (descriptions and labels)
         dora_match = re.search(
@@ -12524,14 +12641,52 @@ def test_all_measure_terms_explained_in_orientation_block():
             "per-term check below would silently skip it"
         )
 
+        # AC1: the roster label 'Released epics' must be present so the
+        # 'epic' check fires.
+        assert "released epics" in all_label_text, (
+            "'Released epics' roster label not found; the fixture should "
+            "render the 'What got done' card"
+        )
+        # AC2: the 'What changed' labels must be present so the
+        # 'superseded' and 'wip violations' checks fire.
+        assert "stories superseded" in all_label_text, (
+            "'stories superseded' label not found in 'What changed'; "
+            "the fixture's prior metrics should produce the row"
+        )
+        assert "wip violations" in all_label_text, (
+            "'WIP violations' label not found in 'What changed'; "
+            "the fixture's prior metrics should produce the row"
+        )
+        # AC3: the decided kind 'technical epic' must be present so the
+        # check fires.
+        assert "technical epic" in all_label_text, (
+            "'technical epic' kind not found in 'Decided by the crew'; "
+            "the fixture's technical epic card should produce the row"
+        )
+        # AC4: the sent-back sentences must be present so the step-name
+        # checks fire.
+        assert "criteria check" in all_label_text, (
+            "'criteria check' not found in a 'Sent back' sentence; "
+            "the fixture's sent_back event should produce the sentence"
+        )
+        assert "the split" in all_label_text, (
+            "'the split' not found in a 'Sent back' sentence; "
+            "the fixture's sent_back event should produce the sentence"
+        )
+        assert "refinement" in all_label_text, (
+            "'refinement' not found in a 'Sent back' sentence; "
+            "the fixture's sent_back event should produce the sentence"
+        )
+
         for term in terms:
             if term in all_label_text:
                 # The label may use a hyphenated form (e.g. 'first-attempt')
                 # while the block uses the spaced form ('first attempt').
                 spaced = term.replace("-", " ")
                 assert term in orientation_text or spaced in orientation_text, (
-                    f"term {term!r} appears in a measure label or heading on "
-                    f"the sprint page but is not explained in the "
+                    f"term {term!r} appears in a measure label, heading, "
+                    f"roster label, decided kind, or sent-back sentence "
+                    f"on the sprint page but is not explained in the "
                     f"'What this is' block"
                 )
     finally:
