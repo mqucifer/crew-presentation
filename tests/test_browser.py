@@ -1532,8 +1532,9 @@ def test_failure_causes_empty_renders_no_failures():
 
 
 def test_failure_causes_2_0_list_shape_renders_class_rows():
-    """AC1: 2.0.0 {class, role, count} entries render one row each, the class as the
-    label, each count preserved, and no row is the 'Cause not recorded' placeholder."""
+    """AC1: 2.0.0 {class, role, count} entries render one row each, the class's
+    plain sentence as the label, each count preserved, and no row is the
+    'Cause not recorded' placeholder."""
     tag = "delivery-history-TEST"
     causes = [
         {"class": "VERIFY", "role": "Developer", "count": 7},
@@ -1566,9 +1567,12 @@ def test_failure_causes_2_0_list_shape_renders_class_rows():
         # one row per entry
         rows = section.count('class="cause-row"')
         assert rows == 2, f"expected 2 cause rows, got {rows}"
-        # the class is shown as the label, not the placeholder
-        assert ">VERIFY</span>" in section, "2.0.0 class 'VERIFY' not shown as a label"
-        assert ">EDIT</span>" in section, "2.0.0 class 'EDIT' not shown as a label"
+        # the class's plain sentence is shown as the label, not the raw code
+        assert ">Tests didn't pass</span>" in section, "2.0.0 class 'VERIFY' not shown as its plain sentence"
+        assert ">The edit didn't land</span>" in section, "2.0.0 class 'EDIT' not shown as its plain sentence"
+        # the raw codes must not appear as labels
+        assert ">VERIFY</span>" not in section, "raw code 'VERIFY' must not appear as a label"
+        assert ">EDIT</span>" not in section, "raw code 'EDIT' must not appear as a label"
         # each row's count equals the entry's count
         assert ">7</span>" in section, "VERIFY count 7 not shown"
         assert ">1</span>" in section, "EDIT count 1 not shown"
@@ -7869,9 +7873,9 @@ def test_cause_labels_no_raw_code_pattern():
 
 
 def test_cause_label_review_renders_as_cause_not_recorded():
-    """AC1: code 'REVIEW' (not in CAUSE_LABELS) renders as 'Cause not recorded', not 'REVIEW'."""
+    """AC2: code 'SOMETHING_NEW' (not in CAUSE_LABELS) renders as 'Cause not recorded', not the raw code."""
     tag = "delivery-history-TEST"
-    causes = [{"reason": "REVIEW", "count": 1}]
+    causes = [{"reason": "SOMETHING_NEW", "count": 1}]
     _make_fake_package(
         tag,
         ["Sprint 6"],
@@ -7897,11 +7901,11 @@ def test_cause_label_review_renders_as_cause_not_recorded():
         section = html[section_start:section_end]
         # The label span must contain 'Cause not recorded'
         assert ">Cause not recorded</span>" in section, (
-            "label span should read 'Cause not recorded' for unknown code 'REVIEW'"
+            "label span should read 'Cause not recorded' for unknown code 'SOMETHING_NEW'"
         )
-        # The raw code 'REVIEW' must not appear in a label span
-        assert ">REVIEW</span>" not in section, (
-            "raw code 'REVIEW' must not appear as a label"
+        # The raw code must not appear in a label span
+        assert ">SOMETHING_NEW</span>" not in section, (
+            "raw code 'SOMETHING_NEW' must not appear as a label"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -7909,9 +7913,9 @@ def test_cause_label_review_renders_as_cause_not_recorded():
 
 
 def test_cause_label_qa_renders_as_cause_not_recorded():
-    """AC2: code 'QA' (not in CAUSE_LABELS) renders as 'Cause not recorded', not 'QA'."""
+    """AC2: code 'ANOTHER_NEW' (not in CAUSE_LABELS) renders as 'Cause not recorded', not the raw code."""
     tag = "delivery-history-TEST"
-    causes = [{"reason": "QA", "count": 1}]
+    causes = [{"reason": "ANOTHER_NEW", "count": 1}]
     _make_fake_package(
         tag,
         ["Sprint 6"],
@@ -7937,11 +7941,11 @@ def test_cause_label_qa_renders_as_cause_not_recorded():
         section = html[section_start:section_end]
         # The label span must contain 'Cause not recorded'
         assert ">Cause not recorded</span>" in section, (
-            "label span should read 'Cause not recorded' for unknown code 'QA'"
+            "label span should read 'Cause not recorded' for unknown code 'ANOTHER_NEW'"
         )
-        # The raw code 'QA' must not appear in a label span
-        assert ">QA</span>" not in section, (
-            "raw code 'QA' must not appear as a label"
+        # The raw code must not appear in a label span
+        assert ">ANOTHER_NEW</span>" not in section, (
+            "raw code 'ANOTHER_NEW' must not appear as a label"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
