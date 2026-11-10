@@ -217,7 +217,7 @@ def _render_pages(pkg: Path) -> dict:
 
     sprint_template = env.get_template("sprint_overview.html")
     default_sprint_slug = ""
-    for sprint in sprints:
+    for i, sprint in enumerate(sprints):
         slug = _slug(sprint["name"])
         key = sprint["name"]
         if key not in sprint_metrics_answers:
@@ -282,20 +282,35 @@ def _render_pages(pkg: Path) -> dict:
                 metrics.get("session_epics"),
             )
 
+        prior_sprint_name = sprints[i - 1]["name"] if i > 0 else None
         analysis_changed = analysis_by_sprint.get(sprint["name"], {}).get(
             "changed", []
         )
+        _EXCLUDED_MEASURES = frozenset({
+            "escalation_count",
+            "wip_violations",
+            "crew_fixes_merged",
+        })
         if analysis_changed:
-            changed = [
-                {
-                    "text": e["text"],
-                    "label": _changed_label(e["measure"]),
-                    "previous": _format_changed_value(e["measure"], e["previous"]),
-                    "now": _format_changed_value(e["measure"], e["now"]),
-                }
-                for e in analysis_changed
-                if e["measure"] != "escalation_count"
-            ]
+            changed = []
+            for e in analysis_changed:
+                measure = e["measure"]
+                if measure in _EXCLUDED_MEASURES:
+                    continue
+                label = _changed_label(measure)
+                previous = _format_changed_value(measure, e["previous"])
+                now = _format_changed_value(measure, e["now"])
+                if not previous or not now or previous == "—" or now == "—":
+                    continue
+                changed.append(
+                    {
+                        "sentence": _changed_sentence(label, previous, now),
+                        "label": label,
+                        "previous": previous,
+                        "now": now,
+                        "direction": _measure_direction(measure, e["now"], e["previous"]),
+                    }
+                )
         else:
             prior = metrics.get("prior")
             if prior:
@@ -353,6 +368,7 @@ def _render_pages(pkg: Path) -> dict:
             "epic_groups": epic_groups,
             "has_analysis": has_analysis,
             "changed": changed,
+            "prior_sprint_name": prior_sprint_name,
             "decided": decided,
             "failure_causes": _build_failure_causes(metrics),
             "sent_back_rows": sent_back_rows,
@@ -1154,25 +1170,47 @@ def _build_idle_time(metrics: dict):
 
 
 def _changed_label(measure: str) -> str:
-    """A human-readable label for a changed-trend measure.
-
-    Time measures show as 'cycle time' or 'lead time'; non-time measures
-    show as their human-readable name.
-    """
+    """A human-readable label for a changed-trend measure, matching the totals card."""
     LABELS = {
-        "cycle_time_days": "cycle time",
-        "cycle_time_minutes": "cycle time",
-        "lead_time_minutes": "lead time",
-        "lead_time_days": "lead time",
-        "first_attempt_rate_percent": "first-attempt rate",
-        "points_delivered": "points delivered",
-        "throughput": "stories delivered",
-        "blocked_aging_days": "days blocked",
-        "superseded_count": "stories superseded",
-        "crew_fixes_merged": "crew fixes merged",
-        "wip_violations": "WIP violations",
+        "cycle_time_days": "Start to delivered",
+        "cycle_time_minutes": "Start to delivered",
+        "lead_time_minutes": "Filed to delivered",
+        "lead_time_days": "Filed to delivered",
+        "first_attempt_rate_percent": "First-try rate",
+        "points_delivered": "Points delivered",
+        "throughput": "Stories delivered",
+        "blocked_aging_days": "Days blocked",
+        "superseded_count": "Stories superseded",
     }
     return LABELS.get(measure, measure)
+
+
+def _measure_direction(measure: str, now_value, prev_value) -> str | None:
+    """'better' or 'worse' for measures with a settled direction, None otherwise."""
+    if now_value == prev_value:
+        return None
+    up_is_better = measure in (
+        "throughput",
+        "points_delivered",
+        "first_attempt_rate_percent",
+    )
+    up_is_worse = measure in (
+        "cycle_time_minutes",
+        "cycle_time_days",
+        "lead_time_minutes",
+        "lead_time_days",
+        "blocked_aging_days",
+    )
+    if up_is_better:
+        return "better" if now_value > prev_value else "worse"
+    if up_is_worse:
+        return "worse" if now_value > prev_value else "better"
+    return None
+
+
+def _changed_sentence(label: str, previous: str, now: str) -> str:
+    """A plain sentence naming the measure in plain English and mentioning both numbers."""
+    return f"{label} went from {previous} to {now}"
 
 
 def _changed_from_metrics(metrics: dict, prior: dict) -> list[dict]:
@@ -1182,12 +1220,11 @@ def _changed_from_metrics(metrics: dict, prior: dict) -> list[dict]:
     entries for measures that have a non-null value in both.
     """
     MEASURES = [
-        "cycle_time_minutes",
-        "lead_time_minutes",
         "throughput",
         "points_delivered",
         "first_attempt_rate_percent",
-        "wip_violations",
+        "cycle_time_minutes",
+        "lead_time_minutes",
         "blocked_aging_days",
         "superseded_count",
     ]
@@ -1197,12 +1234,16 @@ def _changed_from_metrics(metrics: dict, prior: dict) -> list[dict]:
         prev_value = prior.get(measure)
         if now_value is None or prev_value is None:
             continue
+        label = _changed_label(measure)
+        previous = _format_metrics_value(measure, prev_value)
+        now = _format_metrics_value(measure, now_value)
         entries.append(
             {
-                "text": "",
-                "label": _changed_label(measure),
-                "previous": _format_metrics_value(measure, prev_value),
-                "now": _format_metrics_value(measure, now_value),
+                "sentence": _changed_sentence(label, previous, now),
+                "label": label,
+                "previous": previous,
+                "now": now,
+                "direction": _measure_direction(measure, now_value, prev_value),
             }
         )
     return entries
