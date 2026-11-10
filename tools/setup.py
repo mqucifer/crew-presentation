@@ -41,7 +41,9 @@ def _fetch(url: str, dest: Path, label: str) -> None:
     are exhausted the run fails loudly, naming the label.
     """
     last_exc = None
+    attempts = 0
     for attempt in range(1, MAX_ATTEMPTS + 1):
+        attempts = attempt
         try:
             with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT) as response:
                 dest.write_bytes(response.read())
@@ -59,7 +61,7 @@ def _fetch(url: str, dest: Path, label: str) -> None:
                 )
                 time.sleep(wait)
     print(
-        f"Failed to download {label} after {MAX_ATTEMPTS} attempt(s): {last_exc}",
+        f"Failed to download {label} after {attempts} attempt(s): {last_exc}",
         file=sys.stderr,
     )
     sys.exit(1)
