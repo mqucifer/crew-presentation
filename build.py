@@ -949,12 +949,12 @@ def _normalize_failure_causes(raw) -> list[dict]:
     shapes carry a list of [reason, count] pairs, a list of {reason, count}
     objects, or a bare list of reasons. Each carries the same information.
 
-    A 2.0.0 entry's class is a recorded cause and is shown as-is, so it is
-    flagged recorded=True and its reason is the class value; every other shape
-    (a 1.x map key, a reason/cause field, or a bare code) is looked up in
-    CAUSE_LABELS by the caller and flagged recorded=False. Anything we cannot
-    read yields a 0 count instead of a crash — the site shows what its package
-    says, it does not compute the metric itself.
+    Every entry is flagged recorded=False and its reason looked up in
+    CAUSE_LABELS by the caller, which maps a known class or reason code to its
+    plain sentence and falls back to "Cause not recorded" for anything the
+    table doesn't know. Anything we cannot read yields a 0 count instead of a
+    crash — the site shows what its package says, it does not compute the
+    metric itself.
     """
     if not raw:
         return []
@@ -970,22 +970,19 @@ def _normalize_failure_causes(raw) -> list[dict]:
         if isinstance(item, dict):
             class_code = item.get("class")
             if class_code is not None:
-                # 2.0.0: {class, role, count} — the class is the recorded cause
+                # 2.0.0: {class, role, count} — the class is looked up in
+                # CAUSE_LABELS for its plain sentence
                 reason = str(class_code)
                 count = item.get("count", 0)
-                recorded = bool(reason)
             else:
                 reason = item.get("reason", item.get("cause", ""))
                 count = item.get("count", 0)
-                recorded = False
         elif isinstance(item, (list, tuple)) and len(item) >= 2:
             reason, count = item[0], item[1]
-            recorded = False
         else:
             reason, count = item, 0
-            recorded = False
         causes.append(
-            {"reason": str(reason), "count": _as_count(count), "recorded": recorded}
+            {"reason": str(reason), "count": _as_count(count), "recorded": False}
         )
     return causes
 
@@ -1006,23 +1003,19 @@ def _as_count(value) -> int:
 def _build_failure_causes(metrics: dict) -> list[dict]:
     """Sprint-metrics' top_failure_causes as ready-to-render bar-chart rows.
 
-    Each row carries the reason (a 2.0.0 class shown as-is, or a 1.x reason
-    code mapped to a display string via CAUSE_LABELS), its count, the bar's
-    width as a percentage of the largest count, and whether the reason is the
-    unrecorded placeholder. Widths are computed here (display sizing, not a
-    metric) so the template only prints values and the build never divides by
-    zero.
+    Each row carries the reason (a known class or reason code mapped to its
+    plain sentence via CAUSE_LABELS, or the "Cause not recorded" placeholder
+    for a code the table doesn't know), its count, the bar's width as a
+    percentage of the largest count, and whether the reason is the unrecorded
+    placeholder. Widths are computed here (display sizing, not a metric) so
+    the template only prints values and the build never divides by zero.
     """
     causes = _normalize_failure_causes(metrics.get("top_failure_causes"))
     max_count = max((c["count"] for c in causes), default=0)
     rows = []
     for c in causes:
-        if c["recorded"]:
-            reason = c["reason"]
-            unrecorded = False
-        else:
-            reason = CAUSE_LABELS.get(c["reason"], "Cause not recorded")
-            unrecorded = c["reason"] not in CAUSE_LABELS or c["reason"] == "unrecorded"
+        reason = CAUSE_LABELS.get(c["reason"], "Cause not recorded")
+        unrecorded = c["reason"] not in CAUSE_LABELS or c["reason"] == "unrecorded"
         rows.append(
             {
                 "reason": reason,
@@ -1295,12 +1288,23 @@ def _changed_from_metrics(metrics: dict, prior: dict) -> list[dict]:
 
 
 CAUSE_LABELS = {
+    # 1.x reason codes
     "test_assertion_failed": "A test's assertion failed",
     "already_exists": '"already exists"',
     "must_create_or_edit_file": "Must create or edit a file",
     "undefined_name": "Undefined name (lint)",
     "no_test_written": "No test written",
     "unrecorded": "Cause not recorded",
+    # 2.0.0 failure classes
+    "REVIEW": "Failed at review",
+    "QA": "Failed at QA",
+    "SCHEMA": "The code didn't match the schema",
+    "EDIT": "The edit didn't land",
+    "VERIFY": "Tests didn't pass",
+    "REGRESSION": "A regression was found",
+    "OVERWRITE": "The edit overwrote existing work",
+    "BOUNDS": "Out of bounds",
+    "CAPABILITY": "Beyond the model's capability",
 }
 
 # Board's own word for each step the flow records.
