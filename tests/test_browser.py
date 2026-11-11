@@ -7222,7 +7222,7 @@ def test_stat_values_and_order_at_phone_width():
                 values = page.evaluate(
                     """
                     () => Array.from(
-                        document.querySelectorAll('.stat__value')
+                        document.querySelectorAll('.stats .stat__value')
                     ).map((el) => el.textContent.trim())
                     """
                 )
@@ -7282,7 +7282,7 @@ def test_stat_values_at_least_text_xl_at_phone_width():
             sizes = page.evaluate(
                 """
                 () => Array.from(
-                    document.querySelectorAll('.stat__value')
+                    document.querySelectorAll('.stats .stat__value')
                 ).map(
                     (el) =>
                         parseFloat(
