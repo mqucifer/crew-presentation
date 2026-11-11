@@ -107,7 +107,6 @@ def _build_events_validators(events_schema):
     if not discriminator:
         return None, None
 
-    kind_property = discriminator.get("propertyName", "kind")
     kind_to_ref = discriminator.get("mapping", {})
 
     # Build a structural schema: same top-level constraints, but events.items
