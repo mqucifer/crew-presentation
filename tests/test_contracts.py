@@ -602,6 +602,220 @@ def test_build_succeeds_when_sprint_events_file_absent():
         shutil.rmtree(pkg_dir, ignore_errors=True)
 
 
+def test_events_file_read_at_most_once():
+    """AC1: each events file is read from disk at most once per build.
+
+    Without a cache, _load_sprint_events is called up to 3 times per sprint
+    in the render loop (for epic_groups, for decided, for sent_back), plus
+    once in _build_board_state, and _load_all_events re-reads every events
+    file again for story-journey pages. Each call re-reads and JSON-parses
+    the same file from disk. With delivery-history-2026-11-11's larger event
+    set, this redundant I/O pushes the total past the 20-second bound.
+    """
+    tag = "delivery-history-TEST-CACHE"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-11-06"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+
+    index = {
+        "package": "delivery-history",
+        "schema_version": "3.0.0",
+        "date": "2026-11-06",
+        "timezone": "America/Chicago",
+        "crew_repository": "crew",
+        "repositories": ["crew-presentation"],
+        "sprints": [
+            {"name": "Sprint 1", "start": "2026-11-06", "end": "2026-11-06"},
+            {"name": "Sprint 2", "start": "2026-11-07", "end": "2026-11-07"},
+        ],
+        "cards": [
+            {
+                "repo": "crew-presentation",
+                "number": 1,
+                "type": "Story",
+                "title": "A test story",
+                "url": "https://github.com/mqucifer/crew-presentation/issues/1",
+                "parent": None,
+                "points": 1,
+                "sprint": "Sprint 1",
+                "status": "Done",
+                "status_set": "2026-11-06T12:00:00Z",
+                "created": "2026-11-06T09:00:00Z",
+                "closed": "2026-11-06T12:00:00Z",
+                "technical": False,
+                "closed_as": "completed",
+                "superseded_because": None,
+            },
+            {
+                "repo": "crew-presentation",
+                "number": 2,
+                "type": "Story",
+                "title": "Another story",
+                "url": "https://github.com/mqucifer/crew-presentation/issues/2",
+                "parent": None,
+                "points": 1,
+                "sprint": "Sprint 2",
+                "status": "Done",
+                "status_set": "2026-11-07T12:00:00Z",
+                "created": "2026-11-07T09:00:00Z",
+                "closed": "2026-11-07T12:00:00Z",
+                "technical": False,
+                "closed_as": "completed",
+                "superseded_because": None,
+            },
+        ],
+        "periods": [
+            {
+                "sprint": "Sprint 1",
+                "start": "2026-11-06",
+                "end": "2026-11-06",
+                "file": "events/2026-11-06.json",
+                "events": 1,
+            },
+            {
+                "sprint": "Sprint 2",
+                "start": "2026-11-07",
+                "end": "2026-11-07",
+                "file": "events/2026-11-07.json",
+                "events": 1,
+            },
+        ],
+        "sprint_metrics": {
+            "release": "3.0.0",
+            "answers": {
+                "Sprint 1": {
+                    "cycle_time_days": 0,
+                    "lead_time_days": 0,
+                    "throughput": 1,
+                    "wip_violations": 0,
+                    "blocked_aging_days": 0,
+                    "escalation_rate_percent": 0,
+                    "points_delivered": 1,
+                    "first_attempt_numerator": 1,
+                    "first_attempt_denominator": 1,
+                    "escalation_count": 0,
+                    "superseded_count": 0,
+                    "superseded_points": 0,
+                    "first_attempt_rate_percent": 100,
+                    "failure_breakdown": [],
+                    "top_failure_causes": {},
+                    "superseded_breakdown": None,
+                    "flags": None,
+                    "prior": None,
+                    "delta": None,
+                    "cycle_time_minutes": 30,
+                    "lead_time_minutes": 30,
+                },
+                "Sprint 2": {
+                    "cycle_time_days": 0,
+                    "lead_time_days": 0,
+                    "throughput": 1,
+                    "wip_violations": 0,
+                    "blocked_aging_days": 0,
+                    "escalation_rate_percent": 0,
+                    "points_delivered": 1,
+                    "first_attempt_numerator": 1,
+                    "first_attempt_denominator": 1,
+                    "escalation_count": 0,
+                    "superseded_count": 0,
+                    "superseded_points": 0,
+                    "first_attempt_rate_percent": 100,
+                    "failure_breakdown": [],
+                    "top_failure_causes": {},
+                    "superseded_breakdown": None,
+                    "flags": None,
+                    "prior": None,
+                    "delta": None,
+                    "cycle_time_minutes": 30,
+                    "lead_time_minutes": 30,
+                },
+            },
+        },
+    }
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(parents=True, exist_ok=True)
+    (events_dir / "2026-11-06.json").write_text(
+        json.dumps(
+            {
+                "events": [
+                    {
+                        "kind": "card_moved",
+                        "at": "2026-11-06T09:00:00Z",
+                        "card": {"repo": "crew-presentation", "number": 1},
+                        "from_column": "Inbox (Goals)",
+                        "to_column": "Sprint Backlog",
+                    }
+                ]
+            }
+        )
+    )
+    (events_dir / "2026-11-07.json").write_text(
+        json.dumps(
+            {
+                "events": [
+                    {
+                        "kind": "card_moved",
+                        "at": "2026-11-07T09:00:00Z",
+                        "card": {"repo": "crew-presentation", "number": 2},
+                        "from_column": "Inbox (Goals)",
+                        "to_column": "Sprint Backlog",
+                    }
+                ]
+            }
+        )
+    )
+
+    # Import build.py and instrument _load_json to count reads per file.
+    spec = importlib.util.spec_from_file_location(
+        "build_cache_test", REPO_ROOT / "build.py"
+    )
+    build_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(build_mod)
+
+    # Clear the cache in case it was populated by module-level code.
+    if hasattr(build_mod, "_events_file_cache"):
+        build_mod._events_file_cache.clear()
+
+    load_counts: dict[str, int] = {}
+    original_load_json = build_mod._load_json
+
+    def counting_load_json(path):
+        key = str(path)
+        load_counts[key] = load_counts.get(key, 0) + 1
+        return original_load_json(path)
+
+    build_mod._load_json = counting_load_json
+
+    try:
+        build_mod._render_pages(pkg_dir)
+    finally:
+        build_mod._load_json = original_load_json
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+    # Each events file should have been read from disk at most once.
+    for name in ("2026-11-06.json", "2026-11-07.json"):
+        path_str = str(events_dir / name)
+        count = load_counts.get(path_str, 0)
+        assert count <= 1, (
+            f"events/{name} was read {count} times from disk; "
+            "each events file must be read at most once per build, "
+            "because redundant re-reading pushes the build past its "
+            "20-second bound with a large enough package"
+        )
+
+
 def test_build_fails_on_unsupported_major_version():
     """AC2: build.py exits non-zero and names the major version as unsupported."""
     tag = "delivery-history-TEST"
