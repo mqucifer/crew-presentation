@@ -13883,6 +13883,65 @@ def test_undelivered_story_time_cell_reads_state():
         shutil.rmtree(pkg_dir, ignore_errors=True)
 
 
+def test_done_not_in_roster_row_does_not_read_not_delivered():
+    """AC1+AC2: a story whose badge reads 'Done' but whose card is not in this
+    sprint's roster.completed_stories does not show 'not delivered' in its
+    time cell and does not show 'Not delivered yet.' in its happened line."""
+    # Roster excludes sprint-metrics#125 (a Done card) to create the
+    # Done-but-not-in-roster case.
+    roster = [
+        "sprint-metrics#126",
+        "sprint-metrics#127",
+        "sprint-metrics#128",
+        "sprint-metrics#133",
+    ]
+    tag, pkg_dir = _build_3_0_0_mock_sprint_6(roster_completed=roster)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+
+        def row_time_cell(card_number):
+            marker = f'sprint-metrics<span class="num meta">#{card_number}</span>'
+            row_start = html.find(marker)
+            assert row_start != -1, f"row for card #{card_number} not found"
+            next_row = html.find('class="story-row"', row_start + len(marker))
+            if next_row == -1:
+                next_row = len(html)
+            row_html = html[row_start:next_row]
+            match = re.search(
+                r'class="story-row__time num">(.*?)</span>', row_html, re.DOTALL
+            )
+            assert match, f"time cell not found for card #{card_number}"
+            return match.group(1)
+
+        def row_happened(card_number):
+            pattern = (
+                rf'sprint-metrics<span class="num meta">#{card_number}</span>'
+                r'.*?class="story-row__happened">([^<]+)<'
+            )
+            match = re.search(pattern, html, re.DOTALL)
+            assert match, f"happened line for card #{card_number} not found"
+            return match.group(1)
+
+        # Card 125 has status "Done" but is not in the roster.
+        # AC1: time cell must not contain "not delivered"
+        time_cell_125 = row_time_cell(125)
+        assert "not delivered" not in time_cell_125, (
+            f"card #125 time cell should not read 'not delivered': {time_cell_125!r}"
+        )
+
+        # AC2: happened line must not contain "Not delivered yet."
+        happened_125 = row_happened(125)
+        assert "Not delivered yet." not in happened_125, (
+            f"card #125 happened line should not read 'Not delivered yet.': {happened_125!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
 def test_zero_session_minutes_shown_not_no_time_recorded():
     """AC6: a zero the package carries is shown as 0; absence and zero are
     distinct, so 'no time recorded' is reserved for what the package does

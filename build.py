@@ -721,6 +721,8 @@ def _story_happened_line(
         if parts:
             return "Blocked now, " + " and ".join(parts) + "."
         return "Blocked now."
+    if status == "Done":
+        return "Done — not counted in this sprint's delivered stories."
     if missed_count == 1:
         return "Not delivered yet, missed once so far."
     elif missed_count == 2:
@@ -738,12 +740,15 @@ def _story_time_cell(
     A delivered story with a session_stories entry whose session_minutes is
     not null reads '<working> · <model> model'; a delivered story with no
     entry (or a null session_minutes) reads 'no time recorded'; a story
-    closed as not planned reads 'never built'; any other undelivered story
-    reads 'not delivered'.
+    closed as not planned reads 'never built'; a Done story not in this
+    sprint's delivered roster reads '—'; any other undelivered story reads
+    'not delivered'.
     """
     if not is_delivered:
         if card.get("closed_as") == "not_planned":
             return "never built"
+        if (card.get("status") or "") == "Done":
+            return "—"
         return "not delivered"
     # Delivered: look up the session_stories entry.
     if not session_stories:
