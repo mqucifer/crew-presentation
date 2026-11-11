@@ -2247,7 +2247,7 @@ def test_sprint_overview_dora_values_shown():
 
 
 def test_sprint_overview_dora_absent_shows_no_data():
-    """AC2: when dora is null, the DORA card shows 'no release data for this sprint'."""
+    """AC2: when dora is null, the DORA card still shows all four measures, each reading 'no value yet'."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -2271,9 +2271,18 @@ def test_sprint_overview_dora_absent_shows_no_data():
         html = (BUILD_DIR / "sprint-6.html").read_text()
         # The section heading is still present
         assert "How releases went" in html, "DORA heading 'How releases went' not found"
-        # The absence message is shown
-        assert "no release data for this sprint" in html, (
-            "absence line 'no release data for this sprint' not found"
+        # All four measure labels are present
+        assert "Releases this sprint" in html, "DORA label 'Releases this sprint' not found"
+        assert "Change to release" in html, "DORA label 'Change to release' not found"
+        assert "Releases that failed" in html, "DORA label 'Releases that failed' not found"
+        assert "Time to recover" in html, "DORA label 'Time to recover' not found"
+        # Each value reads 'no value yet'
+        assert html.count("no value yet") == 4, (
+            f"expected 4 occurrences of 'no value yet', found {html.count('no value yet')}"
+        )
+        # The old absence line is gone
+        assert "no release data for this sprint" not in html, (
+            "old absence line 'no release data for this sprint' should not appear"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
@@ -2281,7 +2290,7 @@ def test_sprint_overview_dora_absent_shows_no_data():
 
 
 def test_sprint_overview_dora_all_null_shows_no_data():
-    """AC1: when dora exists but all four values are null, show 'no release data for this sprint'."""
+    """AC1: when dora exists but all four values are null, each shows 'no value yet'."""
     tag = "delivery-history-TEST"
     _make_fake_package(
         tag,
@@ -2310,15 +2319,19 @@ def test_sprint_overview_dora_all_null_shows_no_data():
         html = (BUILD_DIR / "sprint-6.html").read_text()
         # The section heading is still present
         assert "How releases went" in html, "DORA heading 'How releases went' not found"
-        # The absence message is shown
-        assert "no release data for this sprint" in html, (
-            "absence line 'no release data for this sprint' not found"
+        # All four measure labels are present
+        assert "Releases this sprint" in html, "DORA label 'Releases this sprint' not found"
+        assert "Change to release" in html, "DORA label 'Change to release' not found"
+        assert "Releases that failed" in html, "DORA label 'Releases that failed' not found"
+        assert "Time to recover" in html, "DORA label 'Time to recover' not found"
+        # Each value reads 'no value yet'
+        assert html.count("no value yet") == 4, (
+            f"expected 4 occurrences of 'no value yet', found {html.count('no value yet')}"
         )
-        # None of the metric labels are rendered
-        assert "Releases this sprint" not in html, "metric label 'Releases this sprint' should not appear"
-        assert "Change to release" not in html, "metric label 'Change to release' should not appear"
-        assert "Releases that failed" not in html, "metric label 'Releases that failed' should not appear"
-        assert "Time to recover" not in html, "metric label 'Time to recover' should not appear"
+        # The old absence line is gone
+        assert "no release data for this sprint" not in html, (
+            "old absence line 'no release data for this sprint' should not appear"
+        )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original)
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
