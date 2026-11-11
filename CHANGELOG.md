@@ -6,6 +6,14 @@ builds its section here from them (towncrier, Keep a Changelog). Entries still u
 
 <!-- towncrier release notes start -->
 
+## [0.7.0] - 2026-11-10
+
+### Added
+
+- The sprint page's "What changed" card now names the previous sprint in its heading ("What changed since Sprint N") and marks each moved measure as better or worse in words. Each line carries a plain sentence naming the measure and both numbers, the two values with their units, and a "better" or "worse" word for the six headline measures (stories delivered, points delivered, first-try rate, start to delivered, filed to delivered, days blocked). Stories superseded shows both numbers without a direction word. WIP violations no longer appear in the card. (mqucifer/crew-presentation#342)
+- The DORA card now shows 'no value yet' while the package carries no value for a measure, instead of a bare dash. When the dora object is absent or all its values are null, the card still displays all four measures with their units, each reading 'no value yet'. (mqucifer/crew-presentation#344)
+- The comparison card now shows only measures that moved; a measure equal to its prior or null on either side no longer gets a line, so unchanged measures no longer dilute the answer to 'is the crew getting better?'.
+
 ## [0.6.0] - 2026-11-10
 
 ### Added
