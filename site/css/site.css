@@ -459,6 +459,9 @@
     width: 100%;
     flex-wrap: wrap;
   }
+  .story-row .blocks {
+    flex-wrap: wrap;
+  }
   .attempt-row .attempt-status {
     width: 100%;
   }
