@@ -118,7 +118,7 @@ def _build_events_validators(events_schema):
         **events_schema,
         "properties": {
             **events_schema.get("properties", {}),
-            "events": {**orig_events, "items": {"type": "object"}, "title": "Events"},
+            "events": {**orig_events, "items": True, "title": "Events"},
         },
     }
     structural_validator = jsonschema.Draft202012Validator(structural_schema)
@@ -175,7 +175,10 @@ def _validate_events_file(
     if isinstance(events, list):
         for i, event in enumerate(events):
             if not isinstance(event, dict):
-                continue  # already caught by structural validation
+                errors.append(
+                    (["events", i], f"expected object, got {type(event).__name__}")
+                )
+                continue
             kind = event.get(kind_property)
             if kind not in branch_validators:
                 errors.append((["events", i, kind_property], f"unrecognized kind {kind!r}"))
@@ -215,6 +218,7 @@ def _validate_package(pkg: Path) -> None:
         for events_file in sorted(events_dir.glob("*.json")):
             data = _load_json(events_file)
             _validate_events_file(data, events_schema, f"events/{events_file.name}", validators=validators)
+            _events_file_cache[events_file.resolve()] = data.get("events", [])
 
 
 def _render_pages(pkg: Path) -> dict:
@@ -453,6 +457,14 @@ def _render_pages(pkg: Path) -> dict:
 
     story_journey_template = env.get_template("story_journey.html")
     all_events = _load_all_events(pkg, index)
+    # Index events by card so each card's lookup is O(1) instead of O(n).
+    card_events_index: dict[tuple, list[dict]] = {}
+    for e in all_events:
+        card_ref = e.get("card")
+        if card_ref:
+            card_events_index.setdefault(
+                (card_ref.get("number"), card_ref.get("repo")), []
+            ).append(e)
     for card in cards:
         repo = card.get("repo", "")
         number = card.get("number")
@@ -467,7 +479,8 @@ def _render_pages(pkg: Path) -> dict:
                 break
         # Load and format events for this card, omitting internal per-tool
         # and per-turn events that would make the timeline unreadable.
-        card_events = _filter_events_by_card(all_events, number, repo)
+        card_events = card_events_index.get((number, repo), [])
+        card_events.sort(key=lambda e: e.get("at", ""))
         event_dates = {e.get("at", "")[:10] for e in card_events if e.get("at")}
         include_date = len(event_dates) > 1
         formatted_events = []
