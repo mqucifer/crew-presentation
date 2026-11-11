@@ -1,0 +1,1 @@
+The comparison card now shows only measures that moved; a measure equal to its prior or null on either side no longer gets a line, so unchanged measures no longer dilute the answer to 'is the crew getting better?'.

@@ -10156,6 +10156,101 @@ def test_changed_from_metrics_null_on_one_side_omits_line():
         shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
 
 
+def test_changed_from_metrics_equal_values_no_line():
+    """AC1: when a measure is equal to its prior (e.g. blocked_aging_days 0 on both sides),
+    that line is absent from the comparison card.
+    """
+    tag = "delivery-history-TEST"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 5,
+            "blocked_aging_days": 0,
+            "superseded_count": 0,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "prior": {
+                "throughput": 3,
+                "blocked_aging_days": 0,
+                "superseded_count": 0,
+            },
+        }
+    }
+    _make_fake_package(tag, sprint_names=["Sprint 5", "Sprint 6"], metrics=metrics)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        section_match = re.search(
+            r'<section class="card changed-trend".*?</section>',
+            html,
+            re.DOTALL,
+        )
+        assert section_match, "changed-trend section not found"
+        section_html = section_match.group(0)
+        # AC1: blocked_aging_days equal on both sides — no line
+        assert "Days blocked" not in section_html, (
+            f"'Days blocked' (blocked_aging_days equal on both sides) should not appear: {section_html!r}"
+        )
+        # AC1: superseded_count equal on both sides — no line
+        assert "Stories superseded" not in section_html, (
+            f"'Stories superseded' (superseded_count equal on both sides) should not appear: {section_html!r}"
+        )
+        # The changed measure (throughput 3→5) still appears
+        assert "Stories delivered" in section_html, (
+            f"'Stories delivered' (throughput changed) should appear: {section_html!r}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
+def test_changed_from_metrics_all_equal_or_null_no_card():
+    """AC3: when every measure is either equal to its prior or null on at least one side,
+    the 'What changed since' card does not appear at all.
+    """
+    tag = "delivery-history-TEST"
+    metrics = {
+        "Sprint 6": {
+            "throughput": 5,
+            "points_delivered": 10,
+            "first_attempt_rate_percent": 60,
+            "cycle_time_minutes": 300,
+            "lead_time_minutes": 500,
+            "blocked_aging_days": 0,
+            "superseded_count": 0,
+            "first_attempt_numerator": 3,
+            "first_attempt_denominator": 5,
+            "prior": {
+                "throughput": 5,
+                "points_delivered": 10,
+                "first_attempt_rate_percent": 60,
+                "cycle_time_minutes": 300,
+                "lead_time_minutes": 500,
+                "blocked_aging_days": 0,
+                "superseded_count": 0,
+            },
+        }
+    }
+    _make_fake_package(tag, sprint_names=["Sprint 5", "Sprint 6"], metrics=metrics)
+    original = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+    try:
+        _build()
+        html = (BUILD_DIR / "sprint-6.html").read_text()
+        # AC3: no 'What changed' card at all
+        assert "changed-trend" not in html, (
+            "changed-trend element found when all measures are equal to prior"
+        )
+        # The totals card still renders in full
+        assert 'aria-label="Sprint totals"' in html, (
+            "Sprint totals section not found"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original)
+        shutil.rmtree(PACKAGE_DIR / tag, ignore_errors=True)
+
+
 def test_changed_from_analysis_preserved():
     """AC5: analysis.sprints has a changed list with measure, previous, now.
 
