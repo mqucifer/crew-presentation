@@ -486,6 +486,122 @@ def test_build_succeeds_on_well_formed_major_4_package():
         shutil.rmtree(pkg_dir, ignore_errors=True)
 
 
+def test_build_succeeds_when_sprint_events_file_absent():
+    """AC2: a sprint whose events file is absent from the package directory renders its page without error."""
+    tag = "delivery-history-TEST-NOEVENTS"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-11-06"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+    (pkg_dir / "events.schema.json").write_text(json.dumps({"type": "object"}))
+
+    index = {
+        "package": "delivery-history",
+        "schema_version": "3.0.0",
+        "date": "2026-11-06",
+        "timezone": "America/Chicago",
+        "crew_repository": "crew",
+        "repositories": ["crew-presentation"],
+        "sprints": [
+            {"name": "Sprint 1", "start": "2026-11-06", "end": "2026-11-06"}
+        ],
+        "cards": [
+            {
+                "repo": "crew-presentation",
+                "number": 1,
+                "type": "Story",
+                "title": "A test story",
+                "url": "https://github.com/mqucifer/crew-presentation/issues/1",
+                "parent": None,
+                "points": 1,
+                "sprint": "Sprint 1",
+                "status": "Done",
+                "status_set": "2026-11-06T12:00:00Z",
+                "created": "2026-11-06T09:00:00Z",
+                "closed": "2026-11-06T12:00:00Z",
+                "technical": False,
+                "closed_as": "completed",
+                "superseded_because": None,
+            }
+        ],
+        "periods": [
+            {
+                "sprint": "Sprint 1",
+                "start": "2026-11-06",
+                "end": "2026-11-06",
+                "file": "events/2026-11-06.json",
+                "events": 0,
+            }
+        ],
+        "sprint_metrics": {
+            "release": "3.0.0",
+            "answers": {
+                "Sprint 1": {
+                    "cycle_time_days": 0,
+                    "lead_time_days": 0,
+                    "throughput": 0,
+                    "wip_violations": 0,
+                    "blocked_aging_days": 0,
+                    "escalation_rate_percent": 0,
+                    "points_delivered": 0,
+                    "first_attempt_numerator": 0,
+                    "first_attempt_denominator": 0,
+                    "escalation_count": 0,
+                    "superseded_count": 0,
+                    "superseded_points": 0,
+                    "first_attempt_rate_percent": None,
+                    "failure_breakdown": [],
+                    "top_failure_causes": {},
+                    "superseded_breakdown": None,
+                    "flags": None,
+                    "prior": None,
+                    "delta": None,
+                    "cycle_time_minutes": 0,
+                    "lead_time_minutes": 0,
+                }
+            },
+        },
+    }
+    (pkg_dir / "delivery-history.json").write_text(json.dumps(index))
+
+    # Note: the events directory and file are intentionally NOT created.
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"build.py should succeed when a sprint's events file is absent:\n"
+            f"{result.stdout}\n{result.stderr}"
+        )
+        build_dir = REPO_ROOT / "build"
+        page_path = build_dir / "sprint-1.html"
+        assert page_path.is_file(), (
+            "sprint-overview page not written when events file is absent"
+        )
+        page = page_path.read_text()
+        assert 'id="sent-back-h"' in page, "'Sent back' card heading not found"
+        assert 'id="left-open-h"' in page, "'Left open' card heading not found"
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
 def test_build_fails_on_unsupported_major_version():
     """AC2: build.py exits non-zero and names the major version as unsupported."""
     tag = "delivery-history-TEST"
