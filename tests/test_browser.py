@@ -11533,6 +11533,25 @@ def test_epic_groups_no_clipping_at_phone_and_desktop_width():
         "achieved_goals": None,
     }
     dh_path.write_text(json.dumps(dh))
+    # Add 8 attempt events for sprint-metrics#128 so its story row carries 9
+    # blocks (8 missed + 1 landed), which at 40px each in an un-wrapping flex
+    # row overflows the 375px viewport without flex-wrap on .story-row .blocks.
+    events_path = pkg_dir / "events" / "2026-09-25.json"
+    events_data = json.loads(events_path.read_text())
+    for i in range(8):
+        events_data["events"].append(
+            {
+                "kind": "attempt",
+                "at": f"2026-09-26T02:0{i + 3}:00Z",
+                "card": {"repo": "sprint-metrics", "number": 128},
+                "role": "Developer",
+                "number": i + 1,
+                "failure_class": "VERIFY",
+                "decision": "retry_local",
+                "reason": None,
+            }
+        )
+    events_path.write_text(json.dumps(events_data))
     original = DELIVERY_HISTORY_TAG.read_text()
     DELIVERY_HISTORY_TAG.write_text(tag + "\n")
     try:
