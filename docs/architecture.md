@@ -179,11 +179,10 @@ validated against the schema the package carries.
   reshapes it to a list of `{class, role, count}`, the same list-of-objects
   shape `failure_breakdown` already uses in 1.x. `_normalize_failure_causes`
   in `build.py` reads the 1.x map via `items()` and reads a list item's
-  `reason`/`cause` field, flagging each such entry `recorded=False`; a 2.0.0
-  entry that carries a `class` is read by that field and flagged
-  `recorded=True`. `_build_failure_causes` shows a recorded class as-is and
-  maps every other reason through `CAUSE_LABELS` (the old reason-code map),
-  rendering an unknown code or a missing reason as "Cause not recorded".
+  `reason`/`cause` field or its `class` field; every entry is looked up in
+  `CAUSE_LABELS` (which holds both the 1.x reason codes and the 2.0.0 failure
+  classes, each mapped to a plain sentence), rendering an unknown code or a
+  missing reason as "Cause not recorded".
 - Stop reading the removed escalation fields. 2.0.0 removes
   `escalation_count` and `escalation_rate_percent` from each answer and its
   `prior`, `delta` and `flags`, and drops `escalation_count` as a measure from
