@@ -94,21 +94,19 @@ def _check_schema_version(manifest: dict) -> None:
         sys.exit(1)
 
 
-def _validate_events_file(data, events_schema, file_label: str) -> None:
-    """Validate an events file, using the schema's discriminator to pick the right oneOf branch.
+def _build_events_validators(events_schema):
+    """Build the structural and per-branch validators for events files.
 
-    Without this, every event is checked against every oneOf branch (18× per
-    event on the pinned package), which is the dominant cost of validation.
+    Returns (structural_validator, branch_validators) where branch_validators
+    is a dict mapping kind to its validator, or (None, None) if the schema has
+    no discriminator (the caller then falls back to full oneOf validation).
     """
     items_schema = events_schema.get("properties", {}).get("events", {}).get("items", {})
     discriminator = items_schema.get("discriminator")
 
     if not discriminator:
-        # No discriminator: fall back to full oneOf validation.
-        _validate_against_schema(data, events_schema, file_label)
-        return
+        return None, None
 
-    kind_property = discriminator.get("propertyName", "kind")
     kind_to_ref = discriminator.get("mapping", {})
 
     # Build a structural schema: same top-level constraints, but events.items
@@ -123,25 +121,58 @@ def _validate_events_file(data, events_schema, file_label: str) -> None:
             "events": {**orig_events, "items": {"type": "object"}, "title": "Events"},
         },
     }
+    structural_validator = jsonschema.Draft202012Validator(structural_schema)
+
+    branch_validators = {}
+    for kind, ref in kind_to_ref.items():
+        branch_schema = {
+            "$defs": events_schema.get("$defs", {}),
+            "$ref": ref,
+        }
+        branch_validators[kind] = jsonschema.Draft202012Validator(branch_schema)
+
+    return structural_validator, branch_validators
+
+
+def _validate_events_file(
+    data,
+    events_schema,
+    file_label: str,
+    *,
+    validators: tuple | None = None,
+) -> None:
+    """Validate an events file, using the schema's discriminator to pick the right oneOf branch.
+
+    Without this, every event is checked against every oneOf branch (18× per
+    event on the pinned package), which is the dominant cost of validation.
+    """
+    if validators is None:
+        validators = _build_events_validators(events_schema)
+
+    structural_validator, branch_validators = validators
+
+    if structural_validator is None:
+        # No discriminator: fall back to full oneOf validation.
+        _validate_against_schema(data, events_schema, file_label)
+        return
+
+    kind_property = (
+        events_schema.get("properties", {})
+        .get("events", {})
+        .get("items", {})
+        .get("discriminator", {})
+        .get("propertyName", "kind")
+    )
 
     errors: list[tuple[list, str]] = []
 
     # Pass 1: top-level structure (required fields, types, events is a list of objects).
-    structural_validator = jsonschema.Draft202012Validator(structural_schema)
     for err in structural_validator.iter_errors(data):
         errors.append((list(err.path), err.message))
 
     # Pass 2: each event against its specific oneOf branch, chosen by kind.
     events = data.get("events")
     if isinstance(events, list):
-        branch_validators = {}
-        for kind, ref in kind_to_ref.items():
-            branch_schema = {
-                "$defs": events_schema.get("$defs", {}),
-                "$ref": ref,
-            }
-            branch_validators[kind] = jsonschema.Draft202012Validator(branch_schema)
-
         for i, event in enumerate(events):
             if not isinstance(event, dict):
                 continue  # already caught by structural validation
@@ -180,9 +211,10 @@ def _validate_package(pkg: Path) -> None:
 
     events_dir = pkg / "events"
     if events_dir.is_dir():
+        validators = _build_events_validators(events_schema)
         for events_file in sorted(events_dir.glob("*.json")):
             data = _load_json(events_file)
-            _validate_events_file(data, events_schema, f"events/{events_file.name}")
+            _validate_events_file(data, events_schema, f"events/{events_file.name}", validators=validators)
 
 
 def _render_pages(pkg: Path) -> dict:

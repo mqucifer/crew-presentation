@@ -816,6 +816,130 @@ def test_events_file_read_at_most_once():
         )
 
 
+def test_events_validators_created_once():
+    """AC1: events-file validation must not create a fresh set of validators for every file.
+
+    Creating a Draft202012Validator per branch per events file multiplies the
+    cost linearly with the number of events files. With delivery-history-
+    2026-11-11's larger package, this pushes the build past its 20-second bound.
+    The fix hoists validator creation out of the per-file loop, so the count
+    is independent of how many events files the package carries.
+    """
+    tag = "delivery-history-TEST-VALIDATORS"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-11-06"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(json.dumps({"type": "object"}))
+
+    # Events schema with a discriminator mapping to two branches.
+    events_schema = {
+        "type": "object",
+        "required": ["events"],
+        "properties": {
+            "events": {
+                "type": "array",
+                "items": {
+                    "discriminator": {
+                        "propertyName": "kind",
+                        "mapping": {
+                            "card_moved": "#/$defs/CardMoved",
+                            "sent_back": "#/$defs/SentBack",
+                        },
+                    },
+                    "oneOf": [{"$ref": "#/$defs/CardMoved"}, {"$ref": "#/$defs/SentBack"}],
+                },
+            }
+        },
+        "$defs": {
+            "CardMoved": {
+                "type": "object",
+                "required": ["kind", "at"],
+                "properties": {
+                    "kind": {"const": "card_moved"},
+                    "at": {"type": "string"},
+                },
+            },
+            "SentBack": {
+                "type": "object",
+                "required": ["kind", "at"],
+                "properties": {
+                    "kind": {"const": "sent_back"},
+                    "at": {"type": "string"},
+                },
+            },
+        },
+    }
+    (pkg_dir / "events.schema.json").write_text(json.dumps(events_schema))
+    (pkg_dir / "delivery-history.json").write_text(json.dumps({"sprints": [], "cards": []}))
+
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir(parents=True, exist_ok=True)
+    # Three well-formed events files.
+    for date in ("2026-11-06", "2026-11-07", "2026-11-08"):
+        (events_dir / f"{date}.json").write_text(
+            json.dumps(
+                {
+                    "events": [
+                        {
+                            "kind": "card_moved",
+                            "at": f"{date}T09:00:00Z",
+                            "card": {"repo": "crew-presentation", "number": 1},
+                            "from_column": "Inbox (Goals)",
+                            "to_column": "Sprint Backlog",
+                        }
+                    ]
+                }
+            )
+        )
+
+    # Import build.py and instrument Draft202012Validator to count
+    # instantiations.
+    spec = importlib.util.spec_from_file_location(
+        "build_validators_test", REPO_ROOT / "build.py"
+    )
+    build_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(build_mod)
+
+    validator_counts = []
+    original_validator = jsonschema.Draft202012Validator
+
+    def counting_validator(*args, **kwargs):
+        validator_counts.append(1)
+        return original_validator(*args, **kwargs)
+
+    jsonschema.Draft202012Validator = counting_validator
+    try:
+        build_mod._validate_package(pkg_dir)
+    finally:
+        jsonschema.Draft202012Validator = original_validator
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+    # The events schema has 2 branches, so the events path needs at most
+    # 1 structural + 2 branch = 3 validators, created once and reused across
+    # all events files. _validate_against_schema creates 1 each for the
+    # manifest and the index = 2. The total must be at most 5, independent
+    # of the number of events files.
+    #
+    # Without the fix, each events file creates its own structural validator
+    # plus one per branch: 3 files × (1 + 2) = 9, plus the 2 for manifest
+    # and index = 11.
+    assert len(validator_counts) <= 5, (
+        f"Draft202012Validator was instantiated {len(validator_counts)} times; "
+        "the expected count is at most 5 (2 for manifest and index, plus 3 "
+        "for the events branches), independent of the number of events files. "
+        "Creating validators per file multiplies the cost linearly and pushes "
+        "the build past its 20-second bound with a large enough package."
+    )
+
+
 def test_build_fails_on_unsupported_major_version():
     """AC2: build.py exits non-zero and names the major version as unsupported."""
     tag = "delivery-history-TEST"
@@ -1313,6 +1437,98 @@ def test_build_fails_on_non_conforming_events_file():
         )
         assert "does not conform" in output, (
             f"output should say the file does not conform: {output}"
+        )
+    finally:
+        DELIVERY_HISTORY_TAG.write_text(original_tag)
+        shutil.rmtree(pkg_dir, ignore_errors=True)
+
+
+def test_build_fails_on_unrecognized_event_kind():
+    """AC2: build.py exits non-zero and names the unrecognized kind when an event's
+    kind value is absent from the schema's discriminator mapping."""
+    tag = "delivery-history-TEST-UNRECOGNIZED"
+    pkg_dir = PACKAGE_DIR / tag
+    pkg_dir.mkdir(parents=True, exist_ok=True)
+
+    (pkg_dir / "manifest.json").write_text(
+        json.dumps(
+            {"schema_version": "3.0.0", "package": "delivery-history", "date": "2026-01-01"}
+        )
+    )
+    (pkg_dir / "manifest.schema.json").write_text(
+        json.dumps({"type": "object", "required": ["schema_version"]})
+    )
+    (pkg_dir / "schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "required": ["sprints"],
+                "properties": {"sprints": {"type": "array"}},
+            }
+        )
+    )
+    # Events schema with a discriminator: only "card_moved" is in the mapping.
+    events_schema = {
+        "type": "object",
+        "required": ["events"],
+        "properties": {
+            "events": {
+                "type": "array",
+                "items": {
+                    "discriminator": {
+                        "propertyName": "kind",
+                        "mapping": {"card_moved": "#/$defs/CardMoved"},
+                    },
+                    "oneOf": [{"$ref": "#/$defs/CardMoved"}],
+                },
+            }
+        },
+        "$defs": {
+            "CardMoved": {
+                "type": "object",
+                "required": ["kind", "at"],
+                "properties": {
+                    "kind": {"const": "card_moved"},
+                    "at": {"type": "string"},
+                },
+            }
+        },
+    }
+    (pkg_dir / "events.schema.json").write_text(json.dumps(events_schema))
+    (pkg_dir / "delivery-history.json").write_text(
+        json.dumps({"sprints": [], "cards": []})
+    )
+
+    # An events file whose event has a kind not present in the discriminator mapping.
+    events_dir = pkg_dir / "events"
+    events_dir.mkdir()
+    (events_dir / "2026-01-01.json").write_text(
+        json.dumps(
+            {
+                "events": [
+                    {"kind": "nonexistent_kind", "at": "2026-01-01T09:00:00Z"},
+                ],
+            }
+        )
+    )
+
+    original_tag = DELIVERY_HISTORY_TAG.read_text()
+    DELIVERY_HISTORY_TAG.write_text(tag + "\n")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "build.py"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        assert result.returncode == 1, (
+            f"build.py should exit 1 for an unrecognized kind, "
+            f"got {result.returncode}\n{result.stdout}\n{result.stderr}"
+        )
+        assert "unrecognized kind" in result.stderr, (
+            f"stderr should contain 'unrecognized kind': {result.stderr}"
         )
     finally:
         DELIVERY_HISTORY_TAG.write_text(original_tag)
