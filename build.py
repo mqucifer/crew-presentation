@@ -39,6 +39,10 @@ _EXCLUDED_MEASURES = frozenset({
     "crew_fixes_merged",
 })
 
+# Cache of parsed events files, keyed by resolved path. Each file is read and
+# JSON-parsed once; subsequent calls return the cached list.
+_events_file_cache: dict[Path, list[dict]] = {}
+
 
 def _package_dir() -> Path:
     """Locate the package directory under ./.package/ named by delivery-history.tag."""
@@ -1505,8 +1509,10 @@ def _load_sprint_events(pkg: Path, sprint_name: str, index: dict) -> list[dict]:
         if period.get("sprint") == sprint_name:
             events_file = pkg / period["file"]
             if events_file.is_file():
-                data = _load_json(events_file)
-                return data.get("events", [])
+                key = events_file.resolve()
+                if key not in _events_file_cache:
+                    _events_file_cache[key] = _load_json(events_file).get("events", [])
+                return _events_file_cache[key]
     return []
 
 
@@ -1517,8 +1523,10 @@ def _load_all_events(pkg: Path, index: dict) -> list[dict]:
     for period in periods:
         events_file = pkg / period["file"]
         if events_file.is_file():
-            data = _load_json(events_file)
-            events.extend(data.get("events", []))
+            key = events_file.resolve()
+            if key not in _events_file_cache:
+                _events_file_cache[key] = _load_json(events_file).get("events", [])
+            events.extend(_events_file_cache[key])
     return events
 
 
