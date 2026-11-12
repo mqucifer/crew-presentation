@@ -1,15 +1,16 @@
 # crew-presentation - architecture
 
-The system as it is in the code, on 2026-10-28.
+The system as it is in the code, on 2026-11-12.
 
 Crew Presentation is a static site on GitHub Pages that shows how the crew
-works: one page per sprint, one page per story card, and a page for a
-sprint's events. There is no server and no backend. All of the data it shows
-arrives as a **delivery-history package** the crew releases; the site
-validates it against the schema the package itself carries, renders the
-pages, and is published to Pages when a merge names a new package. The
-repository keeps no copy of the crew's data or of any schema, and the site
-shows what its package says - it computes no metric itself.
+works: one page per sprint, one page per story card behind an index of every
+card, and a replay page for a sprint's events. There is no server and no
+backend. All of the data it shows arrives as a **delivery-history package**
+the crew releases; the site validates it against the schema the package
+itself carries, renders the pages, and is published to Pages when a merge
+names a new package. The repository keeps no copy of the crew's data or of
+any schema, and the site shows what its package says - it computes no metric
+itself.
 
 ## Context
 
@@ -65,13 +66,13 @@ C4Container
 
     System_Boundary(boundary, "Crew Presentation - this repository") {
         Container(actions, "GitHub Actions", "workflows: checks.yml, deploy.yml", "checks.yml gates every pull request, in the project's sandbox image; deploy.yml builds and publishes after a merge that names a new package, asserting the published pages answer 200")
-        Container(setup, "tools/setup.py", "Python", "The only code that touches the network: installs the pinned dependencies, downloads the package named by delivery-history.tag and the design-system CSS at the pinned tag into .package/")
+        Container(setup, "tools/setup.py", "Python", "The only code that touches the network: installs the pinned dependencies, downloads the package named by delivery-history.tag and the design-system CSS at the pinned tag into .package/, retrying a transient download failure a bounded number of times")
         Container(pkg, "The delivery-history package", "JSON data and its schemas", "Fetched into .package/ by setup; named by the one line in delivery-history.tag; holds the sprints, the cards, per-day events, the sprint-metrics answers and the schemas the site validates against")
-        Container(buildpy, "build.py", "Python, jinja2, jsonschema", "Validates every data file against the schema the package carries, refuses a schema major version outside SUPPORTED_MAJOR_VERSIONS, renders every page from site/templates, and assembles the static site in build/")
+        Container(buildpy, "build.py", "Python, jinja2, jsonschema", "Validates every data file against the schema the package carries, refuses a schema major version outside SUPPORTED_MAJOR_VERSIONS, renders every page from site/templates, copies site/css and site/js, and assembles the static site in build/")
         Container(templates, "site/templates", "Jinja2", "base.html, the shared layout that links the design-system stylesheet at its pinned jsDelivr URL and the site's own CSS, plus sprint_overview.html, story_journey.html and replay.html")
         Container(checks, "The checks", "Python, pytest, playwright 1.52.0", "test_contracts.py validates the package and its schema major version; test_browser.py drives the built pages in Chromium, serving the design-system CSS from .package/; test_tokens.py runs the site's own contrast and token rules (tools/token_check.py)")
         Container(designcss, "The design-system CSS at its pinned tag", "CSS", "The tag lives in site/css/design-system.version; the same file is fetched by setup into .package/ for the checks and linked by every page at read time")
-        Container(sitepages, "The deployed site", "Static HTML, CSS and JavaScript", "What deploy.yml publishes: one page per sprint, one page per story card, the replay page, a root page that redirects to the newest sprint, site/css/site.css and site/js/replay.js")
+        Container(sitepages, "The deployed site", "Static HTML, CSS and JavaScript", "What deploy.yml publishes: one page per sprint, a story-journey index and one page per story card, the replay page, a root page that redirects to the newest sprint, site/css/site.css and site/js/replay.js")
     }
 
     Rel(crew, setup, "the release asset: a tarball at the tag delivery-history.tag names")
@@ -95,33 +96,50 @@ C4Container
 
 ## The deployed site, in detail
 
-The three views all extend one shared layout. The build renders the opening
-state of the board into the replay page and embeds the sprint's events and
-cards as JSON; the player that would animate them is not built yet.
+The three views all extend one shared layout, which opens every page with
+the "What this is" orientation, before any measure. The build renders the
+opening state of the board into the replay page and embeds the sprint's
+events and cards as JSON for the player.
 
 ```mermaid
 C4Component
-    title The deployed site - what the browser loads
+    title Crew Presentation - the deployed site, as built on 2026-11-12
 
-    Container(site, "The deployed site", "Static HTML, CSS and JavaScript on GitHub Pages", "Built from the delivery-history package the tag names")
+    Container(buildpy, "build.py", "Python, jinja2, jsonschema", "Validates the package against the schema it carries, refuses a schema major version outside SUPPORTED_MAJOR_VERSIONS (today 1, 2, 3, 4), renders every page from site/templates, and copies site/css and site/js into build/")
+    Container(pkg, "The delivery-history package", "JSON data and its schemas", "Pinned by delivery-history.tag, now delivery-history-2026-11-11 (schema 4.0.0, sprint-metrics release 4.5.0): 48 sprints, the cards, the per-day events (71,142 of them, by the manifest) and sprint-metrics' answers, with prior embedded. The 4.x answer fields (working time, model time and its planning/building split, idle, DORA values, per-story session times) carry values in most sprints and are null in a few")
+    Container(designcss, "The design-system CSS at its pinned tag", "CSS", "The look of the site (v0.1.0), served by jsDelivr at read time")
 
-    Component(base, "base.html, the shared layout", "Jinja2, rendered at build time", "Header and navigation between the three views, the theme, the design-system stylesheet link at its pinned jsDelivr URL, and the site's own CSS")
-    Component(overview, "The sprint overview pages", "HTML", "One per sprint: the sprint's totals, the sprint's stories story by story (the attempt chart when the package carries analysis, the stories grouped under their epics with each epic's done count and status otherwise), the measures that changed, why work did not land first time, and what the crew decided")
-    Component(journey, "The story journey pages", "HTML", "One per story card: the card's repository, number and title; the journey itself is not drawn yet")
-    Component(replay, "The replay page", "HTML with embedded JSON", "The sprint's board in its opening state, rendered at build time; the sprint's events and cards are embedded as JSON for the player")
+    Container(site, "The deployed site", "Static HTML, CSS and JavaScript on GitHub Pages", "One page per sprint, a story-journey index and one page per story card, the replay page, and a root page that redirects to the newest sprint")
+
+    Component(base, "base.html, the shared layout", "Jinja2", "The header, the top navigation between the views (Sprint, A story's journey, Replay, and 'About the crew', an in-page anchor to the orientation), the theme, the stylesheets, and the 'What this is' orientation section that opens every page before any measure, with no crew term left unexplained")
+    Component(overview, "The sprint overview pages", "HTML", "One page per sprint, rendered by build.py from the package; the existing sections (failure causes, 'Decided by the crew') stay as they are")
+    Component(headline, "Headline totals and how each measure moved", "HTML", "The sprint's five totals - stories delivered with points, landed first try with the share, start to delivered, filed to delivered, days blocked with what was superseded - every number carrying its unit, and, for each measure that moved, its two numbers with their units and, where the measure has a settled direction, a mark saying better or worse against the previous sprint, from the answer and its embedded prior")
+    Component(roster, "The 'What got done' roster card", "HTML", "The sprint's released epics and achieved Goals, from the answer's roster; says so explicitly when a kind has none")
+    Component(stories, "What got done, story by story", "HTML", "The sprint's stories grouped under their epics (cards' parent and repo), each with its number, title, attempt blocks, status, working time and model time and a line saying what happened to it; each epic's heading with its done count, times and status; when the package carries analysis, the delivered stories' attempt chart instead")
+    Component(rework, "Sent back, and left open at the end", "HTML", "Every send-back from the sprint's sent_back events - which step sent it, back to which, by which rule, when - with the sprint's count, and what was still open at the sprint's end: waiting, blocked and refused, each with how long it has been in that state")
+    Component(dora, "The 'How releases went' DORA card", "HTML", "DORA's four measures, each with its unit; 'no value yet' while the package carries no value for a measure")
+    Component(wheretime, "Where the time went", "HTML", "The model time split between planning and building as a proportion with both numbers in minutes, and the time with no session running against the sprint's total time; renders absent while the package's fields are null")
+    Component(journey, "The story journey pages", "HTML", "A story-journey.html index listing every card, plus one page per card under stories/: the card's repository, number and title, a path strip (refined, built, reviewed, QA, merged, with the stages reached marked), its event timeline, omitting the per-tool and per-turn internal events, and, when the package carries analysis cost data, its developer calls and wall clock")
+    Component(replay, "The replay page", "HTML with embedded JSON", "The sprint's board in its opening state, rendered at build time; the sprint's events and cards embedded as JSON for the player")
+    Component(js, "site/js/replay.js", "Vanilla JavaScript", "The replay player: play/pause, speed (1x, 30x, 60x), skip-idle, the timeline scrubber, the event ticker, the who's-working panel, and board-state animation driven by the embedded events")
     Component(root, "The root page, index.html", "HTML", "Written by the deploy workflow, not by the build: redirects to the newest sprint's page")
-    Component(css, "site/css/site.css", "CSS", "The site's own components: the stats row, the sprint grid, the attempt chart, the failure-cause bars, the board columns; design-system tokens only, no raw colours")
-    Component(js, "site/js/replay.js", "Vanilla JavaScript", "The replay player: play/pause, speed (1×, 30×, 60×), skip-idle, the timeline scrubber, the event ticker, the who's-working panel, and board-state animation driven by the embedded events")
+    Component(css, "site/css/site.css", "CSS", "The site's own components - the stats row, the sprint grid, the epic groups, the attempt blocks, the failure-cause bars, the DORA grid, the model-time and idle bars, the orientation block, the journey timeline - design-system tokens only")
 
-    System_Ext(designcss, "The design-system CSS", "Pinned at a tag in the site's code, served by jsDelivr")
-
+    Rel(pkg, buildpy, "the data: every file validated against the schema the package carries")
+    Rel(buildpy, site, "renders and assembles into build/, which the workflow publishes")
     Rel(overview, base, "extends")
     Rel(journey, base, "extends")
     Rel(replay, base, "extends")
-    Rel(base, css, "links the site's own CSS")
     Rel(base, designcss, "links its stylesheet at the pinned tag, via jsDelivr")
-    Rel(replay, js, "loads the replay player")
+    Rel(base, css, "links the site's own CSS")
     Rel(root, overview, "redirects to the newest sprint's page")
+    Rel(headline, overview, "is the page's totals and trend card")
+    Rel(roster, overview, "is the page's roster card")
+    Rel(stories, overview, "is the page's central card")
+    Rel(rework, overview, "is the page's friction card")
+    Rel(dora, overview, "is the page's DORA card")
+    Rel(wheretime, overview, "is the page's time card")
+    Rel(replay, js, "loads the replay player")
 ```
 
 ## How it is built and deployed
@@ -129,8 +147,9 @@ C4Component
 - `delivery-history.tag` is the one line that names the package. The crew
   releases a new package and opens a pull request here that changes that
   line; the repository keeps no copy of the data or of any schema.
-- `checks.yml` runs `tools/setup.py` and then the three checks in the
-  project's sandbox image. The pre-merge gate on the package is
+- `checks.yml` runs the setup and then the checks the project record names -
+  `test_contracts.py`, the build, `test_browser.py` and `test_tokens.py` -
+  in the project's sandbox image. The pre-merge gate on the package is
   `test_contracts.py` and `build.py`'s `SUPPORTED_MAJOR_VERSIONS`: a package
   on a schema major version the site cannot display fails its pull request,
   so the site never sees it.
@@ -149,65 +168,60 @@ C4Component
   pipeline: it moves the cards this repository's own board holds that no
   crew role moves, which the crew's recorded events - and so the site - see.
 
-## delivery-history 2.0.0 (announced 2026-10-29)
+## Where the build differs from the target
 
-The crew announced `delivery-history` 2.0.0 on 2026-10-29: it replaces 1.x on
-2026-11-06, whether this project has moved to it or not. This project pins
-`delivery-history-2026-10-29`, schema 1.11.0, in `delivery-history.tag`. The
-ruling below is against the crew's announced changelog for 2.0.0; the 2.0.0
-schemas and mock are not in this repository and the site has no network, so
-the field-shape rulings rest on that changelog, while the version-gate
-refusal is verifiable from this repository's own code.
+The diagram above starts from the Goal's target diagram and is corrected to
+what the code shows on 2026-11-12. The code differs from the target in these
+places:
 
-**The version gate now accepts schema major 3.** `SUPPORTED_MAJOR_VERSIONS` is
-`(1, 2, 3)` in `build.py`, and it keeps its own copy in `test_contracts.py`.
-`_check_schema_version` in `build.py` exits non-zero when the manifest's
-`schema_version` major is not in that set, and `test_contracts.py` carries the
-same gate. The contract tests pin the refusal: both
-`test_build_fails_on_unsupported_major_version` and
-`test_unsupported_major_version_fails_with_version` feed `schema_version`
-`"4.0.0"` and assert the build and the check fail, naming major 4. A 3.0.0
-package (schema major 3) passes the pre-merge gate; its fields are then
-validated against the schema the package carries.
-
-**What build.py must change to adopt 2.0.0:**
-
-- Support schema major 2: add `2` to `SUPPORTED_MAJOR_VERSIONS` in `build.py`
-  and mirror it in `test_contracts.py`.
-- Read `top_failure_causes` in both shapes. 1.x carries it as a map of
-  cause-code to count (for example `{"EDIT": 1, "VERIFY": 1}`); 2.0.0
-  reshapes it to a list of `{class, role, count}`, the same list-of-objects
-  shape `failure_breakdown` already uses in 1.x. `_normalize_failure_causes`
-  in `build.py` reads the 1.x map via `items()` and reads a list item's
-  `reason`/`cause` field or its `class` field; every entry is looked up in
-  `CAUSE_LABELS` (which holds both the 1.x reason codes and the 2.0.0 failure
-  classes, each mapped to a plain sentence), rendering an unknown code or a
-  missing reason as "Cause not recorded".
-- Stop reading the removed escalation fields. 2.0.0 removes
-  `escalation_count` and `escalation_rate_percent` from each answer and its
-  `prior`, `delta` and `flags`, and drops `escalation_count` as a measure from
-  the "what changed" list. `build.py` surfaces `escalation_count` in two
-  places that must stop reading it: the sprint stat
-  (`metrics.get("escalation_count")` in `_render_pages`, rendered as the
-  "escalations" stat in `site/templates/sprint_overview.html`) and the
-  `_changed_label` map (`"escalation_count": "escalations"`).
-  `escalation_rate_percent` is not surfaced by `build.py` today; it leaves the
-  contract with the rest.
-
-**What the site loses by staying on 1.11.0.** 1.11.0 carries
-sprint-metrics 1.3.1's answers; 2.0.0 carries 4.2.1's. A site that keeps its
-pin on 1.11.0 and does not adopt 2.0.0 does not display the 4.x measures the
-contract adds: the costs, rework, roster, working and idle time, and DORA
-measures. The crew's own escalation record is untouched by this: the
-`escalated` events and pattern, and each story's `escalations`, stay. Only
-sprint-metrics' `escalation_count` and `escalation_rate_percent` leave.
-
-## What is not there yet
-
-As of 2026-10-28 the code does not yet have:
-
-- The story's journey. The journey pages carry only the card's repository,
-  number and title.
+- **The pinned package.** The target names `delivery-history-2026-11-04`
+  (schema 3.0.0, sprint-metrics 4.2.1, 41 sprints, 58,170 events). The code's
+  `delivery-history.tag` pins `delivery-history-2026-11-11` instead: schema
+  4.0.0, sprint-metrics release 4.5.0, 48 sprints, and 71,142 events by the
+  manifest.
+- **The version gate.** The target says the gate refuses a schema major
+  version outside 1, 2, 3. The code's `SUPPORTED_MAJOR_VERSIONS` is
+  `(1, 2, 3, 4)` in both `build.py` and `test_contracts.py`; a 4.0.0 package
+  passes the gate, which is how the pinned package builds.
+- **The 4.x answer fields.** The target records them as null or empty in
+  every sprint, which was true of the package it named. In the pinned
+  `delivery-history-2026-11-11` package they carry values in most sprints
+  (working time, model time and its planning/building split, idle, DORA,
+  per-story session times), and are null in a few. `prior` is null for seven
+  of the 48 sprints, and the package carries no `analysis` section, so the
+  build takes its fallback paths: the epic-grouped story list from the
+  cards, "What changed" from the answer's embedded prior, and "Decided by
+  the crew" from events and cards.
+- **The orientation block.** The target draws "What this is" as its own
+  element that "opens the sprint page before any measure". The build has it
+  as a section of `base.html`, the shared layout: it opens every page
+  (sprint, journey and replay) before any measure, and the navigation's
+  "About the crew" item is an in-page anchor to that section, not a separate
+  view. The diagram folds it into the shared layout rather than carrying it
+  as a separate component.
+- **Two sprint-page cards the target's component list omits.** The "What got
+  done" roster card (the sprint's released epics and achieved Goals, from the
+  answer's roster) and the "How releases went" DORA card (DORA's four
+  measures, "no value yet" while the package carries no value for a
+  measure). Both predate the Goal; the diagram adds them as components.
+- **"What changed" lines.** The target says a line for each measure against
+  the previous sprint. The build gives a line only to a measure that moved
+  (one equal to its prior, or null on either side, gets none), and the
+  better/worse mark appears only where a measure has a settled direction -
+  the six headline measures; "Stories superseded" shows its two numbers
+  without a direction word.
+- **The journey pages carry more than the event timeline.** The target names
+  only "the card's repository, number and title and its event timeline".
+  Each card page also carries a path strip (refined, built, reviewed, QA,
+  merged, with the stages reached marked) and a "What it cost" block
+  (developer calls, wall clock) when the package carries analysis cost data,
+  and the timeline omits the per-tool and per-turn internal events. The view
+  also has an index page, `story-journey.html` (the navigation's "A story's
+  journey"), listing every card; the per-card pages live under `stories/`.
+- **The target's diagram omits the replay player.** The build ships
+  `site/js/replay.js`, which the replay page loads and which drives
+  play/pause, the speed control, skip-idle, the timeline scrubber, the event
+  ticker, the who's-working panel and the board animation.
 
 The boards in `docs/design/mock/` are the design reference to build to; they
 are not part of the system.
