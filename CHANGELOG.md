@@ -6,6 +6,16 @@ builds its section here from them (towncrier, Keep a Changelog). Entries still u
 
 <!-- towncrier release notes start -->
 
+## [0.7.1] - 2026-11-11
+
+### Fixed
+
+- Failure-cause rows on the sprint page now read as plain sentences (e.g. "Failed at review") instead of bare codes like `REVIEW`. (mqucifer/crew-presentation#384)
+- Build no longer re-reads and re-parses the same events file multiple times per sprint, which was pushing the build past its 20-second bound with larger packages. (mqucifer/crew-presentation#397)
+- Build no longer creates a fresh set of validators for every events file, which was pushing the build past its 20-second bound with larger packages. (mqucifer/crew-presentation#399)
+- Story rows with nine or more attempt blocks no longer overflow horizontally at phone width: the blocks row now wraps at the 767px breakpoint. (mqucifer/crew-presentation#403)
+- The full build no longer overruns the checks' time budget against the pinned delivery-history package; it now indexes events by card up front and caches parsed events, cutting the build well under the 20-second bound. (mqucifer/crew-presentation#408)
+
 ## [0.7.0] - 2026-11-10
 
 ### Added
