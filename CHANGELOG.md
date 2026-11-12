@@ -6,6 +6,13 @@ builds its section here from them (towncrier, Keep a Changelog). Entries still u
 
 <!-- towncrier release notes start -->
 
+## [0.7.2] - 2026-11-12
+
+### Fixed
+
+- Story rows with nine or more attempt blocks no longer overflow horizontally at phone width: the blocks row now wraps at the 767px breakpoint.
+  A story whose badge reads "Done" but which is not counted in the sprint's delivered roster no longer shows "not delivered" in its time cell or "Not delivered yet." in its happened line; the row now reads consistently as done but not counted in this sprint. (mqucifer/crew-presentation#403)
+
 ## [0.7.1] - 2026-11-11
 
 ### Fixed
